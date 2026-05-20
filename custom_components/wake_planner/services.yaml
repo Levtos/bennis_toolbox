@@ -1,0 +1,70 @@
+skip_next:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+set_override:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    wake_time:
+      required: true
+      selector:
+        time:
+    until:
+      required: false
+      selector:
+        date:
+clear_override:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+add_person:
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    person_entity_id:
+      required: false
+      selector:
+        entity:
+          domain: person
+    entry_id:
+      required: false
+      selector:
+        text:
+remove_person:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+set_rules:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    rules:
+      required: true
+      selector:
+        object:
+set_special_rules:
+  fields:
+    holiday_behavior:
+      required: false
+      selector:
+        select:
+          options:
+            - skip
+            - weekend_profile
+    manual_holiday_dates:
+      required: false
+      selector:
+        text:

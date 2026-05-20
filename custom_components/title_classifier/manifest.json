@@ -1,0 +1,12 @@
+{
+  "domain": "title_classifier",
+  "name": "Title Classifier",
+  "codeowners": ["@Levtos"],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/Levtos/bennis_toolbox",
+  "issue_tracker": "https://github.com/Levtos/bennis_toolbox/issues",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "0.1.0"
+}

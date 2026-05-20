@@ -1,0 +1,12 @@
+{
+  "domain": "wake_planner",
+  "name": "Wake Planner",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/Levtos/wake-planner",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@Levtos"],
+  "iot_class": "local_push",
+  "hacs": "1.0.0"
+}

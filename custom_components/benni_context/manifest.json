@@ -1,0 +1,12 @@
+{
+  "domain": "benni_context",
+  "name": "Benni Context",
+  "version": "0.1.0",
+  "documentation": "https://github.com/benni/benni_context",
+  "issue_tracker": "https://github.com/benni/benni_context/issues",
+  "codeowners": ["@benni"],
+  "config_flow": true,
+  "dependencies": [],
+  "iot_class": "local_push",
+  "requirements": []
+}

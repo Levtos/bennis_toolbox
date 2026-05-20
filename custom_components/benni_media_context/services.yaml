@@ -1,0 +1,34 @@
+force_recalculate:
+  name: Force Recalculate
+  description: Force a recalculation of the media context.
+
+set_manual_nudge:
+  name: Set Manual Nudge
+  description: Override the subcontext until cleared.
+  fields:
+    subcontext:
+      name: Subcontext
+      description: Target subcontext (e.g. streaming_netflix).
+      required: true
+      example: streaming_netflix
+      selector:
+        text:
+
+clear_manual_nudge:
+  name: Clear Manual Nudge
+  description: Clear any active manual subcontext override.
+
+start_radio:
+  name: Start Radio
+  description: Fire an event requesting radio start.
+  fields:
+    station:
+      name: Station
+      description: Optional station identifier.
+      required: false
+      selector:
+        text:
+
+stop_media:
+  name: Stop Media
+  description: Fire an event requesting media stop.

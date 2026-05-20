@@ -1,0 +1,62 @@
+route:
+  name: Route notification
+  description: Route a notification through the Benni Notification Router.
+  fields:
+    event_type:
+      name: Event type
+      description: Event class.
+      required: true
+      example: doorbell
+      selector:
+        select:
+          options:
+            - doorbell
+            - security
+            - appliance_done
+            - device_health
+            - lock
+            - climate
+            - media
+            - info
+    severity:
+      name: Severity
+      description: Severity level.
+      required: false
+      default: normal
+      selector:
+        select:
+          options: [info, normal, urgent, critical]
+    title:
+      name: Title
+      example: "Türklingel"
+      selector: {text: {}}
+    message:
+      name: Message
+      example: "Jemand steht vor der Tür"
+      selector: {text: {multiline: true}}
+    payload:
+      name: Payload
+      description: Extra structured payload forwarded to the routed event.
+      selector: {object: {}}
+    dedupe_key:
+      name: Dedupe key
+      description: Optional key used to suppress duplicate events.
+      selector: {text: {}}
+
+clear:
+  name: Clear router state
+  description: Clear all or one deduplication entry.
+  fields:
+    dedupe_key:
+      name: Dedupe key
+      selector: {text: {}}
+
+set_dnd:
+  name: Set Do-Not-Disturb override
+  description: Activate DND for a duration (seconds). 0 disables.
+  fields:
+    duration:
+      name: Duration (s)
+      default: 0
+      selector:
+        number: {min: 0, max: 86400, mode: box, unit_of_measurement: s}

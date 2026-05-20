@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Stash Player">
+  <rect width="128" height="128" rx="24" fill="#111827"/>
+  <path d="M32 40h64v48H32z" fill="#22c55e"/>
+  <path d="M56 52l24 12-24 12z" fill="#0b1220"/>
+  <circle cx="96" cy="32" r="8" fill="#38bdf8"/>
+</svg>

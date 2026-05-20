@@ -1,0 +1,262 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Media Art Wrapper — Player",
+        "description": "Select the media player to wrap and choose how its content should be categorised.",
+        "data": {
+          "entity_kind": "Integration type",
+          "source_entity_id": "Media player",
+          "display_name": "Display name",
+          "category": "Content category"
+        },
+        "data_description": {
+          "entity_kind": "Choose whether to create a wrapper player, a combined player, or both.",
+          "source_entity_id": "The media player entity whose artwork will be resolved. Required for wrapper types.",
+          "display_name": "Friendly name shown in Home Assistant. Leave blank to use the player name.",
+          "category": "Determines which artwork providers are used. Choose Auto to try all providers."
+        }
+      },
+      "artwork": {
+        "title": "Media Art Wrapper — Artwork",
+        "description": "Configure the artwork image dimensions, fallback behaviour, and optional API keys.",
+        "data": {
+          "ratio": "Aspect ratio",
+          "artwork_width": "Custom width (px)",
+          "artwork_height": "Custom height (px)",
+          "fallback_mode": "Fallback when no artwork is found",
+          "fallback_custom_url": "Custom fallback image URL",
+          "tmdb_api_key": "TMDb API key (streaming)",
+          "igdb_client_id": "IGDB Client ID (gaming)",
+          "igdb_client_secret": "IGDB Client Secret (gaming)",
+          "steamgriddb_api_key": "SteamGridDB API key (optional, gaming)",
+          "fanart_api_key": "Fanart.tv API key (optional, TV)",
+          "porndb_api_key": "PornDB API key (optional, theporndb.net)",
+          "aebn_api_key": "AEBN API key (optional)",
+          "epg_sensor": "EPG sensor (optional, catch-all)",
+          "epg_sensor_map": "Per-channel EPG sensor (one line: channel=sensor.id)",
+          "epg_full_lookup_channels": "EPG channels with full lookup",
+          "maw_sensor_tv_input": "Sensor: active TV source (§2.3)",
+          "maw_sensor_discord_game": "Sensor: Discord game (§2.3)",
+          "maw_sensor_stash_active": "Sensor: Stash active (§2.3, optional)"
+        },
+        "data_description": {
+          "ratio": "Preset dimensions for the artwork image. Choose Custom to enter exact pixel values.",
+          "artwork_width": "Only used when Custom is selected above.",
+          "artwork_height": "Only used when Custom is selected above.",
+          "fallback_mode": "What to show when no artwork can be found for the current track.",
+          "fallback_custom_url": "Full URL to an image shown when no artwork is found. Only used when Custom URL is selected above.",
+          "tmdb_api_key": "Required for The Movie Database streaming artwork. Leave blank to skip.",
+          "igdb_client_id": "Twitch developer app Client ID, required for IGDB game cover art.",
+          "igdb_client_secret": "Twitch developer app Client Secret, required for IGDB game cover art.",
+          "steamgriddb_api_key": "Optional. Enables high-quality community game art from SteamGridDB. Steam Store artwork works without a key.",
+          "fanart_api_key": "Optional. Enables TV show logos and posters from Fanart.tv.",
+          "porndb_api_key": "Optional Bearer token for theporndb.net (§6.4 prio 3). Without a key the public endpoint is tried but may return nothing.",
+          "aebn_api_key": "Optional Bearer token for AEBN's affiliate API (§6.4 prio 4). Most calls return nothing without a key.",
+          "epg_sensor": "Catch-all sensor of the HA-EPG integration. Used when the active channel has no entry in the per-channel map below.",
+          "epg_sensor_map": "One mapping per line: 'channel=sensor.entity_id'. Channel match is case-insensitive. Falls back to the catch-all sensor when no entry hits.",
+          "epg_full_lookup_channels": "Channels for which a full EPG lookup (TVMaze + TMDb) is performed. All other channels just receive their channel_icon directly. Matching is case-insensitive. Default: ARD/ZDF/WDR/arte + public-broadcaster family (§5.1).",
+          "maw_sensor_tv_input": "Default: sensor.tv_active_input (§7.1). Values: ps5/atv/live_tv/tv_on_idle/none — drives the §2.3 artwork hierarchy.",
+          "maw_sensor_discord_game": "Default: sensor.discord_active_game_atomic (§7.1). Numeric sensor (>0 = game active).",
+          "maw_sensor_stash_active": "§7.2 — does not exist yet. Leave empty or provide your own binary_sensor."
+        }
+      },
+      "combined": {
+        "title": "Media Art Wrapper — Combined Player",
+        "description": "Optionally create a virtual combined player that aggregates multiple media players.",
+        "data": {
+          "create_combined": "Create combined player",
+          "combined_name": "Combined player name",
+          "auto_priority": "Auto-derive priority from category",
+          "combined_sources": "Sources (leave empty to use all configured wrappers)",
+          "combined_source_1": "Source 1 (highest priority)",
+          "combined_source_2": "Source 2",
+          "combined_source_3": "Source 3",
+          "combined_source_4": "Source 4",
+          "combined_source_5": "Source 5",
+          "combined_source_6": "Source 6",
+          "combined_source_7": "Source 7",
+          "combined_source_8": "Source 8 (lowest priority)",
+          "combined_audio_sources": "Audio control targets (optional)",
+          "combined_delegate_1": "Control entity (optional)",
+          "combined_delegate_2": "Control entity (optional)",
+          "combined_delegate_3": "Control entity (optional)",
+          "combined_delegate_4": "Control entity (optional)",
+          "combined_delegate_5": "Control entity (optional)",
+          "combined_delegate_6": "Control entity (optional)",
+          "combined_delegate_7": "Control entity (optional)",
+          "combined_delegate_8": "Control entity (optional)",
+          "combined_role_1": "Slot 1 — role (CMP §2.2)",
+          "combined_role_2": "Slot 2 — role (CMP §2.2)",
+          "combined_role_3": "Slot 3 — role (CMP §2.2)",
+          "combined_role_4": "Slot 4 — role (CMP §2.2)",
+          "combined_role_5": "Slot 5 — role (CMP §2.2)",
+          "combined_role_6": "Slot 6 — role (CMP §2.2)",
+          "combined_role_7": "Slot 7 — role (CMP §2.2)",
+          "combined_role_8": "Slot 8 — role (CMP §2.2)",
+          "cmp_sensor_ps5_context": "Sensor: PS5 context active",
+          "cmp_sensor_homepods_music": "Sensor: HomePods playing music",
+          "cmp_sensor_homepods_active": "Sensor: HomePods active"
+        },
+        "data_description": {
+          "create_combined": "When enabled, creates a virtual media_player entity and a cover image entity aggregating the sources below.",
+          "combined_name": "Used to name the entities: media_player.NAME and image.NAME_cover. Use lowercase letters and underscores only.",
+          "auto_priority": "Gaming has highest priority, then Streaming, TV, Music, Auto.",
+          "combined_source_1": "Priority ordered: PLAYING or BUFFERING beats PAUSED or IDLE, which beats ON. Lower slot number wins within the same tier.",
+          "combined_audio_sources": "Entities that receive volume, shuffle and playback commands. If empty, commands are sent to the active display entity.",
+          "combined_delegate_1": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_2": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_3": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_4": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_5": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_6": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_7": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_8": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_role_1": "Role of this slot in the CMP priority table (§2.2). 'Other' = slot is not part of the scenario-based routing.",
+          "combined_role_2": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_3": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_4": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_5": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_6": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_7": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_8": "Role of this slot in the CMP priority table (§2.2).",
+          "cmp_sensor_ps5_context": "Default: binary_sensor.ps5_context_active_combined (§7.1).",
+          "cmp_sensor_homepods_music": "Default: binary_sensor.homepods_music_active (§7.1).",
+          "cmp_sensor_homepods_active": "Default: binary_sensor.homepods_active_atomic (§7.1)."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This media player is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Media Art Wrapper — Player",
+        "description": "Update the category and display name for this media player.",
+        "data": {
+          "display_name": "Display name",
+          "category": "Content category"
+        },
+        "data_description": {
+          "display_name": "Friendly name shown in Home Assistant.",
+          "category": "Determines which artwork providers are used. Choose Auto to try all providers."
+        }
+      },
+      "artwork": {
+        "title": "Media Art Wrapper — Artwork",
+        "description": "Configure the artwork image dimensions, fallback behaviour, and optional API keys.",
+        "data": {
+          "ratio": "Aspect ratio",
+          "artwork_width": "Custom width (px)",
+          "artwork_height": "Custom height (px)",
+          "fallback_mode": "Fallback when no artwork is found",
+          "fallback_custom_url": "Custom fallback image URL",
+          "tmdb_api_key": "TMDb API key (streaming)",
+          "igdb_client_id": "IGDB Client ID (gaming)",
+          "igdb_client_secret": "IGDB Client Secret (gaming)",
+          "steamgriddb_api_key": "SteamGridDB API key (optional, gaming)",
+          "fanart_api_key": "Fanart.tv API key (optional, TV)",
+          "porndb_api_key": "PornDB API key (optional, theporndb.net)",
+          "aebn_api_key": "AEBN API key (optional)",
+          "epg_sensor": "EPG sensor (optional, catch-all)",
+          "epg_sensor_map": "Per-channel EPG sensor (one line: channel=sensor.id)",
+          "epg_full_lookup_channels": "EPG channels with full lookup",
+          "maw_sensor_tv_input": "Sensor: active TV source (§2.3)",
+          "maw_sensor_discord_game": "Sensor: Discord game (§2.3)",
+          "maw_sensor_stash_active": "Sensor: Stash active (§2.3, optional)"
+        },
+        "data_description": {
+          "ratio": "Preset dimensions for the artwork image. Choose Custom to enter exact pixel values.",
+          "artwork_width": "Only used when Custom is selected above.",
+          "artwork_height": "Only used when Custom is selected above.",
+          "fallback_mode": "What to show when no artwork can be found for the current track.",
+          "fallback_custom_url": "Full URL to an image shown when no artwork is found. Only used when Custom URL is selected above.",
+          "tmdb_api_key": "Required for The Movie Database streaming artwork. Leave blank to skip.",
+          "igdb_client_id": "Twitch developer app Client ID, required for IGDB game cover art.",
+          "igdb_client_secret": "Twitch developer app Client Secret, required for IGDB game cover art.",
+          "steamgriddb_api_key": "Optional. Enables high-quality community game art from SteamGridDB. Steam Store artwork works without a key.",
+          "fanart_api_key": "Optional. Enables TV show logos and posters from Fanart.tv.",
+          "porndb_api_key": "Optional Bearer token for theporndb.net (§6.4 prio 3). Without a key the public endpoint is tried but may return nothing.",
+          "aebn_api_key": "Optional Bearer token for AEBN's affiliate API (§6.4 prio 4). Most calls return nothing without a key.",
+          "epg_sensor": "Catch-all sensor of the HA-EPG integration. Used when the active channel has no entry in the per-channel map below.",
+          "epg_sensor_map": "One mapping per line: 'channel=sensor.entity_id'. Channel match is case-insensitive. Falls back to the catch-all sensor when no entry hits.",
+          "epg_full_lookup_channels": "Channels for which a full EPG lookup (TVMaze + TMDb) is performed. All other channels just receive their channel_icon directly. Matching is case-insensitive. Default: ARD/ZDF/WDR/arte + public-broadcaster family (§5.1).",
+          "maw_sensor_tv_input": "Default: sensor.tv_active_input (§7.1). Values: ps5/atv/live_tv/tv_on_idle/none — drives the §2.3 artwork hierarchy.",
+          "maw_sensor_discord_game": "Default: sensor.discord_active_game_atomic (§7.1). Numeric sensor (>0 = game active).",
+          "maw_sensor_stash_active": "§7.2 — does not exist yet. Leave empty or provide your own binary_sensor."
+        }
+      },
+      "combined": {
+        "title": "Media Art Wrapper — Combined Player",
+        "description": "Optionally create a virtual combined player that aggregates multiple media players.",
+        "data": {
+          "create_combined": "Create combined player",
+          "combined_name": "Combined player name",
+          "auto_priority": "Auto-derive priority from category",
+          "combined_sources": "Sources (leave empty to use all configured wrappers)",
+          "combined_source_1": "Source 1 (highest priority)",
+          "combined_source_2": "Source 2",
+          "combined_source_3": "Source 3",
+          "combined_source_4": "Source 4",
+          "combined_source_5": "Source 5",
+          "combined_source_6": "Source 6",
+          "combined_source_7": "Source 7",
+          "combined_source_8": "Source 8 (lowest priority)",
+          "combined_audio_sources": "Audio control targets (optional)",
+          "combined_delegate_1": "Control entity (optional)",
+          "combined_delegate_2": "Control entity (optional)",
+          "combined_delegate_3": "Control entity (optional)",
+          "combined_delegate_4": "Control entity (optional)",
+          "combined_delegate_5": "Control entity (optional)",
+          "combined_delegate_6": "Control entity (optional)",
+          "combined_delegate_7": "Control entity (optional)",
+          "combined_delegate_8": "Control entity (optional)",
+          "combined_role_1": "Slot 1 — role (CMP §2.2)",
+          "combined_role_2": "Slot 2 — role (CMP §2.2)",
+          "combined_role_3": "Slot 3 — role (CMP §2.2)",
+          "combined_role_4": "Slot 4 — role (CMP §2.2)",
+          "combined_role_5": "Slot 5 — role (CMP §2.2)",
+          "combined_role_6": "Slot 6 — role (CMP §2.2)",
+          "combined_role_7": "Slot 7 — role (CMP §2.2)",
+          "combined_role_8": "Slot 8 — role (CMP §2.2)",
+          "cmp_sensor_ps5_context": "Sensor: PS5 context active",
+          "cmp_sensor_homepods_music": "Sensor: HomePods playing music",
+          "cmp_sensor_homepods_active": "Sensor: HomePods active"
+        },
+        "data_description": {
+          "create_combined": "When enabled, creates a virtual media_player entity and a cover image entity aggregating the sources below.",
+          "combined_name": "Used to name the entities: media_player.NAME and image.NAME_cover. Use lowercase letters and underscores only.",
+          "auto_priority": "Gaming has highest priority, then Streaming, TV, Music, Auto.",
+          "combined_sources": "Select the MAW wrapper players for the combined player. Leave empty to include all automatically.",
+          "combined_source_1": "Priority ordered: PLAYING or BUFFERING beats PAUSED or IDLE, which beats ON. Lower slot number wins within the same tier.",
+          "combined_audio_sources": "Entities that receive volume, shuffle and playback commands. If empty, commands are sent to the active display entity.",
+          "combined_delegate_1": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_2": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_3": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_4": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_5": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_6": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_7": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_delegate_8": "If set, browse, queue and control commands are forwarded to this entity. Useful for Music Assistant with HomePods or native PS5 control.",
+          "combined_role_1": "Role of this slot in the CMP priority table (§2.2). 'Other' = slot is not part of the scenario-based routing.",
+          "combined_role_2": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_3": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_4": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_5": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_6": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_7": "Role of this slot in the CMP priority table (§2.2).",
+          "combined_role_8": "Role of this slot in the CMP priority table (§2.2).",
+          "cmp_sensor_ps5_context": "Default: binary_sensor.ps5_context_active_combined (§7.1).",
+          "cmp_sensor_homepods_music": "Default: binary_sensor.homepods_music_active (§7.1).",
+          "cmp_sensor_homepods_active": "Default: binary_sensor.homepods_active_atomic (§7.1)."
+        }
+      }
+    }
+  },
+  "errors": {
+    "combined_name_required": "A name is required when the combined player is enabled.",
+    "source_entity_required": "A media player entity is required for this integration type."
+  }
+}

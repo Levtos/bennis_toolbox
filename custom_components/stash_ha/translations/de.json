@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Stash verbinden",
+        "description": "Stash Server-URL und optionalen API-Schlüssel eingeben. Beispiele: https://stash.example.com, http://192.168.1.100:9999 oder 192.168.1.100:9999 (http:// wird automatisch ergänzt).",
+        "data": {
+          "url": "Stash Server URL",
+          "api_key": "API-Schlüssel (optional)"
+        }
+      },
+      "options": {
+        "title": "Stash Player Optionen",
+        "description": "Polling und Inhaltsmodus konfigurieren.",
+        "data": {
+          "player_name": "Player-Name",
+          "poll_interval": "Abfrageintervall (Sekunden)",
+          "use_webhook": "Stash-Webhooks verwenden",
+          "nsfw_mode": "Inhalts-Modus"
+        }
+      },
+      "webhook": {
+        "title": "Webhook-Optionen",
+        "description": "Stash sendet Ereignisse direkt an HA. Reaktionsschneller als Polling, benötigt aber Netzwerkzugriff von Stash auf HA.",
+        "data": {
+          "webhook_port": "Webhook-Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu Stash fehlgeschlagen. URL und API-Schlüssel prüfen.",
+      "invalid_auth": "Ungültige Authentifizierung"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stash Player Optionen",
+        "data": {
+          "player_name": "Player-Name",
+          "poll_interval": "Abfrageintervall (Sekunden)",
+          "use_webhook": "Stash-Webhooks verwenden",
+          "nsfw_mode": "Inhalts-Modus"
+        }
+      },
+      "webhook": {
+        "title": "Webhook-Optionen",
+        "description": "Stash sendet Ereignisse direkt an HA. Reaktionsschneller als Polling, benötigt aber Netzwerkzugriff von Stash auf HA.",
+        "data": {
+          "webhook_port": "Webhook-Port"
+        }
+      }
+    }
+  },
+  "selector": {
+    "nsfw_mode": {
+      "options": {
+        "blur": "Unscharf",
+        "hidden": "Versteckt (Platzhalter)",
+        "full": "Volle Qualität"
+      }
+    }
+  }
+}

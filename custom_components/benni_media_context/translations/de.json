@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Media Context",
+        "description": "Quell-Entitäten zuordnen. Alle Felder optional — leer lassen falls nicht genutzt.",
+        "data": {
+          "tv_active": "TV aktiv",
+          "tv_source": "TV-Quelle",
+          "tv_power_fallback": "TV Power-Fallback",
+          "appletv": "Apple TV Media Player",
+          "ps5_status": "PS5 Status",
+          "ps5_title": "PS5 Titel",
+          "switch_dock": "Switch Dock aktiv",
+          "pc_active": "PC aktiv",
+          "denon_active": "Denon aktiv",
+          "homepods": "HomePods Media Player",
+          "classifier_ps5": "Title Classifier Enum PS5",
+          "classifier_pc": "Title Classifier Enum PC/Discord",
+          "classifier_homepods": "Title Classifier Enum HomePods/Musik",
+          "classifier_media": "Title Classifier Enum Media (Mute/Boost)",
+          "entry_door": "Wohnungstür / Quiet-Trigger",
+          "call_monitor": "Anruf-Monitor",
+          "day_state": "Tagesphase",
+          "activity_state": "Aktivitätsstatus",
+          "window_state": "Fensterstatus"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Nur eine Instanz von Benni Media Context ist erlaubt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benni Media Context Optionen",
+        "data": {
+          "debounce_seconds": "Debounce Sekunden",
+          "quiet_ducking_level": "Quiet-Ducking Level (0-1)",
+          "base_volume_homepods": "Basislautstärke HomePods",
+          "base_volume_denon": "Basislautstärke Denon",
+          "track_boost_offset": "Track-Boost Offset",
+          "window_volume_offset": "Lautstärke-Offset bei offenem Fenster"
+        }
+      }
+    }
+  }
+}

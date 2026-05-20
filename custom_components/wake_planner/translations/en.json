@@ -1,0 +1,116 @@
+{
+  "title": "Wake Planner",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wake Planner setup",
+        "description": "Pick the calendars Wake Planner should read (both optional — you can add them later in Settings). People and rules are managed in the Wake Planner sidebar panel after setup.",
+        "data": {
+          "calendar_entity_id": "Wake calendar (events like 'wake: 06:30' override that day)",
+          "holiday_calendar_entity_id": "Holiday/vacation calendar (all-day events)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Wake Planner is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "calendar": {
+        "title": "Calendars",
+        "data": {
+          "calendar_entity_id": "Wake calendar",
+          "holiday_calendar_entity_id": "Holiday calendar"
+        }
+      },
+      "special_rules": {
+        "title": "Weekends & holidays",
+        "description": "How weekends, holidays and manually entered dates affect the wake plan. Manual dates: YYYY-MM-DD, MM-DD (yearly), ranges like YYYY-MM-DD..YYYY-MM-DD, comma separated.",
+        "data": {
+          "holiday_behavior": "Behaviour on weekends/holidays",
+          "manual_holiday_dates": "Manual dates / ranges"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "wake_needed": { "name": "Wake needed" }
+    },
+    "sensor": {
+      "wake_state": {
+        "name": "Wake state",
+        "state": {
+          "scheduled": "Scheduled",
+          "skipped": "Skipped",
+          "overridden": "Overridden",
+          "holiday": "Holiday",
+          "inactive": "Inactive"
+        }
+      },
+      "next_wake": { "name": "Next wake" }
+    }
+  },
+  "services": {
+    "skip_next": {
+      "name": "Skip next wake",
+      "description": "Skip the next wake for a person.",
+      "fields": {
+        "person_id": { "name": "Person ID", "description": "Wake Planner person slug." }
+      }
+    },
+    "set_override": {
+      "name": "Set override",
+      "description": "Set a manual wake time override.",
+      "fields": {
+        "person_id": { "name": "Person ID" },
+        "wake_time": { "name": "Wake time" },
+        "until": { "name": "Until date" }
+      }
+    },
+    "clear_override": {
+      "name": "Clear override",
+      "description": "Clear manual override and skip state.",
+      "fields": { "person_id": { "name": "Person ID" } }
+    },
+    "add_person": {
+      "name": "Add person",
+      "description": "Create a new Wake Planner person with a default Mon–Fri 07:00 rule.",
+      "fields": {
+        "name": { "name": "Name" },
+        "person_entity_id": { "name": "Home Assistant person entity (optional)" },
+        "entry_id": { "name": "Config entry id (only needed with multiple Wake Planner entries)" }
+      }
+    },
+    "remove_person": {
+      "name": "Remove person",
+      "description": "Delete a Wake Planner person and all their rules.",
+      "fields": { "person_id": { "name": "Person ID" } }
+    },
+    "set_rules": {
+      "name": "Set rules",
+      "description": "Replace a person's full rule list. Each rule is a dict (id, name, priority, enabled, weekdays, action, wake_time, optional date_range / week_interval+week_anchor / specific_dates / cycle_*).",
+      "fields": {
+        "person_id": { "name": "Person ID" },
+        "rules": { "name": "Rules list" }
+      }
+    },
+    "set_special_rules": {
+      "name": "Set special rules",
+      "description": "Update holiday behaviour and manual holiday dates.",
+      "fields": {
+        "holiday_behavior": { "name": "Holiday behaviour" },
+        "manual_holiday_dates": { "name": "Manual holiday dates" }
+      }
+    }
+  },
+  "selector": {
+    "holiday_behavior": {
+      "options": {
+        "skip": "Skip wake",
+        "weekend_profile": "Use weekend (Saturday) rule"
+      }
+    }
+  }
+}

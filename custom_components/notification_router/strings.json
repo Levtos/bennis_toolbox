@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Notification Router",
+        "description": "Map context inputs and (optional) output targets.",
+        "data": {
+          "bio_state_entity": "Bio state entity",
+          "activity_state_entity": "Activity state entity",
+          "presence_personal_entity": "Personal presence entity",
+          "media_context_entity": "Media context entity",
+          "headset_active_entity": "Headset active entity",
+          "quiet_mode_active_entity": "Quiet mode active entity",
+          "doorbell_state_entity": "Doorbell state entity",
+          "opening_safety_entity": "Opening safety entity",
+          "lock_battery_entity": "Lock battery entity",
+          "notify_targets": "Notify service targets (e.g. notify.mobile_app_x)",
+          "light_script": "Light/ring script",
+          "media_script": "Media announcement script"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single instance is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Router options",
+        "data": {
+          "quiet_hours_start": "Quiet hours start (HH:MM)",
+          "quiet_hours_end": "Quiet hours end (HH:MM)",
+          "sleep_behavior": "Sleep behavior",
+          "private_time_behavior": "Private time behavior",
+          "headset_behavior": "Headset behavior",
+          "rate_limit_per_minute": "Rate limit (per minute)",
+          "severity_map": "Per-event severity overrides",
+          "cooldowns": "Per-event cooldowns (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "notification_mode": {"name": "Notification Mode"},
+      "last_event": {"name": "Last Notification Event"}
+    },
+    "binary_sensor": {
+      "dnd_active": {"name": "DND Active"}
+    }
+  }
+}

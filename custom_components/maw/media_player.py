@@ -1,0 +1,1068 @@
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from homeassistant.components.media_player import BrowseMedia, MediaPlayerEntity, MediaPlayerEntityFeature, MediaPlayerState
+from homeassistant.components.media_player import DOMAIN as MP_DOMAIN
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from . import CoverCoordinator, CoverData
+from .const import (
+    CATEGORY_SORT_PRIORITY,
+    CMP_ROLE_ATV,
+    CMP_ROLE_HOMEPODS,
+    CMP_ROLE_OTHER,
+    CMP_ROLE_PS5,
+    CMP_ROLE_STASH,
+    CMP_ROLES,
+    COMBINED_NUM_SOURCE_SLOTS,
+    CONF_AUTO_PRIORITY,
+    CONF_CMP_SENSOR_HOMEPODS_ACTIVE,
+    CONF_CMP_SENSOR_HOMEPODS_MUSIC,
+    CONF_CMP_SENSOR_PS5_CONTEXT,
+    CONF_COMBINED_AUDIO_SOURCES,
+    CONF_COMBINED_DELEGATE_PREFIX,
+    CONF_COMBINED_NAME,
+    CONF_COMBINED_ROLE_PREFIX,
+    CONF_COMBINED_SOURCES,
+    CONF_CREATE_COMBINED,
+    CONF_CREATE_WRAPPER,
+    CONF_SOURCE_ENTITY_ID,
+    DEFAULT_CMP_SENSOR_HOMEPODS_ACTIVE,
+    DEFAULT_CMP_SENSOR_HOMEPODS_MUSIC,
+    DEFAULT_CMP_SENSOR_PS5_CONTEXT,
+    DOMAIN,
+)
+from .helpers import (
+    FALLBACK_IMAGE,
+    TIER1_STATES as _TIER1,
+    TIER2_STATES as _TIER2,
+    TIER3_STATES as _TIER3,
+    active_entity_id as _active_entity_id_helper,
+    safe_media_player_state as _safe_state,
+    source_name,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+# §2.2 prio 5 — Stash is "active" for any non-OFF playback state.
+_STASH_ACTIVE_STATES: frozenset[MediaPlayerState] = frozenset(
+    {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED, MediaPlayerState.IDLE}
+)
+# §2.2 prio 1 — ATV claims priority while playing or paused.
+_ATV_ACTIVE_STATES: frozenset[MediaPlayerState] = frozenset(
+    {MediaPlayerState.PLAYING, MediaPlayerState.PAUSED}
+)
+
+
+def _get_combined_config(entry: ConfigEntry) -> tuple[bool, str, list[str], list[str], bool]:
+    """Return (create_combined, name, sources, audio_sources, auto_priority) from entry options/data."""
+    opts = entry.options
+    data = entry.data
+    create = bool(opts.get(CONF_CREATE_COMBINED, data.get(CONF_CREATE_COMBINED, False)))
+    name = str(opts.get(CONF_COMBINED_NAME, data.get(CONF_COMBINED_NAME, ""))).strip()
+    sources: list[str] = list(opts.get(CONF_COMBINED_SOURCES, data.get(CONF_COMBINED_SOURCES, [])))
+    audio: list[str] = list(opts.get(CONF_COMBINED_AUDIO_SOURCES, data.get(CONF_COMBINED_AUDIO_SOURCES, [])))
+    auto_priority = bool(opts.get(CONF_AUTO_PRIORITY, data.get(CONF_AUTO_PRIORITY, True)))
+    return create, name, sources, audio, auto_priority
+
+
+def _get_cmp_sensor_config(entry: ConfigEntry) -> dict[str, str]:
+    """Return §7.1 sensor entity_ids used by the §2.2 priority resolver.
+
+    Defaults match LASTENHEFT §7.1 so an out-of-the-box setup needs no
+    configuration; user can override via OptionsFlow.
+    """
+    opts = entry.options
+    data = entry.data
+    return {
+        CONF_CMP_SENSOR_PS5_CONTEXT: str(
+            opts.get(
+                CONF_CMP_SENSOR_PS5_CONTEXT,
+                data.get(CONF_CMP_SENSOR_PS5_CONTEXT, DEFAULT_CMP_SENSOR_PS5_CONTEXT),
+            )
+        ).strip(),
+        CONF_CMP_SENSOR_HOMEPODS_MUSIC: str(
+            opts.get(
+                CONF_CMP_SENSOR_HOMEPODS_MUSIC,
+                data.get(CONF_CMP_SENSOR_HOMEPODS_MUSIC, DEFAULT_CMP_SENSOR_HOMEPODS_MUSIC),
+            )
+        ).strip(),
+        CONF_CMP_SENSOR_HOMEPODS_ACTIVE: str(
+            opts.get(
+                CONF_CMP_SENSOR_HOMEPODS_ACTIVE,
+                data.get(CONF_CMP_SENSOR_HOMEPODS_ACTIVE, DEFAULT_CMP_SENSOR_HOMEPODS_ACTIVE),
+            )
+        ).strip(),
+    }
+
+
+def _build_role_map(
+    entry: ConfigEntry,
+    combined_sources: list[str],
+    display_sources: list[str],
+) -> dict[str, str]:
+    """Map display source entity_id → role string per CONF_COMBINED_ROLE_PREFIX.
+
+    *combined_sources* is the wrapper-entity list from options (slot order
+    1..8). *display_sources* is the resolved underlying media_player list
+    in the same slot order (output of _resolve_combined_sources).
+    Slots without a stored role default to CMP_ROLE_OTHER.
+    """
+    opts = entry.options
+    data = entry.data
+    role_map: dict[str, str] = {}
+    for idx, wrapper in enumerate(combined_sources, start=1):
+        if idx > COMBINED_NUM_SOURCE_SLOTS:
+            break
+        if idx - 1 >= len(display_sources):
+            break
+        display = display_sources[idx - 1]
+        key = f"{CONF_COMBINED_ROLE_PREFIX}{idx}"
+        raw = opts.get(key, data.get(key, CMP_ROLE_OTHER))
+        role = str(raw).strip().lower() if isinstance(raw, str) else CMP_ROLE_OTHER
+        if role not in CMP_ROLES:
+            role = CMP_ROLE_OTHER
+        role_map[display] = role
+    return role_map
+
+
+def _sort_sources_by_category(
+    sources: list[str],
+    hass: HomeAssistant,
+) -> list[str]:
+    """Sort combined sources by their MAW coordinator's category priority.
+
+    Lower CATEGORY_SORT_PRIORITY number = higher priority in the sorted list.
+    Sources without a MAW coordinator (non-MAW media players) keep their
+    original relative order at the end with priority=999.
+    """
+    # Build a map of source entity_id → category priority from active MAW coordinators
+    cat_priority: dict[str, int] = {}
+    for coordinator in hass.data.get(DOMAIN, {}).values():
+        if isinstance(coordinator, CoverCoordinator):
+            priority = CATEGORY_SORT_PRIORITY.get(coordinator.category, 999)
+            cat_priority[coordinator.source_entity_id] = priority
+
+    # Stable sort: sources without a coordinator keep their original order at end
+    return sorted(sources, key=lambda sid: cat_priority.get(sid, 999))
+
+
+def _resolve_combined_sources(hass: HomeAssistant, wrapper_entities: list[str]) -> tuple[list[str], list[str]]:
+    """Resolve wrapper entity ids into display (original) and control (delegate) ids."""
+    display_sources: list[str] = []
+    control_sources: list[str] = []
+    entries = hass.config_entries.async_entries(DOMAIN)
+    by_wrapper: dict[str, ConfigEntry] = {}
+    registry = er.async_get(hass)
+    for e in entries:
+        for entity_entry in er.async_entries_for_config_entry(registry, e.entry_id):
+            if entity_entry.domain == "media_player" and entity_entry.unique_id.endswith("_cover_player") and entity_entry.entity_id:
+                by_wrapper[entity_entry.entity_id] = e
+                break
+
+    for wrapper in wrapper_entities:
+        entry = by_wrapper.get(wrapper)
+        if entry is None:
+            continue
+        original = str(entry.data.get(CONF_SOURCE_ENTITY_ID, "")).strip()
+        if not original:
+            continue
+        display_sources.append(original)
+        control_sources.append(original)
+
+    return list(dict.fromkeys(display_sources)), list(dict.fromkeys(control_sources))
+
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
+    create_wrapper = bool(entry.options.get(CONF_CREATE_WRAPPER, entry.data.get(CONF_CREATE_WRAPPER, True)))
+    entities: list[MediaPlayerEntity] = []
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if create_wrapper and isinstance(coordinator, CoverCoordinator):
+        entities.append(MediaCoverArtUniversalPlayer(coordinator, entry))
+
+    create_combined, combined_name, combined_sources, combined_audio, auto_priority = _get_combined_config(entry)
+    if create_combined and combined_name:
+        if not combined_sources and auto_priority:
+            registry = er.async_get(hass)
+            discovered: list[str] = []
+            for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+                if cfg_entry.entry_id == entry.entry_id:
+                    continue
+                for entity_entry in er.async_entries_for_config_entry(registry, cfg_entry.entry_id):
+                    if entity_entry.domain == "media_player" and entity_entry.unique_id.endswith("_cover_player") and entity_entry.entity_id:
+                        discovered.append(entity_entry.entity_id)
+            combined_sources = sorted(set(discovered))
+        if combined_sources:
+            display_sources, auto_audio_sources = _resolve_combined_sources(hass, combined_sources)
+            # Build role map BEFORE auto-priority re-sort so slot indices align
+            # with combined_sources / display_sources slot order.
+            role_map = _build_role_map(entry, combined_sources, display_sources)
+            if auto_priority:
+                display_sources = _sort_sources_by_category(display_sources, hass)
+            control_sources = combined_audio or auto_audio_sources
+            slot_delegate_map: dict[str, str] = {}
+            for idx, wrapper in enumerate(combined_sources, start=1):
+                delegate = entry.options.get(f"{CONF_COMBINED_DELEGATE_PREFIX}{idx}")
+                if not isinstance(delegate, str) or not delegate.strip():
+                    continue
+                resolved_display, _ = _resolve_combined_sources(hass, [wrapper])
+                if resolved_display:
+                    slot_delegate_map[resolved_display[0]] = delegate.strip()
+            sensors = _get_cmp_sensor_config(entry)
+            entities.append(
+                CombinedMediaPlayer(
+                    hass,
+                    entry,
+                    display_sources,
+                    control_sources,
+                    combined_name,
+                    slot_delegate_map,
+                    role_map=role_map,
+                    sensors=sensors,
+                )
+            )
+
+    async_add_entities(entities, update_before_add=False)
+
+
+class MediaCoverArtUniversalPlayer(CoordinatorEntity[CoverCoordinator], MediaPlayerEntity):
+    """Universal-style media-player wrapper.
+
+    The entity proxies controls/state to the selected source media_player and only
+    overrides the media image with cover art generated by this integration.
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:speaker"
+
+    def __init__(self, coordinator: CoverCoordinator, entry: ConfigEntry) -> None:
+        CoordinatorEntity.__init__(self, coordinator)
+        try:
+            MediaPlayerEntity.__init__(self)
+        except TypeError:
+            pass
+        self._attr_unique_id = f"{entry.entry_id}_cover_player"
+        self._attr_name = f"{source_name(coordinator.source_entity_id)} Cover"
+        self._delegate_entity: str | None = None
+        self._unsub_source_state = None
+
+    @property
+    def source_entity_id(self) -> str:
+        return self.coordinator.source_entity_id
+
+    @property
+    def source_state(self) -> State | None:
+        return self.hass.states.get(self.source_entity_id)
+
+    @property
+    def control_entity_id(self) -> str:
+        return self._delegate_entity or self.source_entity_id
+
+    @property
+    def control_state(self) -> State | None:
+        return self.hass.states.get(self.control_entity_id)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._unsub_source_state = async_track_state_change_event(
+            self.hass,
+            [self.source_entity_id],
+            self._async_handle_source_state,
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub_source_state is not None:
+            self._unsub_source_state()
+            self._unsub_source_state = None
+        await super().async_will_remove_from_hass()
+
+    @callback
+    def _async_handle_source_state(self, event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        src = self.source_state
+        return src is not None and src.state not in {"unavailable", "unknown"}
+
+    @property
+    def state(self) -> MediaPlayerState | None:
+        src = self.source_state
+        if src is None:
+            return None
+        try:
+            return MediaPlayerState(src.state)
+        except ValueError:
+            return None
+
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        features = MediaPlayerEntityFeature(0)
+        for state in (self.source_state, self.control_state):
+            if state is None:
+                continue
+            try:
+                features |= MediaPlayerEntityFeature(int(state.attributes.get("supported_features", 0)))
+            except (TypeError, ValueError):
+                continue
+        return features
+
+    def _source_attr(self, key: str, default: Any = None) -> Any:
+        src = self.source_state
+        if src is None:
+            return default
+        return src.attributes.get(key, default)
+
+    @property
+    def media_title(self) -> str | None:
+        return self._source_attr("media_title")
+
+    @property
+    def media_artist(self) -> str | None:
+        return self._source_attr("media_artist")
+
+    @property
+    def media_album_name(self) -> str | None:
+        return self._source_attr("media_album_name")
+
+    @property
+    def media_duration(self) -> int | None:
+        return self._source_attr("media_duration")
+
+    @property
+    def media_position(self) -> float | None:
+        return self._source_attr("media_position")
+
+    @property
+    def media_position_updated_at(self):
+        return self._source_attr("media_position_updated_at")
+
+    @property
+    def volume_level(self) -> float | None:
+        return self.control_state.attributes.get("volume_level") if self.control_state else None
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        return self.control_state.attributes.get("is_volume_muted") if self.control_state else None
+
+    @property
+    def source(self) -> str | None:
+        return self.control_state.attributes.get("source") if self.control_state else None
+
+    @property
+    def source_list(self) -> list[str] | None:
+        return self.control_state.attributes.get("source_list") if self.control_state else None
+
+    @property
+    def sound_mode(self) -> str | None:
+        return self._source_attr("sound_mode")
+
+    @property
+    def sound_mode_list(self) -> list[str] | None:
+        return self._source_attr("sound_mode_list")
+
+    @property
+    def shuffle(self) -> bool | None:
+        return self.control_state.attributes.get("shuffle") if self.control_state else None
+
+    @property
+    def repeat(self) -> str | None:
+        return self.control_state.attributes.get("repeat") if self.control_state else None
+
+    @property
+    def media_image_hash(self) -> str | None:
+        data: CoverData | None = self.coordinator.data
+        if not data or not data.track_key:
+            return None
+        # Include last_updated so the hash changes when the cover image loads
+        # after the initial fallback, busting the browser cache.
+        if data.last_updated:
+            return f"{data.track_key}:{data.last_updated.isoformat()}"
+        return data.track_key
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """Return True when artwork_url is a public CDN URL (no HA proxy needed).
+
+        Exposing a direct URL here causes HA to write it as ``entity_picture``
+        in the entity state, which allows external consumers such as Music
+        Assistant to pick up the cover art without an additional HA API call.
+        """
+        data: CoverData | None = self.coordinator.data
+        return bool(data and data.artwork_url)
+
+    @property
+    def media_image_url(self) -> str | None:
+        """Direct public cover art URL, written into ``entity_picture`` by HA."""
+        data: CoverData | None = self.coordinator.data
+        return data.artwork_url if (data and data.artwork_url) else None
+
+    async def async_get_media_image(self):
+        data: CoverData | None = self.coordinator.data
+        if not data or not data.image:
+            return FALLBACK_IMAGE, "image/png"
+        return data.image, data.content_type or "image/jpeg"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data: CoverData | None = self.coordinator.data
+        return {
+            "source_entity_id": self.source_entity_id,
+            "track_key": data.track_key if data else None,
+            "artist": data.artist if data else None,
+            "title": data.title if data else None,
+            "album": data.album if data else None,
+            "provider": data.provider if data else None,
+            "artwork_url": data.artwork_url if data else None,
+            "artwork_width": self.coordinator.artwork_width,
+            "artwork_height": self.coordinator.artwork_height,
+            "artwork_size": self.coordinator.artwork_size,
+        }
+
+    async def _async_call_source(self, service: str, **service_data: Any) -> None:
+        await self.hass.services.async_call(
+            "media_player",
+            service,
+            {"entity_id": self.control_entity_id, **service_data},
+            blocking=True,
+        )
+
+    async def async_turn_on(self) -> None:
+        await self._async_call_source("turn_on")
+
+    async def async_turn_off(self) -> None:
+        await self._async_call_source("turn_off")
+
+    async def async_toggle(self) -> None:
+        await self._async_call_source("toggle")
+
+    async def async_media_play(self) -> None:
+        await self._async_call_source("media_play")
+
+    async def async_media_pause(self) -> None:
+        await self._async_call_source("media_pause")
+
+    async def async_media_stop(self) -> None:
+        await self._async_call_source("media_stop")
+
+    async def async_media_next_track(self) -> None:
+        await self._async_call_source("media_next_track")
+
+    async def async_media_previous_track(self) -> None:
+        await self._async_call_source("media_previous_track")
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        await self._async_call_source("volume_set", volume_level=volume)
+
+    async def async_volume_up(self) -> None:
+        await self._async_call_source("volume_up")
+
+    async def async_volume_down(self) -> None:
+        await self._async_call_source("volume_down")
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        await self._async_call_source("volume_mute", is_volume_muted=mute)
+
+    async def async_media_seek(self, position: float) -> None:
+        await self._async_call_source("media_seek", seek_position=position)
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+        await self._async_call_source(
+            "play_media",
+            media_content_type=media_type,
+            media_content_id=media_id,
+            **kwargs,
+        )
+
+    async def async_select_source(self, source: str) -> None:
+        await self._async_call_source("select_source", source=source)
+
+    async def async_select_sound_mode(self, sound_mode: str) -> None:
+        await self._async_call_source("select_sound_mode", sound_mode=sound_mode)
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        await self._async_call_source("shuffle_set", shuffle=shuffle)
+
+    async def async_set_repeat(self, repeat: str) -> None:
+        await self._async_call_source("repeat_set", repeat=repeat)
+
+    async def async_clear_playlist(self) -> None:
+        await self._async_call_source("clear_playlist")
+
+    async def async_browse_media(
+        self,
+        media_content_type: str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        """Forward browse requests to the source media player entity."""
+        entity_comp = self.hass.data.get("entity_components", {}).get(MP_DOMAIN)
+        if entity_comp is not None:
+            source_entity = entity_comp.get_entity(self.control_entity_id)
+            if source_entity is not None:
+                return await source_entity.async_browse_media(
+                    media_content_type, media_content_id
+                )
+        from homeassistant.components.media_player.errors import BrowseError
+        raise BrowseError(f"Source entity {self.control_entity_id} is not available for browsing")
+
+
+# ---------------------------------------------------------------------------
+# Combined Media Player
+# ---------------------------------------------------------------------------
+
+class CombinedMediaPlayer(MediaPlayerEntity):
+    """Priority-based virtual media player aggregating multiple source entities.
+
+    Implements the full CMP specification:
+    - Tier-based active source selection (PLAYING > PAUSED/IDLE > ON)
+    - Display/control split via optional audio_sources
+    - Full attribute propagation from active display/control source
+    - All 17 service forwarding calls (blocking=True)
+    - browse_media cascade
+    - Always-available (never UNAVAILABLE, degrades to OFF)
+    - Event-driven updates via async_track_state_change_event, no polling
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = False
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        sources: list[str],
+        audio_sources: list[str],
+        name: str,
+        slot_delegate_map: dict[str, str] | None = None,
+        *,
+        role_map: dict[str, str] | None = None,
+        sensors: dict[str, str] | None = None,
+    ) -> None:
+        self.hass = hass
+        self._entry = entry
+        self._sources = list(sources)
+        self._audio_sources = list(audio_sources)
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_combined_player"
+        self._slot_delegate_map = dict(slot_delegate_map or {})
+        self._unsub: Any | None = None
+
+        # §2.2 — role-based priority resolution
+        self._role_map = dict(role_map or {})  # display entity_id → role
+        self._role_to_entity: dict[str, str] = {}
+        for entity_id, role in self._role_map.items():
+            # First slot wins per role; later slots with the same role are ignored.
+            self._role_to_entity.setdefault(role, entity_id)
+        self._has_role_config = any(
+            r != CMP_ROLE_OTHER for r in self._role_map.values()
+        )
+
+        sensors = sensors or {}
+        self._sensor_ps5_context = sensors.get(CONF_CMP_SENSOR_PS5_CONTEXT, "")
+        self._sensor_homepods_music = sensors.get(CONF_CMP_SENSOR_HOMEPODS_MUSIC, "")
+        self._sensor_homepods_active = sensors.get(CONF_CMP_SENSOR_HOMEPODS_ACTIVE, "")
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def _tracked_sensor_ids(self) -> list[str]:
+        """Sensor entity_ids that affect §2.2 priority resolution."""
+        return [
+            s for s in (
+                self._sensor_ps5_context,
+                self._sensor_homepods_music,
+                self._sensor_homepods_active,
+            )
+            if s
+        ]
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        all_tracked = list(dict.fromkeys(
+            self._sources + self._audio_sources + self._tracked_sensor_ids()
+        ))
+        self._unsub = async_track_state_change_event(
+            self.hass, all_tracked, self._handle_state_change
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub is not None:
+            self._unsub()
+            self._unsub = None
+        await super().async_will_remove_from_hass()
+
+    @callback
+    def _handle_state_change(self, event: Any) -> None:
+        self.async_write_ha_state()
+
+    # ------------------------------------------------------------------
+    # Priority resolution
+    # ------------------------------------------------------------------
+
+    def _sensor_on(self, sensor_entity_id: str) -> bool:
+        """Return True when *sensor_entity_id* state is on/true/1/playing."""
+        if not sensor_entity_id:
+            return False
+        state = self.hass.states.get(sensor_entity_id)
+        if state is None:
+            return False
+        raw = str(state.state).strip().lower()
+        return raw in {"on", "true", "1", "playing", "active"}
+
+    def _state_for(self, entity_id: str | None) -> MediaPlayerState | None:
+        if not entity_id:
+            return None
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        return _safe_state(state.state)
+
+    def _resolve_active_role(self) -> tuple[str | None, str | None] | None:
+        """§2.2 priority resolver.
+
+        Returns:
+        - ``None`` when no role tags are configured — caller must fall back to
+          the legacy generic-tier logic for backward compatibility.
+        - ``(role, entity_id)`` for §2.2 prios 1, 2 and 5 (a controllable
+          player is active).
+        - ``(None, None)`` for §2.2 prios 3 and 4 (context active but no
+          controllable transport).
+        """
+        if not self._has_role_config:
+            return None
+
+        atv = self._role_to_entity.get(CMP_ROLE_ATV)
+        homepods = self._role_to_entity.get(CMP_ROLE_HOMEPODS)
+        stash = self._role_to_entity.get(CMP_ROLE_STASH)
+
+        # Prio 1 — Apple TV playing/paused
+        if atv:
+            s = self._state_for(atv)
+            if s is not None and s in _ATV_ACTIVE_STATES:
+                return CMP_ROLE_ATV, atv
+
+        ps5_context = self._sensor_on(self._sensor_ps5_context)
+        homepods_music = self._sensor_on(self._sensor_homepods_music)
+        homepods_active = self._sensor_on(self._sensor_homepods_active)
+
+        # Prio 2 — HomePods music only (no PS5 context)
+        if homepods and homepods_music and not ps5_context:
+            return CMP_ROLE_HOMEPODS, homepods
+
+        # Prio 3 — PS5 + HomePods dual scenario
+        # OUT OF SCOPE per §10 / §2.2; no controllable transport in this version.
+        # TODO §2.2 prio 3: enable HomePods-as-audio + PS5-as-context once the
+        # CEC-shutdown / simultaneous HomePod activation automation lands.
+        if ps5_context and homepods_active:
+            return None, None
+
+        # Prio 4 — PS5 active, HomePods off → no controllable transport
+        if ps5_context and not homepods_active:
+            return None, None
+
+        # Prio 5 — Stash active
+        if stash:
+            s = self._state_for(stash)
+            if s is not None and s in _STASH_ACTIVE_STATES:
+                return CMP_ROLE_STASH, stash
+
+        return None, None
+
+    def _active_state(self) -> State | None:
+        """Return the state of the highest-priority active display source."""
+        resolved = self._resolve_active_role()
+        if resolved is not None:
+            _role, entity_id = resolved
+            if entity_id is None:
+                return None
+            return self.hass.states.get(entity_id)
+        # Legacy generic-tier fallback (no roles configured)
+        for tier in (_TIER1, _TIER2, _TIER3):
+            for sid in self._sources:
+                state = self.hass.states.get(sid)
+                if state is None:
+                    continue
+                s = _safe_state(state.state)
+                if s is not None and s in tier:
+                    return state
+        return None
+
+    def _active_entity_id(self) -> str | None:
+        resolved = self._resolve_active_role()
+        if resolved is not None:
+            _role, entity_id = resolved
+            return entity_id
+        return _active_entity_id_helper(self.hass, self._sources)
+
+    def _active_audio_entity_id(self) -> str | None:
+        """Return delegate control target for active source when configured."""
+        active_display = self._active_entity_id()
+        if active_display:
+            return self._slot_delegate_map.get(active_display, active_display)
+        # In §2.2 mode (role config present), no audio fallback when resolver
+        # blocked transport — that's the intended prio 3/4 behaviour.
+        if self._has_role_config:
+            return None
+        for tier in (_TIER1, _TIER2, _TIER3):
+            for sid in self._audio_sources:
+                state = self.hass.states.get(sid)
+                if state is None:
+                    continue
+                s = _safe_state(state.state)
+                if s is not None and s in tier:
+                    return sid
+        return None
+
+    def _control_state(self) -> State | None:
+        """Return the state used for volume/shuffle/repeat (audio preferred)."""
+        audio_id = self._active_audio_entity_id()
+        if audio_id:
+            return self.hass.states.get(audio_id)
+        return self._active_state()
+
+    # ------------------------------------------------------------------
+    # Availability & state
+    # ------------------------------------------------------------------
+
+    @property
+    def available(self) -> bool:
+        return True  # Always-available pattern: degrades to OFF, never UNAVAILABLE
+
+    @property
+    def state(self) -> MediaPlayerState:
+        active = self._active_state()
+        if active is None:
+            # §2.2 prio 3/4 — context active (e.g. PS5) but no controllable
+            # transport. Surface ON so dashboards reflect "something is on"
+            # even though play/pause is unavailable.
+            if self._has_role_config and self._sensor_on(self._sensor_ps5_context):
+                return MediaPlayerState.ON
+            return MediaPlayerState.OFF
+        s = _safe_state(active.state)
+        if s in _TIER1:
+            return MediaPlayerState.PLAYING
+        if s in _TIER2:
+            return MediaPlayerState.IDLE
+        if s in _TIER3:
+            return MediaPlayerState.ON
+        return MediaPlayerState.OFF
+
+    # ------------------------------------------------------------------
+    # Attribute helpers
+    # ------------------------------------------------------------------
+
+    def _from_active(self, key: str, default: Any = None) -> Any:
+        state = self._active_state()
+        return state.attributes.get(key, default) if state is not None else default
+
+    def _from_control(self, key: str, default: Any = None) -> Any:
+        state = self._control_state()
+        return state.attributes.get(key, default) if state is not None else default
+
+    # ------------------------------------------------------------------
+    # Media attributes (from display source)
+    # ------------------------------------------------------------------
+
+    @property
+    def media_title(self) -> str | None:
+        return self._from_active("media_title")
+
+    @property
+    def media_artist(self) -> str | None:
+        return self._from_active("media_artist")
+
+    @property
+    def media_album_name(self) -> str | None:
+        return self._from_active("media_album_name")
+
+    @property
+    def media_content_type(self) -> str | None:
+        return self._from_active("media_content_type")
+
+    @property
+    def media_duration(self) -> float | None:
+        return self._from_active("media_duration")
+
+    @property
+    def media_position(self) -> float | None:
+        return self._from_active("media_position")
+
+    @property
+    def media_position_updated_at(self) -> Any:
+        return self._from_active("media_position_updated_at")
+
+    @property
+    def media_series_title(self) -> str | None:
+        return self._from_active("media_series_title")
+
+    @property
+    def media_season(self) -> str | None:
+        return self._from_active("media_season")
+
+    @property
+    def media_episode(self) -> str | None:
+        return self._from_active("media_episode")
+
+    @property
+    def app_name(self) -> str | None:
+        return self._from_active("app_name")
+
+    # ------------------------------------------------------------------
+    # Control attributes (from audio source, falling back to display)
+    # ------------------------------------------------------------------
+
+    @property
+    def volume_level(self) -> float | None:
+        return self._from_control("volume_level")
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        return self._from_control("is_volume_muted")
+
+    @property
+    def source(self) -> str | None:
+        return self._from_control("source")
+
+    @property
+    def source_list(self) -> list[str] | None:
+        return self._from_control("source_list")
+
+    @property
+    def shuffle(self) -> bool | None:
+        return self._from_control("shuffle")
+
+    @property
+    def repeat(self) -> str | None:
+        return self._from_control("repeat")
+
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        control = self._control_state()
+        if control is None:
+            features = MediaPlayerEntityFeature(0)
+        else:
+            try:
+                features = MediaPlayerEntityFeature(int(control.attributes.get("supported_features", 0)))
+            except (TypeError, ValueError):
+                features = MediaPlayerEntityFeature(0)
+        # BROWSE_MEDIA: enabled if ANY configured source (display OR audio) supports it
+        for sid in self._sources + self._audio_sources + list(self._slot_delegate_map.values()):
+            state = self.hass.states.get(sid)
+            if state is None:
+                continue
+            try:
+                sf = MediaPlayerEntityFeature(int(state.attributes.get("supported_features", 0)))
+            except (TypeError, ValueError):
+                continue
+            if sf & MediaPlayerEntityFeature.BROWSE_MEDIA:
+                features |= MediaPlayerEntityFeature.BROWSE_MEDIA
+                break
+        return features
+
+    # ------------------------------------------------------------------
+    # Cover art
+    # ------------------------------------------------------------------
+
+    @property
+    def media_image_url(self) -> str | None:
+        """Propagate the active source's entity_picture (HA-relative paths included)."""
+        active_id = self._active_entity_id()
+        if active_id is None:
+            return None
+        state = self.hass.states.get(active_id)
+        if state is None:
+            return None
+        return state.attributes.get("entity_picture")
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        url = self.media_image_url
+        return bool(url and url.startswith("http"))
+
+    async def async_get_media_image(self) -> tuple[bytes | None, str]:
+        """Return image bytes for the active source.
+
+        Tries:
+        1. MAW coordinator for the active source (reuse cover cache directly)
+        2. source entity.async_get_media_image() delegation
+        3. FALLBACK_IMAGE
+        """
+        active_id = self._active_entity_id()
+        if active_id is not None:
+            # 1. Reuse MAW CoverCoordinator cache directly
+            for coordinator in self.hass.data.get(DOMAIN, {}).values():
+                if isinstance(coordinator, CoverCoordinator) and coordinator.source_entity_id == active_id:
+                    data = coordinator.data
+                    if data and data.image:
+                        return data.image, data.content_type or "image/jpeg"
+                    break
+            # 2. Delegate to source entity
+            entity_comp = self.hass.data.get("entity_components", {}).get(MP_DOMAIN)
+            if entity_comp is not None:
+                source_entity = entity_comp.get_entity(active_id)
+                if source_entity is not None:
+                    try:
+                        img, ct = await source_entity.async_get_media_image()
+                        if img:
+                            return img, ct or "image/jpeg"
+                    except Exception:
+                        pass
+        return FALLBACK_IMAGE, "image/png"
+
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {
+            "active_source": self._active_entity_id(),
+            "sources": self._sources,
+        }
+        if self._audio_sources:
+            attrs["active_audio_source"] = self._active_audio_entity_id()
+            attrs["audio_sources"] = self._audio_sources
+        if self._has_role_config:
+            resolved = self._resolve_active_role()
+            attrs["active_role"] = resolved[0] if resolved else None
+            attrs["role_map"] = self._role_map
+        return attrs
+
+    # ------------------------------------------------------------------
+    # Service forwarding
+    # ------------------------------------------------------------------
+
+    async def _call_active(self, service: str, **kwargs: Any) -> None:
+        """Forward a service call to the audio source (preferred) or display source."""
+        target = self._active_audio_entity_id() or self._active_entity_id()
+        if target is None:
+            # §2.2 prio 3/4 — no controllable player active; transport is a no-op.
+            _LOGGER.debug(
+                "CMP %s: %s ignored — no controllable player active (prio 3/4)",
+                self.entity_id or self._attr_unique_id,
+                service,
+            )
+            return
+        await self.hass.services.async_call(
+            "media_player",
+            service,
+            {"entity_id": target, **kwargs},
+            blocking=True,
+        )
+
+    async def async_media_play(self) -> None:
+        await self._call_active("media_play")
+
+    async def async_media_pause(self) -> None:
+        await self._call_active("media_pause")
+
+    async def async_media_stop(self) -> None:
+        await self._call_active("media_stop")
+
+    async def async_media_next_track(self) -> None:
+        await self._call_active("media_next_track")
+
+    async def async_media_previous_track(self) -> None:
+        await self._call_active("media_previous_track")
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        await self._call_active("volume_set", volume_level=volume)
+
+    async def async_volume_up(self) -> None:
+        await self._call_active("volume_up")
+
+    async def async_volume_down(self) -> None:
+        await self._call_active("volume_down")
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        await self._call_active("volume_mute", is_volume_muted=mute)
+
+    async def async_media_seek(self, position: float) -> None:
+        await self._call_active("media_seek", seek_position=position)
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+        await self._call_active(
+            "play_media",
+            media_content_type=media_type,
+            media_content_id=media_id,
+            **kwargs,
+        )
+
+    async def async_select_source(self, source: str) -> None:
+        await self._call_active("select_source", source=source)
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        await self._call_active("shuffle_set", shuffle=shuffle)
+
+    async def async_set_repeat(self, repeat: str) -> None:
+        await self._call_active("repeat_set", repeat=repeat)
+
+    async def async_turn_on(self) -> None:
+        await self._call_active("turn_on")
+
+    async def async_turn_off(self) -> None:
+        await self._call_active("turn_off")
+
+    async def async_toggle(self) -> None:
+        await self._call_active("toggle")
+
+    # ------------------------------------------------------------------
+    # Media browsing
+    # ------------------------------------------------------------------
+
+    def _browse_entity_id(self) -> str | None:
+        """Select the best delegate for async_browse_media().
+
+        Priority:
+        1. Active display source that supports BROWSE_MEDIA
+        2. Active audio source that supports BROWSE_MEDIA
+        3. Any configured source (display or audio) that supports BROWSE_MEDIA
+        """
+        def _supports_browse(sid: str) -> bool:
+            state = self.hass.states.get(sid)
+            if state is None:
+                return False
+            try:
+                sf = MediaPlayerEntityFeature(int(state.attributes.get("supported_features", 0)))
+                return bool(sf & MediaPlayerEntityFeature.BROWSE_MEDIA)
+            except (TypeError, ValueError):
+                return False
+
+        active_id = self._active_entity_id()
+        if active_id and _supports_browse(active_id):
+            return active_id
+        audio_id = self._active_audio_entity_id()
+        if audio_id and _supports_browse(audio_id):
+            return audio_id
+        for sid in self._sources + self._audio_sources + list(self._slot_delegate_map.values()):
+            if _supports_browse(sid):
+                return sid
+        return None
+
+    async def async_browse_media(
+        self,
+        media_content_type: str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        browse_id = self._browse_entity_id()
+        if browse_id is None:
+            from homeassistant.components.media_player.errors import BrowseError
+            raise BrowseError("No configured source supports media browsing")
+        entity_comp = self.hass.data.get("entity_components", {}).get(MP_DOMAIN)
+        if entity_comp is not None:
+            source_entity = entity_comp.get_entity(browse_id)
+            if source_entity is not None:
+                return await source_entity.async_browse_media(
+                    media_content_type, media_content_id
+                )
+        from homeassistant.components.media_player.errors import BrowseError
+        raise BrowseError(f"Source entity {browse_id} is not available for browsing")

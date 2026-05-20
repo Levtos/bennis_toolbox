@@ -1,0 +1,22 @@
+set_bio_state:
+  name: Set bio state
+  description: Override the bio state (sleep / waking / awake).
+  fields:
+    state:
+      name: State
+      description: Target bio state.
+      required: true
+      selector:
+        select:
+          options:
+            - sleep
+            - waking
+            - awake
+
+mark_sleep:
+  name: Mark as sleeping
+  description: Shortcut for set_bio_state with state=sleep.
+
+mark_awake:
+  name: Mark as awake
+  description: Shortcut for set_bio_state with state=awake.

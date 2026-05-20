@@ -1,0 +1,70 @@
+set_enum:
+  name: Set enum
+  description: Create or update an Title Classifier key and assign an enum value from 0 to 9.
+  fields:
+    entry_id:
+      name: Watcher entry ID
+      required: true
+      selector:
+        text:
+    key:
+      name: Key or title
+      required: true
+      selector:
+        text:
+    enum:
+      name: Enum
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 9
+          mode: box
+
+delete_entry:
+  name: Delete entry
+  description: Delete a stored key from a watcher.
+  fields:
+    entry_id:
+      name: Watcher entry ID
+      required: true
+      selector:
+        text:
+    key:
+      name: Key or title
+      required: true
+      selector:
+        text:
+
+import_entries:
+  name: Import entries
+  description: Create or update multiple Title Classifier title mappings for one watcher.
+  fields:
+    entry_id:
+      name: Watcher entry ID
+      required: true
+      selector:
+        text:
+    entries:
+      name: Entries
+      required: true
+      selector:
+        object:
+
+clear_old:
+  name: Clear old entries
+  description: Delete entries whose last_seen timestamp is older than the selected age.
+  fields:
+    entry_id:
+      name: Watcher entry ID
+      required: false
+      selector:
+        text:
+    days:
+      name: Days
+      required: true
+      default: 30
+      selector:
+        number:
+          min: 1
+          mode: box

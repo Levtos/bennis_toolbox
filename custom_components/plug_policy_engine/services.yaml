@@ -1,0 +1,40 @@
+force_evaluate:
+  name: Force evaluate
+  description: Re-run all policies for all configured devices.
+
+apply_policy_now:
+  name: Apply policy now
+  description: Re-evaluate and (temporarily) apply switch changes even if control is disabled.
+  fields:
+    device_id:
+      description: Optional device_id; if omitted, applies to all devices.
+      required: false
+      selector:
+        text:
+
+suspend_device_policy:
+  name: Suspend device policy
+  description: Stop evaluating / acting on a specific device until resumed.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
+
+resume_device_policy:
+  name: Resume device policy
+  description: Resume policy evaluation for a previously suspended device.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
+
+set_manual_recently_on:
+  name: Mark manual-on (PC protection)
+  description: Mark a device as just turned on manually; blocks auto-off during cooldown.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:

@@ -1,0 +1,92 @@
+{
+  "title": "Benni Context",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Context — Entitäten",
+        "description": "Wähle die Eingabe-Entitäten. Alle Felder sind optional; fehlende Inputs fallen auf dokumentierte Defaults zurück.",
+        "data": {
+          "gps_primary": "Primärer GPS-Tracker (person/device_tracker)",
+          "gps_secondary": "Sekundärer GPS-Tracker",
+          "wlan_benni": "Benni WLAN-Tracker",
+          "wlan_eltern_1": "Eltern WLAN-Tracker 1",
+          "wlan_eltern_2": "Eltern WLAN-Tracker 2",
+          "proximity_distance": "Proximity — Distanz",
+          "proximity_direction": "Proximity — Richtung",
+          "wake_next": "Wake Planner — nächste Weckzeit",
+          "wake_needed": "Wake Planner — Wecken nötig",
+          "pc_active": "PC aktiv",
+          "ps5_active": "PS5 aktiv",
+          "coffee_active": "Kaffeemaschine aktiv",
+          "door_wake": "Eingangstür-Wake-Signal",
+          "media_context": "Media-Context",
+          "private_source": "Privat-Modus Quelle",
+          "homeoffice_ping": "Homeoffice-Ping",
+          "holiday_sensor": "Feiertag / Urlaub",
+          "household_source": "Haushalt belegt (Gäste etc.)"
+        }
+      },
+      "thresholds": {
+        "title": "Benni Context — Schwellwerte",
+        "data": {
+          "home_radius": "Home-Radius (m)",
+          "preheat_radius": "Preheat-Radius (m)",
+          "near_radius": "Near-Radius (m)",
+          "hysteresis_m": "Hysterese (m)",
+          "preheat_duration": "Max. Preheat-Dauer (s)",
+          "tracker_freshness": "Tracker-Frische-Fenster (s)",
+          "transition_hold": "Transition-Haltedauer (s)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Nur eine Instanz von Benni Context erlaubt."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benni Context Optionen",
+        "menu_options": {
+          "entities": "Entitäten bearbeiten",
+          "thresholds": "Schwellwerte bearbeiten"
+        }
+      },
+      "entities": {
+        "title": "Entitäten",
+        "data": {
+          "gps_primary": "Primärer GPS-Tracker",
+          "gps_secondary": "Sekundärer GPS-Tracker",
+          "wlan_benni": "Benni WLAN-Tracker",
+          "wlan_eltern_1": "Eltern WLAN-Tracker 1",
+          "wlan_eltern_2": "Eltern WLAN-Tracker 2",
+          "proximity_distance": "Proximity — Distanz",
+          "proximity_direction": "Proximity — Richtung",
+          "wake_next": "Wake Planner — nächste Weckzeit",
+          "wake_needed": "Wake Planner — Wecken nötig",
+          "pc_active": "PC aktiv",
+          "ps5_active": "PS5 aktiv",
+          "coffee_active": "Kaffeemaschine aktiv",
+          "door_wake": "Eingangstür-Wake-Signal",
+          "media_context": "Media-Context",
+          "private_source": "Privat-Modus Quelle",
+          "homeoffice_ping": "Homeoffice-Ping",
+          "holiday_sensor": "Feiertag / Urlaub",
+          "household_source": "Haushalt belegt"
+        }
+      },
+      "thresholds": {
+        "title": "Schwellwerte",
+        "data": {
+          "home_radius": "Home-Radius (m)",
+          "preheat_radius": "Preheat-Radius (m)",
+          "near_radius": "Near-Radius (m)",
+          "hysteresis_m": "Hysterese (m)",
+          "preheat_duration": "Max. Preheat-Dauer (s)",
+          "tracker_freshness": "Tracker-Frische-Fenster (s)",
+          "transition_hold": "Transition-Haltedauer (s)"
+        }
+      }
+    }
+  }
+}

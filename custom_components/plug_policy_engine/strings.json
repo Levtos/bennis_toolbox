@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Plug Policy",
+        "description": "Global selectors. Devices are added via the options menu after setup.",
+        "data": {
+          "presence_entity": "Presence (zuhause / abwesend / bei_eltern)",
+          "bio_entity": "Bio state (awake / sleep)",
+          "day_entity": "Day phase",
+          "media_context_entity": "Media context",
+          "entertainment_active_entity": "Entertainment active",
+          "activity_entity": "Activity (optional)",
+          "enable_control": "Allow integration to switch devices",
+          "scan_interval": "Scan interval (s)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one instance of this integration is supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benni Plug Policy",
+        "menu_options": {
+          "globals": "Edit global selectors",
+          "add_device": "Add device",
+          "edit_device": "Edit device",
+          "remove_device": "Remove device"
+        }
+      },
+      "globals": { "title": "Global selectors" },
+      "add_device": { "title": "Add device" },
+      "edit_device": { "title": "Edit device" },
+      "remove_device": { "title": "Remove device" }
+    },
+    "abort": { "no_devices": "No devices configured yet." }
+  }
+}

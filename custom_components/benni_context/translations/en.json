@@ -1,0 +1,92 @@
+{
+  "title": "Benni Context",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Context — Entities",
+        "description": "Select the input entities. All fields are optional; missing inputs fall back to documented defaults.",
+        "data": {
+          "gps_primary": "Primary GPS tracker (person/device_tracker)",
+          "gps_secondary": "Secondary GPS tracker",
+          "wlan_benni": "Benni WLAN tracker",
+          "wlan_eltern_1": "Parents WLAN tracker 1",
+          "wlan_eltern_2": "Parents WLAN tracker 2",
+          "proximity_distance": "Proximity — distance",
+          "proximity_direction": "Proximity — direction",
+          "wake_next": "Wake Planner — next wake",
+          "wake_needed": "Wake Planner — wake needed",
+          "pc_active": "PC active",
+          "ps5_active": "PS5 active",
+          "coffee_active": "Coffee machine active",
+          "door_wake": "Entry door wake signal",
+          "media_context": "Media context",
+          "private_source": "Private mode source",
+          "homeoffice_ping": "Homeoffice ping",
+          "holiday_sensor": "Holiday / vacation",
+          "household_source": "Household occupancy (guests etc.)"
+        }
+      },
+      "thresholds": {
+        "title": "Benni Context — Thresholds",
+        "data": {
+          "home_radius": "Home radius (m)",
+          "preheat_radius": "Preheat radius (m)",
+          "near_radius": "Near radius (m)",
+          "hysteresis_m": "Hysteresis (m)",
+          "preheat_duration": "Max preheat duration (s)",
+          "tracker_freshness": "Tracker freshness window (s)",
+          "transition_hold": "Transition hold duration (s)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Benni Context instance is supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benni Context options",
+        "menu_options": {
+          "entities": "Edit entities",
+          "thresholds": "Edit thresholds"
+        }
+      },
+      "entities": {
+        "title": "Entities",
+        "data": {
+          "gps_primary": "Primary GPS tracker",
+          "gps_secondary": "Secondary GPS tracker",
+          "wlan_benni": "Benni WLAN tracker",
+          "wlan_eltern_1": "Parents WLAN tracker 1",
+          "wlan_eltern_2": "Parents WLAN tracker 2",
+          "proximity_distance": "Proximity — distance",
+          "proximity_direction": "Proximity — direction",
+          "wake_next": "Wake Planner — next wake",
+          "wake_needed": "Wake Planner — wake needed",
+          "pc_active": "PC active",
+          "ps5_active": "PS5 active",
+          "coffee_active": "Coffee machine active",
+          "door_wake": "Entry door wake signal",
+          "media_context": "Media context",
+          "private_source": "Private mode source",
+          "homeoffice_ping": "Homeoffice ping",
+          "holiday_sensor": "Holiday / vacation",
+          "household_source": "Household occupancy"
+        }
+      },
+      "thresholds": {
+        "title": "Thresholds",
+        "data": {
+          "home_radius": "Home radius (m)",
+          "preheat_radius": "Preheat radius (m)",
+          "near_radius": "Near radius (m)",
+          "hysteresis_m": "Hysteresis (m)",
+          "preheat_duration": "Max preheat duration (s)",
+          "tracker_freshness": "Tracker freshness window (s)",
+          "transition_hold": "Transition hold duration (s)"
+        }
+      }
+    }
+  }
+}

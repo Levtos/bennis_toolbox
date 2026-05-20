@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni Plug Policy",
+        "description": "Globale Selektoren. Geräte werden anschließend über die Optionen hinzugefügt.",
+        "data": {
+          "presence_entity": "Anwesenheit (zuhause / abwesend / bei_eltern)",
+          "bio_entity": "Bio-Status (awake / sleep)",
+          "day_entity": "Tagesphase",
+          "media_context_entity": "Medien-Kontext",
+          "entertainment_active_entity": "Entertainment aktiv",
+          "activity_entity": "Aktivität (optional)",
+          "enable_control": "Integration darf Steckdosen schalten",
+          "scan_interval": "Scan-Intervall (s)"
+        }
+      }
+    },
+    "abort": { "single_instance_allowed": "Nur eine Instanz dieser Integration ist erlaubt." }
+  },
+  "options": {
+    "step": {
+      "init": { "title": "Benni Plug Policy",
+        "menu_options": {
+          "globals": "Globale Selektoren bearbeiten",
+          "add_device": "Gerät hinzufügen",
+          "edit_device": "Gerät bearbeiten",
+          "remove_device": "Gerät entfernen"
+        }
+      },
+      "globals": { "title": "Globale Selektoren" },
+      "add_device": { "title": "Gerät hinzufügen" },
+      "edit_device": { "title": "Gerät bearbeiten" },
+      "remove_device": { "title": "Gerät entfernen" }
+    },
+    "abort": { "no_devices": "Es sind noch keine Geräte konfiguriert." }
+  }
+}

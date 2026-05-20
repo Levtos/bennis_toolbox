@@ -1,0 +1,13 @@
+{
+  "domain": "benni_media_context",
+  "name": "Benni Media Context",
+  "version": "0.1.0",
+  "documentation": "https://github.com/Benni/benni_media_context",
+  "issue_tracker": "https://github.com/Benni/benni_media_context/issues",
+  "codeowners": ["@Benni"],
+  "requirements": [],
+  "dependencies": [],
+  "config_flow": true,
+  "iot_class": "calculated",
+  "integration_type": "service"
+}
