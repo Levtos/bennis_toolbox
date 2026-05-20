@@ -28,7 +28,7 @@ verfügbaren Module:
 | `notification_router`   | Notification Router    | pending         |
 | `plug_policy_engine`    | Plug Policy Engine     | pending         |
 | `title_classifier`      | Title Classifier       | pending         |
-| `wake_planner`          | Wake Planner           | pending         |
+| `wake_planner`          | Wake Planner           | **ready**       |
 | `maw`                   | Media Art Wrapper      | stub            |
 | `stash_ha`              | Stash HA               | stub            |
 

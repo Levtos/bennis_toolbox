@@ -38,9 +38,25 @@ def load_module(module_id: str) -> ModuleType:
     return importlib.import_module(f"{__name__}.{module_id}")
 
 
+def _try_load_spec_module(module_id: str) -> ModuleType | None:
+    """Lade `<module>._spec` falls vorhanden — frei von HA-Imports.
+
+    Bevorzugt für Enumeration / Tests: vermeidet das Laden der vollen
+    Modul-Runtime nur um an die SPEC zu kommen.
+    """
+    try:
+        return importlib.import_module(f"{__name__}.{module_id}._spec")
+    except ModuleNotFoundError:
+        return None
+
+
 def get_spec(module_id: str) -> ModuleSpec:
-    mod = load_module(module_id)
-    spec = getattr(mod, "SPEC", None)
+    if module_id not in REGISTERED_MODULE_IDS:
+        raise ModuleNotFoundError(f"unknown toolbox module: {module_id}")
+    spec_mod = _try_load_spec_module(module_id)
+    if spec_mod is None:
+        spec_mod = load_module(module_id)
+    spec = getattr(spec_mod, "SPEC", None)
     if not isinstance(spec, ModuleSpec):
         raise RuntimeError(
             f"module '{module_id}' does not export a valid SPEC: ModuleSpec"

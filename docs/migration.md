@@ -48,7 +48,7 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 | `notification_router`   | PENDING  | SPEC, Referenz  | komplette Portierung                |
 | `plug_policy_engine`    | PENDING  | SPEC, Referenz  | komplette Portierung                |
 | `title_classifier`      | PENDING  | SPEC, Referenz  | inkl. Frontend-Panel + WebSocket    |
-| `wake_planner`          | PENDING  | SPEC, Referenz  | inkl. Frontend-Panel + WebSocket    |
+| `wake_planner`          | **READY**| voll portiert: Coordinator, Sensoren, Binary-Sensor, Services, WS, Panel, Flow | — |
 | `maw`                   | STUB     | SPEC            | (später)                            |
 | `stash_ha`              | STUB     | SPEC            | (später)                            |
 

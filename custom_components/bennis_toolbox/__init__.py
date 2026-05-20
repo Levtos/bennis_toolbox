@@ -69,12 +69,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("module %s exposes no async_setup_entry", module_id)
         return False
 
-    ok = await setup(hass, entry)
+    # Bucket vor dem Modul-Setup anlegen, damit das Modul seine Runtime
+    # (coordinator, store, …) direkt darin ablegen kann.
+    bucket: dict[str, Any] = {"module_id": module_id, "status": "loading"}
+    hass.data[DOMAIN][DATA_ENTRIES][entry.entry_id] = bucket
+
+    try:
+        ok = await setup(hass, entry)
+    except Exception:
+        hass.data[DOMAIN][DATA_ENTRIES].pop(entry.entry_id, None)
+        raise
     if not ok:
+        hass.data[DOMAIN][DATA_ENTRIES].pop(entry.entry_id, None)
         return False
 
     if spec.platforms:
-        await hass.config_entries.async_forward_entry_setups(entry, list(spec.platforms))
+        # spec.platforms kann mit HA-freien Enum-Werten deklariert sein —
+        # auf HA's Platform-Enum normalisieren.
+        platforms = [p if isinstance(p, Platform) else Platform(str(p)) for p in spec.platforms]
+        await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     if spec.has_panel:
         panel_reg = getattr(mod, "async_register_panel", None)
@@ -84,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("module %s panel registration failed: %s", module_id, err)
 
-    hass.data[DOMAIN][DATA_ENTRIES][entry.entry_id] = {"module_id": module_id, "status": "ready"}
+    bucket["status"] = "ready"
     entry.async_on_unload(entry.add_update_listener(_async_reload_on_options))
     return True
 
@@ -97,7 +110,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     spec = get_spec(module_id)
     if spec.platforms:
-        await hass.config_entries.async_unload_platforms(entry, list(spec.platforms))
+        platforms = [p if isinstance(p, Platform) else Platform(str(p)) for p in spec.platforms]
+        await hass.config_entries.async_unload_platforms(entry, platforms)
     mod = load_module(module_id)
     unload = getattr(mod, "async_unload_entry", None)
     if unload:

@@ -1,0 +1,88 @@
+# Services aller Toolbox-Module — Namensschema: <module_id>_<action>.
+# Domain in der HA-UI: bennis_toolbox.
+
+wake_planner_skip_next:
+  name: Wake Planner — Skip next wake
+  description: Skips the next scheduled wake for one person.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+wake_planner_set_override:
+  name: Wake Planner — Set override
+  description: Manually overrides the wake time for one person until an optional date.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    wake_time:
+      required: true
+      selector:
+        time:
+    until:
+      required: false
+      selector:
+        date:
+
+wake_planner_clear_override:
+  name: Wake Planner — Clear override
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+wake_planner_add_person:
+  name: Wake Planner — Add person
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    person_entity_id:
+      required: false
+      selector:
+        entity:
+          domain: person
+    entry_id:
+      required: false
+      selector:
+        text:
+
+wake_planner_remove_person:
+  name: Wake Planner — Remove person
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+wake_planner_set_rules:
+  name: Wake Planner — Set rules
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    rules:
+      required: true
+      selector:
+        object:
+
+wake_planner_set_special_rules:
+  name: Wake Planner — Set holiday/global rules
+  fields:
+    holiday_behavior:
+      required: false
+      selector:
+        select:
+          options:
+            - skip
+            - weekend_profile
+    manual_holiday_dates:
+      required: false
+      selector:
+        text:

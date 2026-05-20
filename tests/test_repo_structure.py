@@ -91,41 +91,51 @@ def test_all_expected_modules_present() -> None:
 def test_module_has_init_and_spec(module_id: str) -> None:
     init = MODULES_DIR / module_id / "__init__.py"
     assert init.exists(), f"{module_id}/__init__.py missing"
-    src = init.read_text(encoding="utf-8")
-    assert "SPEC = ModuleSpec(" in src, f"{module_id} does not declare SPEC"
-    assert f'module_id="{module_id}"' in src, f"{module_id} SPEC has wrong id"
+    init_src = init.read_text(encoding="utf-8")
+    spec_file = MODULES_DIR / module_id / "_spec.py"
+    # SPEC darf entweder im __init__.py oder in _spec.py deklariert sein.
+    spec_src = spec_file.read_text(encoding="utf-8") if spec_file.exists() else ""
+    has_spec = "SPEC = ModuleSpec(" in init_src or "SPEC: Final[ModuleSpec] = ModuleSpec(" in spec_src or "SPEC = ModuleSpec(" in spec_src
+    assert has_spec, f"{module_id} does not declare SPEC"
+    combined = init_src + spec_src
+    assert f'module_id="{module_id}"' in combined, f"{module_id} SPEC has wrong id"
 
 
 @pytest.mark.parametrize("module_id", sorted(EXPECTED_MODULE_IDS))
-def test_module_is_importable_without_homeassistant(module_id: str) -> None:
-    """SPEC of every module should be loadable in plain Python.
+def test_module_spec_loadable_without_homeassistant(module_id: str) -> None:
+    """SPEC of every module must be loadable without homeassistant.
 
-    Modules may import homeassistant for their runtime logic, but the
-    top-level `__init__.py` must keep the SPEC declaration importable so
-    the registry can enumerate modules.
+    READY modules ship `_spec.py` (HA-free), PENDING/STUB modules can keep
+    their SPEC in `__init__.py` since those don't import HA. This test
+    loads the SPEC the same way the registry does and verifies the id.
     """
-    # Build a minimal package context (modules → base) so `from ..base import …`
-    # works.
-    base = MODULES_DIR / module_id / "__init__.py"
-    base_module = MODULES_DIR / "base.py"
+    module_dir = MODULES_DIR / module_id
+    spec_file = module_dir / "_spec.py"
+    init_file = module_dir / "__init__.py"
+    target = spec_file if spec_file.exists() else init_file
 
-    pkg_name = "bt_modules_test"
+    pkg_name = f"bt_modules_test_{module_id}"
     pkg = ModuleType(pkg_name)
     pkg.__path__ = [str(MODULES_DIR)]
     sys.modules[pkg_name] = pkg
 
-    spec_base = importlib.util.spec_from_file_location(
-        f"{pkg_name}.base", base_module
+    base_spec = importlib.util.spec_from_file_location(
+        f"{pkg_name}.base", MODULES_DIR / "base.py"
     )
-    mod_base = importlib.util.module_from_spec(spec_base)
+    mod_base = importlib.util.module_from_spec(base_spec)
     sys.modules[f"{pkg_name}.base"] = mod_base
-    spec_base.loader.exec_module(mod_base)
+    base_spec.loader.exec_module(mod_base)
 
-    spec = importlib.util.spec_from_file_location(
-        f"{pkg_name}.{module_id}", base, submodule_search_locations=[str(base.parent)]
-    )
+    # Sub-package shell so `from ..base import …` resolves.
+    sub_pkg_name = f"{pkg_name}.{module_id}"
+    sub_pkg = ModuleType(sub_pkg_name)
+    sub_pkg.__path__ = [str(module_dir)]
+    sys.modules[sub_pkg_name] = sub_pkg
+
+    full_name = f"{sub_pkg_name}._spec" if target is spec_file else sub_pkg_name
+    spec = importlib.util.spec_from_file_location(full_name, target)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules[f"{pkg_name}.{module_id}"] = mod
+    sys.modules[full_name] = mod
     spec.loader.exec_module(mod)
 
     assert hasattr(mod, "SPEC")
