@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Create Title Classifier watcher",
+        "description": "Choose the entity whose title/state values should be mapped to an enum.",
+        "data": {
+          "name": "Name",
+          "source_entity": "Source entity",
+          "watcher_type": "Watcher type",
+          "retention_days": "Retention days"
+        }
+      },
+      "artist": {
+        "title": "Select artist attribute",
+        "description": "Choose the attribute that contains the artist/author for this media watcher.",
+        "data": {
+          "artist_attribute": "Artist attribute"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Title Classifier watcher options",
+        "data": {
+          "retention_days": "Retention days",
+          "auto_hide_hours": "Auto-hide after N hours (0 = off)"
+        }
+      }
+    }
+  }
+}

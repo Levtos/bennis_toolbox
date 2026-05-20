@@ -27,7 +27,7 @@ verfügbaren Module:
 | `benni_media_context`   | Benni Media Context    | pending         |
 | `notification_router`   | Notification Router    | pending         |
 | `plug_policy_engine`    | Plug Policy Engine     | pending         |
-| `title_classifier`      | Title Classifier       | pending         |
+| `title_classifier`      | Title Classifier       | **ready**       |
 | `wake_planner`          | Wake Planner           | **ready**       |
 | `maw`                   | Media Art Wrapper      | stub            |
 | `stash_ha`              | Stash HA               | stub            |

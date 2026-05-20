@@ -86,3 +86,66 @@ wake_planner_set_special_rules:
       required: false
       selector:
         text:
+
+# --- Title Classifier --------------------------------------------------------
+
+title_classifier_set_enum:
+  name: Title Classifier — Set enum
+  description: Maps a specific title to an enum value (0–9) for one watcher.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    key:
+      required: true
+      selector:
+        text:
+    enum:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 9
+          step: 1
+          mode: box
+
+title_classifier_delete_entry:
+  name: Title Classifier — Delete entry
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    key:
+      required: true
+      selector:
+        text:
+
+title_classifier_clear_old:
+  name: Title Classifier — Clear entries not seen for N days
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+    days:
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 1
+          step: 1
+          mode: box
+
+title_classifier_import_entries:
+  name: Title Classifier — Bulk-import mappings
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    entries:
+      required: true
+      selector:
+        object:

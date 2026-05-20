@@ -47,7 +47,7 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 | `benni_media_context`   | PENDING  | SPEC, `logic.py`, `const.py`, Logiktests | Config-Flow-Helper, Coordinator, Entities |
 | `notification_router`   | PENDING  | SPEC, Referenz  | komplette Portierung                |
 | `plug_policy_engine`    | PENDING  | SPEC, Referenz  | komplette Portierung                |
-| `title_classifier`      | PENDING  | SPEC, Referenz  | inkl. Frontend-Panel + WebSocket    |
+| `title_classifier`      | **READY**| voll portiert: Storage, Runtime, Sensoren, Number, Services, WS, Panel, Multi-Step-Flow | — |
 | `wake_planner`          | **READY**| voll portiert: Coordinator, Sensoren, Binary-Sensor, Services, WS, Panel, Flow | — |
 | `maw`                   | STUB     | SPEC            | (später)                            |
 | `stash_ha`              | STUB     | SPEC            | (später)                            |

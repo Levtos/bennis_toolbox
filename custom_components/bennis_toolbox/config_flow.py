@@ -81,17 +81,36 @@ class BennisToolboxConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._module_id and self._helper
         return await self._helper.async_step_init()
 
-    # Generischer Hop für mehrstufige Modul-Flows. Modulhelfer rufen
-    # `flow.async_show_form(step_id="module_step", ...)` und implementieren
-    # `async_step_module_step(flow, user_input)` selbst — siehe Modul-Doku.
+    # Generischer Hop für mehrstufige Modul-Flows. Modulhelfer dürfen
+    # `flow.async_show_form(step_id="<beliebig>", …)` zurückgeben und
+    # implementieren das passende `async_step_<beliebig>` selbst — wir
+    # leiten unbekannte Step-Methoden an den Helper durch. Das
+    # kanonische Eingangs-Step heißt aus Lesbarkeit `module_step`.
     async def async_step_module_step(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        assert self._helper is not None
-        handler = getattr(self._helper, "async_step_module_step", None)
+        return await self._delegate_step("module_step", user_input)
+
+    async def _delegate_step(self, step_id: str, user_input):
+        if self._helper is None:
+            return self.async_abort(reason="invalid_flow_state")
+        handler = getattr(self._helper, f"async_step_{step_id}", None)
         if handler is None:
             return self.async_abort(reason="invalid_flow_state")
         return await handler(user_input)
+
+    def __getattr__(self, name: str):
+        # Nur Step-Methoden weiterleiten, die HA via getattr() auflöst.
+        # __getattr__ wird nur bei nicht gefundenen Attributen aufgerufen,
+        # nicht bei explizit definierten Methoden.
+        if name.startswith("async_step_"):
+            step_id = name[len("async_step_"):]
+
+            async def _proxy(user_input=None, _sid=step_id):
+                return await self._delegate_step(_sid, user_input)
+
+            return _proxy
+        raise AttributeError(name)
 
     # --- Options Flow ---------------------------------------------------------
 
@@ -106,21 +125,45 @@ class BennisToolboxOptionsFlow(OptionsFlow):
         self.config_entry = config_entry
         self._helper: Any | None = None
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def _ensure_helper(self):
+        if self._helper is not None:
+            return True
         module_id: str | None = self.config_entry.data.get(CONF_MODULE_ID)
         if not module_id:
-            return self.async_abort(reason="missing_module")
+            return False
         try:
             mod = load_module(module_id)
         except Exception:  # noqa: BLE001
-            return self.async_abort(reason="unknown_module")
+            return False
         helper_cls = getattr(mod, "OptionsFlowHelper", None)
         if helper_cls is None:
-            # Modul hat keine Options.
+            return False
+        self._helper = helper_cls(self.hass, self.config_entry, self)
+        return True
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        if not await self._ensure_helper():
+            module_id: str | None = self.config_entry.data.get(CONF_MODULE_ID)
+            if not module_id:
+                return self.async_abort(reason="missing_module")
+            # Modul ohne OptionsFlowHelper — keine Options.
             return self.async_create_entry(title="", data=dict(self.config_entry.options))
-        if self._helper is None:
-            self._helper = helper_cls(self.hass, self.config_entry, self)
         return await self._helper.async_step_init(user_input)
+
+    def __getattr__(self, name: str):
+        if name.startswith("async_step_"):
+            step_id = name[len("async_step_"):]
+
+            async def _proxy(user_input=None, _sid=step_id):
+                if not await self._ensure_helper():
+                    return self.async_abort(reason="invalid_flow_state")
+                handler = getattr(self._helper, f"async_step_{_sid}", None)
+                if handler is None:
+                    return self.async_abort(reason="invalid_flow_state")
+                return await handler(user_input)
+
+            return _proxy
+        raise AttributeError(name)
 
 
 async def _maybe_make_helper(hass, module_id: str, flow):
