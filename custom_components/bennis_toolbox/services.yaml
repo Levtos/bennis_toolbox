@@ -204,3 +204,46 @@ benni_media_context_start_radio:
 benni_media_context_stop_media:
   name: Benni Media Context — Stop media event
   description: Fires bennis_toolbox_benni_media_context_stop_media on the bus.
+
+# --- Plug Policy Engine ------------------------------------------------------
+
+plug_policy_engine_force_evaluate:
+  name: Plug Policy Engine — Force evaluate
+  description: Re-runs policy evaluation on every active Plug Policy Engine instance.
+
+plug_policy_engine_apply_policy_now:
+  name: Plug Policy Engine — Apply policy now
+  description: Applies the current policy decision immediately. If device_id is omitted,
+    all configured devices are evaluated.
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
+
+plug_policy_engine_suspend_device_policy:
+  name: Plug Policy Engine — Suspend device policy
+  description: Suspends policy control for one configured device.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
+
+plug_policy_engine_resume_device_policy:
+  name: Plug Policy Engine — Resume device policy
+  description: Resumes policy control for one configured device.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
+
+plug_policy_engine_set_manual_recently_on:
+  name: Plug Policy Engine — Mark manual recently on
+  description: Marks one device as manually turned on so cooldown protection can apply.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
