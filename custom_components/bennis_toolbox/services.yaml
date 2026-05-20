@@ -149,3 +149,27 @@ title_classifier_import_entries:
       required: true
       selector:
         object:
+
+# --- Benni Context -----------------------------------------------------------
+
+benni_context_set_bio_state:
+  name: Benni Context — Set bio state
+  description: Manually overrides the persistent bio state for every loaded
+    Benni Context instance.
+  fields:
+    state:
+      required: true
+      selector:
+        select:
+          options:
+            - sleep
+            - waking
+            - awake
+
+benni_context_mark_sleep:
+  name: Benni Context — Mark as sleeping
+  description: Shortcut for set_bio_state with state=sleep.
+
+benni_context_mark_awake:
+  name: Benni Context — Mark as awake
+  description: Shortcut for set_bio_state with state=awake.

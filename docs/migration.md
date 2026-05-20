@@ -43,7 +43,7 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 
 | Modul                   | Status   | Was steht schon | Was fehlt                           |
 | ----------------------- | -------- | --------------- | ----------------------------------- |
-| `benni_context`         | PENDING  | SPEC, Referenz  | Config-Flow-Helper, Coordinator, Entities, Services |
+| `benni_context`         | **READY**| voll portiert: pure logic, Coordinator, Sensoren, Binary-Sensor, Services, 2-Step-Flow, Options-Menü | — |
 | `benni_media_context`   | PENDING  | SPEC, `logic.py`, `const.py`, Logiktests | Config-Flow-Helper, Coordinator, Entities |
 | `notification_router`   | PENDING  | SPEC, Referenz  | komplette Portierung                |
 | `plug_policy_engine`    | PENDING  | SPEC, Referenz  | komplette Portierung                |

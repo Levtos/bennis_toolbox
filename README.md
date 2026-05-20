@@ -23,7 +23,7 @@ verfügbaren Module:
 
 | Modul-ID                | Anzeigename            | Status in 0.2.0 |
 | ----------------------- | ---------------------- | --------------- |
-| `benni_context`         | Benni Context          | pending         |
+| `benni_context`         | Benni Context          | **ready**       |
 | `benni_media_context`   | Benni Media Context    | pending         |
 | `notification_router`   | Notification Router    | pending         |
 | `plug_policy_engine`    | Plug Policy Engine     | pending         |
