@@ -173,3 +173,34 @@ benni_context_mark_sleep:
 benni_context_mark_awake:
   name: Benni Context — Mark as awake
   description: Shortcut for set_bio_state with state=awake.
+
+# --- Benni Media Context -----------------------------------------------------
+
+benni_media_context_force_recalculate:
+  name: Benni Media Context — Force recalculate
+  description: Re-runs the decision pipeline on every active Media-Context instance.
+
+benni_media_context_set_manual_nudge:
+  name: Benni Media Context — Set manual nudge
+  description: Manually overrides the subcontext until cleared.
+  fields:
+    subcontext:
+      required: true
+      selector:
+        text:
+
+benni_media_context_clear_manual_nudge:
+  name: Benni Media Context — Clear manual nudge
+
+benni_media_context_start_radio:
+  name: Benni Media Context — Start radio event
+  description: Fires bennis_toolbox_benni_media_context_start_radio on the bus.
+  fields:
+    station:
+      required: false
+      selector:
+        text:
+
+benni_media_context_stop_media:
+  name: Benni Media Context — Stop media event
+  description: Fires bennis_toolbox_benni_media_context_stop_media on the bus.

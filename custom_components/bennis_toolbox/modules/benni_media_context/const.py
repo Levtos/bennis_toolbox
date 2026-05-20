@@ -1,8 +1,12 @@
-"""Constants for benni_media_context."""
+"""Constants for benni_media_context.
+
+Externe HA-Domain ist `bennis_toolbox`; alle Namespaces (Storage, Service,
+Event) leiten sich vom Modul-Helper aus `MODULE_ID` ab.
+"""
 from __future__ import annotations
 
-DOMAIN = "benni_media_context"
-PLATFORMS = ["sensor", "binary_sensor"]
+MODULE_ID = "benni_media_context"
+NAME = "Benni Media Context"
 
 # ---- Context values ----
 CTX_IDLE = "idle"
@@ -145,4 +149,6 @@ SERVICE_CLEAR_MANUAL_NUDGE = "clear_manual_nudge"
 SERVICE_START_RADIO = "start_radio"
 SERVICE_STOP_MEDIA = "stop_media"
 
-SIGNAL_UPDATE = f"{DOMAIN}_update"
+# Events auf dem HA-Bus (gepräfixt mit der Toolbox-Domäne).
+EVENT_START_RADIO = "bennis_toolbox_benni_media_context_start_radio"
+EVENT_STOP_MEDIA = "bennis_toolbox_benni_media_context_stop_media"
