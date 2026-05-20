@@ -193,6 +193,71 @@ def test_platform_dispatchers_exist() -> None:
         assert "async_setup_platform_for" in src, f"{name} does not delegate"
 
 
+LEGACY_WS_PATTERNS: tuple[str, ...] = (
+    # Pro Modul-ID das Bare-Prefix verbieten. Jeder dieser Strings darf im
+    # produktiven Frontend nur noch als `bennis_toolbox/<module>/...`
+    # auftauchen — die Bare-Form ist die alte HA-Domain-Schreibweise.
+    '"wake_planner/',
+    "'wake_planner/",
+    '"title_classifier/',
+    "'title_classifier/",
+    '"benni_context/',
+    "'benni_context/",
+    '"benni_media_context/',
+    "'benni_media_context/",
+    '"notification_router/',
+    "'notification_router/",
+    '"plug_policy_engine/',
+    "'plug_policy_engine/",
+    '"maw/',
+    "'maw/",
+    '"stash_ha/',
+    "'stash_ha/",
+)
+
+
+def test_no_bare_module_id_websocket_types_in_frontend() -> None:
+    """Frontend-Dateien dürfen WS-Type-Strings nur unter dem Toolbox-Präfix
+    senden: `bennis_toolbox/<module_id>/<command>`. Eine nackte
+    `<module_id>/<command>`-Form (z.B. `"wake_planner/get_state"`) gehört
+    zum alten HA-Domain-Schema und ist verboten.
+
+    Wir scannen `.js`/`.ts`-Dateien unter jedem `modules/<id>/frontend/`.
+    Treffer in `bennis_toolbox/<module>/...` werden automatisch
+    ignoriert, weil das Präfix vor dem Modulnamen sitzt.
+    """
+    offenders: list[str] = []
+    for module_dir in MODULES_DIR.iterdir():
+        if not module_dir.is_dir():
+            continue
+        frontend_dir = module_dir / "frontend"
+        if not frontend_dir.exists():
+            continue
+        for js in frontend_dir.rglob("*"):
+            if not js.is_file() or js.suffix not in {".js", ".ts", ".mjs"}:
+                continue
+            try:
+                src = js.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for needle in LEGACY_WS_PATTERNS:
+                idx = 0
+                while True:
+                    idx = src.find(needle, idx)
+                    if idx == -1:
+                        break
+                    # Erlaubt: `"bennis_toolbox/wake_planner/...` → check the
+                    # 17 chars before the match.
+                    head = src[max(0, idx - 17):idx]
+                    if not head.endswith("bennis_toolbox/"):
+                        line = src.count("\n", 0, idx) + 1
+                        offenders.append(
+                            f"{js.relative_to(REPO)}:{line}: bare WS prefix {needle[1:]}"
+                        )
+                    idx += len(needle)
+    assert not offenders, "Legacy bare WS commands in frontend:\n" + "\n".join(offenders)
+
+
 def test_no_cross_module_imports() -> None:
     """Modules must not import each other directly."""
     offenders: list[str] = []

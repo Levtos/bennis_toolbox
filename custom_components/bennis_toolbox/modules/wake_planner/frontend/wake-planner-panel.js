@@ -165,7 +165,7 @@ class WakePlannerPanel extends HTMLElement {
 
   async _refresh() {
     if (!this._hass) return;
-    this._state = await this._hass.callWS({ type: "wake_planner/get_state" });
+    this._state = await this._hass.callWS({ type: "bennis_toolbox/wake_planner/get_state" });
     this._loaded = true;
     if (this._tab === "calendar") await this._loadCalendarData();
     this._renderShell();
@@ -177,7 +177,7 @@ class WakePlannerPanel extends HTMLElement {
 
   async _loadSchedule() {
     try {
-      const res = await this._hass.callWS({ type: "wake_planner/get_schedule", days: 14 });
+      const res = await this._hass.callWS({ type: "bennis_toolbox/wake_planner/get_schedule", days: 14 });
       const map = {};
       for (const day of (res?.schedule || [])) map[day.date] = day;
       this._schedule = map;
@@ -607,11 +607,11 @@ class WakePlannerPanel extends HTMLElement {
     const action = el.dataset.action;
     const slug = el.dataset.person;
     if (action === "skip") {
-      const ok = await this._ws("wake_planner/skip_next", { person_id: slug });
+      const ok = await this._ws("bennis_toolbox/wake_planner/skip_next", { person_id: slug });
       if (ok) { this._updateTodayCard(slug); this._flashSuccess(el); this._toast("Next wake skipped"); }
     }
     else if (action === "clear-override") {
-      const ok = await this._ws("wake_planner/clear_override", { person_id: slug });
+      const ok = await this._ws("bennis_toolbox/wake_planner/clear_override", { person_id: slug });
       if (ok) { this._updateTodayCard(slug); this._flashSuccess(el); this._toast("Cleared"); }
     }
     else if (action === "override") this._openOverrideDialog(slug, el);
@@ -619,13 +619,13 @@ class WakePlannerPanel extends HTMLElement {
       const name = this.querySelector("#add-name")?.value?.trim();
       if (!name) return this._toast("Enter a name", true);
       const personEntity = this.querySelector("#add-person-entity")?.value || null;
-      const ok = await this._ws("wake_planner/add_person", { name, person_entity_id: personEntity });
+      const ok = await this._ws("bennis_toolbox/wake_planner/add_person", { name, person_entity_id: personEntity });
       if (ok) { this._flashSuccess(el); this._renderShell(); }
     }
     else if (action === "remove-person") {
       const person = this._state.persons.find(p => p.slug === slug);
       if (!confirm(`Delete ${person?.name || slug}? Rules and runtime state will be lost.`)) return;
-      const ok = await this._ws("wake_planner/remove_person", { person_id: slug });
+      const ok = await this._ws("bennis_toolbox/wake_planner/remove_person", { person_id: slug });
       if (ok) this._renderShell();
     }
     else if (action === "edit-person") this._openEditPersonDialog(slug);
@@ -675,7 +675,7 @@ class WakePlannerPanel extends HTMLElement {
     if (!person) return;
     const updated = this._collectRuleFields(slug, ruleId);
     const rules = person.rules.map(r => r.id === ruleId ? { ...r, ...updated, id: r.id } : r);
-    const ok = await this._ws("wake_planner/set_rules", { person_id: slug, rules });
+    const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules });
     if (ok) { this._flashSuccess(btn); this._toast("Rule saved"); this._updateTodayCard(slug); }
   }
 
@@ -692,7 +692,7 @@ class WakePlannerPanel extends HTMLElement {
       wake_time: "07:00",
     };
     const rules = [...person.rules, newRule];
-    const ok = await this._ws("wake_planner/set_rules", { person_id: slug, rules });
+    const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules });
     if (ok) { this._flashSuccess(btn); this._updatePersonCard(slug); this._updateTodayCard(slug); }
   }
 
@@ -700,14 +700,14 @@ class WakePlannerPanel extends HTMLElement {
     const person = this._state.persons.find(p => p.slug === slug);
     if (!person) return;
     if (!confirm("Delete this rule?")) return;
-    const ok = await this._ws("wake_planner/set_rules", { person_id: slug, rules: person.rules.filter(r => r.id !== ruleId) });
+    const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules: person.rules.filter(r => r.id !== ruleId) });
     if (ok) { this._updatePersonCard(slug); this._updateTodayCard(slug); this._toast("Rule deleted"); }
   }
 
   async _saveWindow(slug, btn) {
     const el = this.querySelector(`[data-window-for="${slug}"]`);
     const minutes = Math.max(1, Math.min(120, parseInt(el?.value || "5", 10)));
-    const ok = await this._ws("wake_planner/update_person", { person_id: slug, wake_window_minutes: minutes });
+    const ok = await this._ws("bennis_toolbox/wake_planner/update_person", { person_id: slug, wake_window_minutes: minutes });
     if (ok) { this._flashSuccess(btn); this._toast("Saved"); }
   }
 
@@ -718,7 +718,7 @@ class WakePlannerPanel extends HTMLElement {
       if (el.type === "checkbox") payload[key] = el.checked;
       else payload[key] = el.value;
     });
-    const ok = await this._ws("wake_planner/set_global", payload);
+    const ok = await this._ws("bennis_toolbox/wake_planner/set_global", payload);
     if (ok) { this._flashSuccess(btn); this._toast("Settings saved"); }
   }
 
@@ -737,7 +737,7 @@ class WakePlannerPanel extends HTMLElement {
     `, async (modal) => {
       const wake = modal.querySelector("#ov-time").value;
       const until = modal.querySelector("#ov-until").value || null;
-      const ok = await this._ws("wake_planner/set_override", { person_id: slug, wake_time: wake, until });
+      const ok = await this._ws("bennis_toolbox/wake_planner/set_override", { person_id: slug, wake_time: wake, until });
       if (ok) { this._updateTodayCard(slug); this._flashSuccess(sourceBtn); this._toast("Override set"); }
     });
   }
@@ -761,7 +761,7 @@ class WakePlannerPanel extends HTMLElement {
       const name = modal.querySelector("#ep-name").value.trim();
       const entity = modal.querySelector("#ep-entity").value || null;
       if (!name) return;
-      const ok = await this._ws("wake_planner/update_person", { person_id: slug, name, person_entity_id: entity });
+      const ok = await this._ws("bennis_toolbox/wake_planner/update_person", { person_id: slug, name, person_entity_id: entity });
       if (ok) { this._updatePersonCard(slug); this._updateTodayCard(slug); this._toast("Saved"); }
     });
   }
