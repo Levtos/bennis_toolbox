@@ -1,0 +1,8 @@
+{
+  "name": "Benni's Toolbox",
+  "render_readme": true,
+  "content_in_root": false,
+  "zip_release": false,
+  "filename": "bennis_toolbox.zip",
+  "homeassistant": "2024.10.0"
+}
