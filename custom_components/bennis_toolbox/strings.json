@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Benni's Toolbox",
+        "description": "Dach-/Übersichtsintegration für alle Toolbox-Module.",
+        "data": {
+          "show_missing": "Nicht installierte Module in der Übersicht anzeigen"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Benni's Toolbox ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Toolbox-Optionen",
+        "data": {
+          "show_missing": "Nicht installierte Module in der Übersicht anzeigen"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "domain": "bennis_toolbox",
+  "name": "Benni's Toolbox",
+  "version": "0.1.0",
+  "documentation": "https://github.com/Levtos/bennis_toolbox",
+  "issue_tracker": "https://github.com/Levtos/bennis_toolbox/issues",
+  "codeowners": ["@Levtos"],
+  "config_flow": true,
+  "iot_class": "calculated",
+  "integration_type": "service",
+  "dependencies": [],
+  "requirements": []
+}
