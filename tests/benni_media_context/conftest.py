@@ -6,7 +6,9 @@ import sys
 import types
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PKG_DIR = os.path.join(ROOT, "custom_components", "benni_media_context")
+PKG_DIR = os.path.join(
+    ROOT, "custom_components", "bennis_toolbox", "modules", "benni_media_context"
+)
 
 # Create a synthetic package so relative imports inside logic.py resolve.
 pkg_name = "bmc_logic_pkg"

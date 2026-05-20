@@ -3,18 +3,16 @@
     "step": {
       "user": {
         "title": "Benni's Toolbox",
-        "description": "Dach-/Übersichtsintegration für alle Toolbox-Module.",
-        "data": { "show_missing": "Nicht installierte Module in der Übersicht anzeigen" }
+        "description": "Wähle das Modul, das du der Toolbox hinzufügen willst. Module mit Status \"pending\" sind im Repo angelegt, aber noch nicht voll aktiv — sie können dennoch vorgemerkt werden.",
+        "data": { "_module_id": "Modul" }
       }
     },
-    "abort": { "already_configured": "Benni's Toolbox ist bereits eingerichtet." }
+    "abort": {
+      "missing_module": "Fehlender Modul-Identifikator im Config-Entry.",
+      "unknown_module": "Dieses Modul ist nicht (mehr) registriert.",
+      "invalid_flow_state": "Flow-Zustand kaputt."
+    },
+    "error": { "unknown_module": "Unbekanntes Modul." }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Toolbox-Optionen",
-        "data": { "show_missing": "Nicht installierte Module in der Übersicht anzeigen" }
-      }
-    }
-  }
+  "options": { "step": { "init": { "title": "Modul-Optionen" } } }
 }

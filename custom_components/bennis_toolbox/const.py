@@ -1,33 +1,53 @@
-"""Constants for the bennis_toolbox umbrella integration."""
+"""Toolbox-weite Konstanten.
+
+Es gibt genau eine HA-Integrationsdomäne: `bennis_toolbox`. Alles, was nach
+außen sichtbar wird (Storage-Keys, Service-Namen, WebSocket-Befehle, Panel-
+URLs), ist innerhalb dieser Domäne mit der Modul-ID präfixiert.
+"""
 
 from __future__ import annotations
 
-DOMAIN = "bennis_toolbox"
+from typing import Final
 
-# Teilintegrationen, die unter dem Toolbox-Dach observiert werden.
-# Eintragsformat: (domain, anzeigename, kurzbeschreibung)
-# WICHTIG: bewusst nur Beobachtung, keine harte Abhängigkeit.
-KNOWN_MEMBERS: tuple[tuple[str, str, str], ...] = (
-    ("wake_planner",         "Wake Planner",         "Weckzeiten- und Routinenplanung"),
-    ("title_classifier",     "Title Classifier",     "Entity-Title-Mapping / Klassifikation"),
-    ("benni_context",        "Benni Context",        "Allgemeiner Kontext-Service"),
-    ("benni_media_context",  "Benni Media Context",  "Medien-/Player-Kontext"),
-    ("notification_router",  "Notification Router",  "Routing von Notifications"),
-    ("plug_policy_engine",   "Plug Policy Engine",   "Steckdosen-Policies"),
-    ("stash_ha",             "Stash HA",             "Stash-Mediaplayer-Bridge"),
-    ("maw",                  "Media Art Wrapper",    "Cover-Art-/Metadaten-Wrapper"),
-)
+DOMAIN: Final[str] = "bennis_toolbox"
 
-# Alte Domains aus Vor-Release-Phase. Nur zur Erkennung evtl. verbliebener
-# Test-Config-Entries — nie als Zielnamen. Wenn eine dieser Domains noch im
-# System ein Config-Entry hat, gibt der Member-Sensor "legacy" + Hinweis aus.
-LEGACY_DOMAINS: dict[str, str] = {
-    "etm":                       "title_classifier",
-    "benni_notification_router": "notification_router",
-    "benni_plug_policy":         "plug_policy_engine",
-    "stash_player":              "stash_ha",
-    "media_art_wrapper":         "maw",
-}
+# Datenwurzel in hass.data[DOMAIN]:
+#   {
+#       "entries": { entry_id: <ModuleRuntime> },
+#       "services_registered": bool,
+#   }
+DATA_ENTRIES: Final[str] = "entries"
+DATA_SERVICES_REGISTERED: Final[str] = "services_registered"
 
-CONF_SHOW_MISSING = "show_missing"
-DEFAULT_SHOW_MISSING = True
+# Marker im ConfigEntry.data
+CONF_MODULE_ID: Final[str] = "_module_id"
+
+# Storage-Präfix: jede Modul-Komponente benutzt
+#   Store(hass, STORAGE_VERSION, storage_key("wake_planner", "plans"))
+# damit Dateien unter .storage/bennis_toolbox_<module>_<name> landen.
+STORAGE_PREFIX: Final[str] = f"{DOMAIN}_"
+
+
+def storage_key(module_id: str, suffix: str) -> str:
+    """Stabiler Storage-Key innerhalb der Toolbox."""
+    return f"{STORAGE_PREFIX}{module_id}_{suffix}"
+
+
+def service_name(module_id: str, action: str) -> str:
+    """Service heißt z.B. `bennis_toolbox.wake_planner_set_plan`."""
+    return f"{module_id}_{action}"
+
+
+def websocket_type(module_id: str, command: str) -> str:
+    """WebSocket-Befehl heißt z.B. `bennis_toolbox/wake_planner/list`."""
+    return f"{DOMAIN}/{module_id}/{command}"
+
+
+def panel_url_path(module_id: str) -> str:
+    """Sidebar-URL-Path eines Modul-Panels: `bennis_toolbox_wake_planner`."""
+    return f"{DOMAIN}_{module_id}"
+
+
+def unique_id(module_id: str, *parts: str) -> str:
+    """Eindeutige unique_id mit Modul-Präfix."""
+    return "_".join((DOMAIN, module_id, *parts))

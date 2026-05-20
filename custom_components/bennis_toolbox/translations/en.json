@@ -3,18 +3,16 @@
     "step": {
       "user": {
         "title": "Benni's Toolbox",
-        "description": "Umbrella/overview integration for all Toolbox modules.",
-        "data": { "show_missing": "Show missing modules in overview" }
+        "description": "Pick which module to add to the toolbox. Modules marked \"pending\" exist in the repo but are not yet fully wired — you can still create an entry for them.",
+        "data": { "_module_id": "Module" }
       }
     },
-    "abort": { "already_configured": "Benni's Toolbox is already configured." }
+    "abort": {
+      "missing_module": "Config entry is missing its module identifier.",
+      "unknown_module": "This module is no longer registered.",
+      "invalid_flow_state": "Broken flow state."
+    },
+    "error": { "unknown_module": "Unknown module." }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Toolbox options",
-        "data": { "show_missing": "Show missing modules in overview" }
-      }
-    }
-  }
+  "options": { "step": { "init": { "title": "Module options" } } }
 }

@@ -1,43 +1,85 @@
 # Benni's Toolbox
 
-Monorepo of Home Assistant custom integrations.
+Eine einzige Home-Assistant-Integration, die mehrere fachlich getrennte
+Module unter einem Dach bündelt. HACS installiert **nur** `bennis_toolbox`,
+HA zeigt **nur** „Benni's Toolbox" unter „Geräte & Dienste". Module werden
+beim Hinzufügen der Toolbox einzeln ausgewählt und konfiguriert.
+
+## Installation in HACS
+
+1. HACS → Custom Repositories → URL `https://github.com/Levtos/bennis_toolbox`,
+   Kategorie "Integration".
+2. „Benni's Toolbox" installieren.
+3. Home Assistant neu starten.
+
+Damit liegt unter `/config/custom_components/` exakt ein Ordner:
+`bennis_toolbox/`.
+
+## Modul hinzufügen
+
+In HA → **Einstellungen → Geräte & Dienste → Integration hinzufügen** →
+„Benni's Toolbox". Im ersten Schritt wählt der Selector eines der
+verfügbaren Module:
+
+| Modul-ID                | Anzeigename            | Status in 0.2.0 |
+| ----------------------- | ---------------------- | --------------- |
+| `benni_context`         | Benni Context          | pending         |
+| `benni_media_context`   | Benni Media Context    | pending         |
+| `notification_router`   | Notification Router    | pending         |
+| `plug_policy_engine`    | Plug Policy Engine     | pending         |
+| `title_classifier`      | Title Classifier       | pending         |
+| `wake_planner`          | Wake Planner           | pending         |
+| `maw`                   | Media Art Wrapper      | stub            |
+| `stash_ha`              | Stash HA               | stub            |
+
+**Statuswerte:**
+- `ready` — voll lauffähig, Entities/Services aktiv.
+- `pending` — Spec ist registriert, Fachlogik liegt unter `_reference/`
+  bereit zur Portierung. Config-Entry kann angelegt werden, registriert
+  aber noch keine Entities oder Services. Wird in Folge-Releases auf
+  `ready` gehoben.
+- `stub` — Platzhalter ohne Logik.
+
+Mehrere Instanzen desselben Moduls (z. B. zwei MAW-Player) werden als
+separate Config-Entries verwaltet.
 
 ## Architektur
 
-`bennis_toolbox` ist ein **Monorepo**, keine Mega-Integration. Jede fachliche
-Integration bleibt eigenständig unter `custom_components/<domain>/` und
-behält ihren bisherigen Domain-Namen, Storage-Key und Config-Entries.
+Genau eine HA-Domain: `bennis_toolbox`. Innerhalb der Integration:
 
-Die Dachintegration `bennis_toolbox` ist nur:
+```
+custom_components/bennis_toolbox/
+  __init__.py            # Dispatch setup/unload an das jeweilige Modul
+  manifest.json
+  const.py
+  config_flow.py         # Modul-Selector + Delegation an ConfigFlowHelper
+  diagnostics.py
+  services.py            # registriert <module>_<action> unter Domain
+  websocket_api.py       # registriert bennis_toolbox/<module>/<cmd>
+  storage.py             # Wrapper für Store(...) mit Modul-Präfix
+  sensor.py, binary_sensor.py, …   # Platform-Dispatcher (delegieren ans Modul)
+  modules/
+    __init__.py          # Registry
+    base.py              # ModuleSpec / ModuleStatus
+    <module_id>/
+      __init__.py        # SPEC + async_setup_entry + async_get_entities
+      …                  # module-internal files
+```
 
-- **Navigations-/Übersichtsschicht** (welche Teilintegrationen sind installiert/geladen)
-- **Health- und Diagnose-Schicht** (Status-Sensoren, Diagnostics-Dump)
-- **kein** Ort für fachliche Logik oder Automationen
+Entities, Services, WebSockets und Storage werden mit der Modul-ID
+präfixiert, damit zwischen Modulen nichts kollidiert:
 
-Siehe [docs/architecture.md](docs/architecture.md) und [docs/migration.md](docs/migration.md).
+- unique_id: `bennis_toolbox_<module>_<…>`
+- Service: `bennis_toolbox.<module>_<action>`
+- WebSocket: `bennis_toolbox/<module>/<command>`
+- Storage: `.storage/bennis_toolbox_<module>_<suffix>`
+- Panel-URL: `bennis_toolbox_<module>` (Sidebar)
 
-## Enthaltene Integrationen
+## Module portieren
 
-| Ordner / Domain        | Anzeigename            |
-| ---------------------- | ---------------------- |
-| `bennis_toolbox`       | Benni's Toolbox        |
-| `wake_planner`         | Wake Planner           |
-| `title_classifier`     | Title Classifier       |
-| `benni_context`        | Benni Context          |
-| `benni_media_context`  | Benni Media Context    |
-| `notification_router`  | Notification Router    |
-| `plug_policy_engine`   | Plug Policy Engine     |
-| `stash_ha`             | Stash HA               |
-| `maw`                  | Media Art Wrapper      |
-
-> Domains sind die **finalen** Namen. Historische Vorgänger und Hinweise für
-> die Migration siehe `docs/migration.md`.
-
-## Installation (HACS)
-
-Custom Repository hinzufügen → "Integration" → URL des Repos.
-Nach Installation erscheinen alle Teilintegrationen einzeln im
-"Integration hinzufügen"-Dialog von Home Assistant.
+Siehe [docs/module_adapter.md](docs/module_adapter.md) — schrittweise
+Anleitung, ein PENDING-Modul auf READY zu heben, basierend auf dem
+Referenzcode unter `_reference/`.
 
 ## Entwicklung
 

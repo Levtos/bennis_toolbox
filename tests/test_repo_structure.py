@@ -1,98 +1,43 @@
-"""Smoke-Tests für die Monorepo-Struktur.
+"""Smoke tests for the umbrella architecture.
 
-Diese Tests prüfen *Repo-Hygiene*, nicht das HA-Verhalten:
-- Jede Integration hat ein valides manifest.json mit eindeutiger Domain.
-- Ordnername == Domain.
-- Keine Cross-Imports zwischen Teilintegrationen.
-- Dachintegration hat config_flow und kennt alle Member im Code (KNOWN_MEMBERS).
+bennis_toolbox is one integration, one HA domain. Inside it, modules live
+under custom_components/bennis_toolbox/modules/<module_id>/ and each
+exposes a ModuleSpec.
 """
 
 from __future__ import annotations
 
 import ast
+import importlib.util
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 CC = REPO / "custom_components"
-UMBRELLA = "bennis_toolbox"
+INTEGRATION_DIR = CC / "bennis_toolbox"
+MODULES_DIR = INTEGRATION_DIR / "modules"
 
+EXPECTED_MODULE_IDS: set[str] = {
+    "benni_context",
+    "benni_media_context",
+    "notification_router",
+    "plug_policy_engine",
+    "title_classifier",
+    "wake_planner",
+    "maw",
+    "stash_ha",
+}
 
-def _integration_dirs() -> list[Path]:
-    return sorted(p for p in CC.iterdir() if p.is_dir() and (p / "manifest.json").exists())
-
-
-def test_integration_dirs_found() -> None:
-    dirs = _integration_dirs()
-    names = {p.name for p in dirs}
-    assert UMBRELLA in names, "Dach-Integration fehlt"
-    # Mindestens das Dach + ein paar Teilintegrationen
-    assert len(dirs) >= 5, f"Unerwartet wenige Integrationen: {names}"
-
-
-@pytest.mark.parametrize("path", _integration_dirs(), ids=lambda p: p.name)
-def test_manifest_valid_and_matches_dirname(path: Path) -> None:
-    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
-    assert "domain" in manifest, f"{path.name}: kein domain-Feld"
-    assert manifest["domain"] == path.name, (
-        f"{path.name}: domain={manifest['domain']} stimmt nicht mit Ordnername überein"
-    )
-    assert "name" in manifest and manifest["name"]
-    assert "version" in manifest and manifest["version"]
-
-
-def test_domains_unique() -> None:
-    domains = [
-        json.loads((p / "manifest.json").read_text(encoding="utf-8"))["domain"]
-        for p in _integration_dirs()
-    ]
-    assert len(domains) == len(set(domains)), f"doppelte Domains: {domains}"
-
-
-def test_no_cross_integration_imports() -> None:
-    """Keine Teilintegration importiert eine andere via custom_components.<x>."""
-    domains = {p.name for p in _integration_dirs()}
-    offenders: list[str] = []
-    for integ in _integration_dirs():
-        own = integ.name
-        for py in integ.rglob("*.py"):
-            try:
-                tree = ast.parse(py.read_text(encoding="utf-8"))
-            except SyntaxError:
-                continue
-            for node in ast.walk(tree):
-                mods: list[str] = []
-                if isinstance(node, ast.Import):
-                    mods = [n.name for n in node.names]
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    mods = [node.module]
-                for mod in mods:
-                    if not mod.startswith("custom_components."):
-                        continue
-                    parts = mod.split(".")
-                    if len(parts) >= 2 and parts[1] in domains and parts[1] != own:
-                        offenders.append(f"{py.relative_to(REPO)} -> {mod}")
-    assert not offenders, "Cross-Imports gefunden:\n" + "\n".join(offenders)
-
-
-def test_umbrella_has_config_flow_and_known_members() -> None:
-    umbrella = CC / UMBRELLA
-    manifest = json.loads((umbrella / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest.get("config_flow") is True
-    const_src = (umbrella / "const.py").read_text(encoding="utf-8")
-    assert "KNOWN_MEMBERS" in const_src
-    # Smoke: die im Repo vorhandenen Teilintegrationen sollten in KNOWN_MEMBERS auftauchen.
-    members_listed = {p.name for p in _integration_dirs()} - {UMBRELLA}
-    for domain in members_listed:
-        assert f'"{domain}"' in const_src, (
-            f"{domain} ist im Repo vorhanden, aber nicht in KNOWN_MEMBERS gelistet"
-        )
-
-
-EXPECTED_DOMAINS: set[str] = {
-    "bennis_toolbox",
+LEGACY_TOP_LEVEL_DOMAINS: set[str] = {
+    "etm",
+    "stash_player",
+    "media_art_wrapper",
+    "benni_notification_router",
+    "benni_plug_policy",
     "wake_planner",
     "title_classifier",
     "benni_context",
@@ -103,104 +48,166 @@ EXPECTED_DOMAINS: set[str] = {
     "maw",
 }
 
-LEGACY_DOMAINS: set[str] = {
-    "etm",
-    "benni_notification_router",
-    "benni_plug_policy",
-    "stash_player",
-    "media_art_wrapper",
-}
+
+# ----------------------------------------------------------------------- shape
 
 
-def test_expected_domains_present() -> None:
-    actual = {p.name for p in _integration_dirs()}
-    missing = EXPECTED_DOMAINS - actual
-    extra = actual - EXPECTED_DOMAINS
-    assert not missing, f"fehlende Integrationen: {missing}"
-    assert not extra, f"unerwartete Integrationen: {extra}"
+def test_only_one_top_level_integration() -> None:
+    integrations = sorted(p.name for p in CC.iterdir() if p.is_dir())
+    assert integrations == ["bennis_toolbox"], (
+        f"only bennis_toolbox may live under custom_components/, got: {integrations}"
+    )
 
 
-def test_no_legacy_domain_folders() -> None:
+def test_no_legacy_top_level_integration_folders() -> None:
     actual = {p.name for p in CC.iterdir() if p.is_dir()}
-    leftover = LEGACY_DOMAINS & actual
-    assert not leftover, f"Legacy-Ordner noch vorhanden: {leftover}"
+    leftover = LEGACY_TOP_LEVEL_DOMAINS & actual
+    # The umbrella itself is fine.
+    leftover.discard("bennis_toolbox")
+    assert not leftover, f"legacy top-level integration folders: {leftover}"
 
 
-def test_no_legacy_domain_in_manifests() -> None:
-    """Kein manifest.json darf eine alte Domain als domain-Feld haben."""
-    for path in _integration_dirs():
-        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
-        assert manifest["domain"] not in LEGACY_DOMAINS, (
-            f"{path.name}/manifest.json domain={manifest['domain']} ist legacy"
-        )
+def test_manifest_domain_matches() -> None:
+    manifest = json.loads((INTEGRATION_DIR / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["domain"] == "bennis_toolbox"
+    assert manifest.get("config_flow") is True
 
 
-LEGACY_TOKENS: tuple[str, ...] = (
-    "benni_notification_router",
-    "benni_plug_policy",
-    "stash_player",
-    "media_art_wrapper",
-    "etm",   # case-sensitive substring; matches "etm", "etm_", "_etm"
-    "ETM",   # CONF_ETM_*, ETM_GAME_*, "ETM" in docstrings/comments
-    "Etm",   # CamelCase class prefixes like EtmConfigFlow
-)
+# --------------------------------------------------------------------- modules
+
+
+def test_all_expected_modules_present() -> None:
+    actual = {
+        p.name for p in MODULES_DIR.iterdir()
+        if p.is_dir() and not p.name.startswith("_") and p.name != "__pycache__"
+    }
+    missing = EXPECTED_MODULE_IDS - actual
+    extra = actual - EXPECTED_MODULE_IDS
+    assert not missing, f"missing modules: {missing}"
+    assert not extra, f"unexpected modules: {extra}"
+
+
+@pytest.mark.parametrize("module_id", sorted(EXPECTED_MODULE_IDS))
+def test_module_has_init_and_spec(module_id: str) -> None:
+    init = MODULES_DIR / module_id / "__init__.py"
+    assert init.exists(), f"{module_id}/__init__.py missing"
+    src = init.read_text(encoding="utf-8")
+    assert "SPEC = ModuleSpec(" in src, f"{module_id} does not declare SPEC"
+    assert f'module_id="{module_id}"' in src, f"{module_id} SPEC has wrong id"
+
+
+@pytest.mark.parametrize("module_id", sorted(EXPECTED_MODULE_IDS))
+def test_module_is_importable_without_homeassistant(module_id: str) -> None:
+    """SPEC of every module should be loadable in plain Python.
+
+    Modules may import homeassistant for their runtime logic, but the
+    top-level `__init__.py` must keep the SPEC declaration importable so
+    the registry can enumerate modules.
+    """
+    # Build a minimal package context (modules → base) so `from ..base import …`
+    # works.
+    base = MODULES_DIR / module_id / "__init__.py"
+    base_module = MODULES_DIR / "base.py"
+
+    pkg_name = "bt_modules_test"
+    pkg = ModuleType(pkg_name)
+    pkg.__path__ = [str(MODULES_DIR)]
+    sys.modules[pkg_name] = pkg
+
+    spec_base = importlib.util.spec_from_file_location(
+        f"{pkg_name}.base", base_module
+    )
+    mod_base = importlib.util.module_from_spec(spec_base)
+    sys.modules[f"{pkg_name}.base"] = mod_base
+    spec_base.loader.exec_module(mod_base)
+
+    spec = importlib.util.spec_from_file_location(
+        f"{pkg_name}.{module_id}", base, submodule_search_locations=[str(base.parent)]
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[f"{pkg_name}.{module_id}"] = mod
+    spec.loader.exec_module(mod)
+
+    assert hasattr(mod, "SPEC")
+    assert mod.SPEC.module_id == module_id
+
+
+# ------------------------------------------------------------------ legacy ban
+
+
+LEGACY_TOKENS = ("ETM", "Etm", "stash_player", "media_art_wrapper",
+                 "benni_notification_router", "benni_plug_policy")
 
 
 def test_no_legacy_tokens_in_production_code() -> None:
-    """Produktiver Code in den Teilintegrationen darf keine Legacy-Tokens
-    enthalten. Erlaubt sind nur:
-      - bennis_toolbox/const.py (LEGACY_DOMAINS-Mapping)
-      - bennis_toolbox/status.py (Legacy-Erkennung)
-      - alle Dateien in docs/ und tests/
+    """Production code under custom_components/ must not contain legacy
+    integration-domain tokens. Lowercase 'etm' is intentionally not
+    blocked here because it is a substring of harmless words.
     """
     offenders: list[str] = []
-    for integ in _integration_dirs():
-        for file in integ.rglob("*"):
-            if not file.is_file() or file.suffix in {".pyc"}:
-                continue
-            if "__pycache__" in file.parts:
-                continue
-            rel = file.relative_to(REPO)
-            # bennis_toolbox darf Legacy-Domains erwähnen (Erkennung).
-            if rel.parts[:2] == ("custom_components", "bennis_toolbox"):
-                continue
-            try:
-                src = file.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-            for token in LEGACY_TOKENS:
-                # Substring-Match. 'etm' lowercase ist absichtlich strikt,
-                # damit CONF_ETM_*, etm_ps5, ETM_GAME_* nicht zurückkehren.
-                if token in src:
-                    offenders.append(f"{rel}: contains '{token}'")
-                    break
-    assert not offenders, "Legacy-Tokens im Produktivcode:\n" + "\n".join(offenders)
-
-
-def test_no_toolbox_domain_prefixes() -> None:
-    """Teilintegrationen dürfen keinen 'toolbox_'-Präfix in der Domain führen.
-    Organisatorische Zugehörigkeit gehört ins Monorepo, nicht in den Domain-Namen.
-    """
-    bad: list[str] = []
-    for path in _integration_dirs():
-        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
-        domain = manifest["domain"]
-        if domain == "bennis_toolbox":
+    for file in INTEGRATION_DIR.rglob("*"):
+        if not file.is_file() or "__pycache__" in file.parts:
             continue
-        if domain.startswith("toolbox_") or domain.startswith("bennis_toolbox_"):
-            bad.append(f"{path.name}: domain={domain}")
-    assert not bad, "Verbotene toolbox_-Präfixe:\n" + "\n".join(bad)
+        if file.suffix not in {".py", ".json", ".yaml", ".js", ".md"}:
+            continue
+        try:
+            src = file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for token in LEGACY_TOKENS:
+            if token in src:
+                offenders.append(f"{file.relative_to(REPO)}: contains {token}")
+    assert not offenders, "legacy tokens in production code:\n" + "\n".join(offenders)
 
 
-def test_umbrella_does_not_import_members() -> None:
-    """Dach-Integration darf keine Teilintegration hart importieren."""
-    umbrella = CC / UMBRELLA
-    member_domains = {p.name for p in _integration_dirs()} - {UMBRELLA}
+def test_no_toolbox_domain_prefix() -> None:
+    """No module folder name may use a toolbox_ prefix — organisational
+    membership lives in the monorepo, not in the module id.
+    """
+    bad = [m for m in EXPECTED_MODULE_IDS if m.startswith("toolbox_")]
+    assert not bad, f"toolbox_-prefixed modules: {bad}"
+
+
+# --------------------------------------------------------- structural sanity
+
+
+def test_platform_dispatchers_exist() -> None:
+    expected = [
+        "sensor.py", "binary_sensor.py", "number.py", "select.py",
+        "switch.py", "button.py", "calendar.py", "image.py", "media_player.py",
+    ]
+    for name in expected:
+        path = INTEGRATION_DIR / name
+        assert path.exists(), f"missing platform dispatcher {name}"
+        src = path.read_text(encoding="utf-8")
+        assert "async_setup_platform_for" in src, f"{name} does not delegate"
+
+
+def test_no_cross_module_imports() -> None:
+    """Modules must not import each other directly."""
     offenders: list[str] = []
-    for py in umbrella.rglob("*.py"):
-        src = py.read_text(encoding="utf-8")
-        for d in member_domains:
-            needle = f"custom_components.{d}"
-            if needle in src:
-                offenders.append(f"{py.relative_to(REPO)} -> {needle}")
-    assert not offenders, "Dach importiert Teilintegrationen:\n" + "\n".join(offenders)
+    for module_dir in MODULES_DIR.iterdir():
+        if not module_dir.is_dir():
+            continue
+        own = module_dir.name
+        for py in module_dir.rglob("*.py"):
+            try:
+                tree = ast.parse(py.read_text(encoding="utf-8"))
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                mods: list[str] = []
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    mods = [node.module]
+                elif isinstance(node, ast.Import):
+                    mods = [n.name for n in node.names]
+                for m in mods:
+                    parts = m.split(".")
+                    # Detect import patterns like `..benni_context` or
+                    # `custom_components.bennis_toolbox.modules.benni_context`.
+                    for other in EXPECTED_MODULE_IDS:
+                        if other == own:
+                            continue
+                        if other in parts:
+                            offenders.append(f"{py.relative_to(REPO)} -> {m}")
+    assert not offenders, "cross-module imports:\n" + "\n".join(offenders)

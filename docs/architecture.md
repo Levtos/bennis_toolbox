@@ -1,85 +1,86 @@
 # Architektur
 
-## Zielbild
+## Eine Domain, viele Module
 
-`bennis_toolbox` ist ein **Monorepo** und die alleinige **Source of Truth**
-für alle enthaltenen Custom Integrations. Es bündelt sie nur logisch und
-für HACS-Verteilung, **nicht** funktional zu einer Mega-Integration. Die
-historischen Einzel-Repos sind deprecated.
-
-Tests aller Teilintegrationen leben unter [`tests/`](../tests/) im Monorepo
-und werden mit `pytest tests/` als Ganzes ausgeführt.
+`bennis_toolbox` ist eine echte **Umbrella-Integration**: genau eine
+HA-Domain, ein HACS-Paket, ein Eintrag in „Geräte & Dienste". Innerhalb
+der Integration existieren mehrere fachlich getrennte **Module**, die
+intern entkoppelt bleiben, aber gemeinsam unter `bennis_toolbox` laufen.
 
 ```
-custom_components/
-  bennis_toolbox/         # Dach: Übersicht, Health, Diagnose
-  wake_planner/
-  title_classifier/       # ehem. etm
-  benni_context/
-  benni_media_context/
-  notification_router/    # ehem. benni_notification_router
-  plug_policy_engine/     # ehem. benni_plug_policy
-  stash_ha/               # ehem. stash_player
-  maw/                    # ehem. media_art_wrapper
+HACS ── installiert ──> custom_components/bennis_toolbox/
+                                  │
+HA   ── lädt ──>        manifest.json (domain = bennis_toolbox)
+                                  │
+User ── fügt hinzu ──>  Benni's Toolbox
+                                  │
+                                  ▼
+                  Modul-Selector (Config-Flow Step "user")
+                                  │
+              ┌───────────┬───────┴────────┬──────────────┐
+              ▼           ▼                ▼              ▼
+        wake_planner  title_classifier  benni_context  …
+        (eigener     (eigener           (eigener      …
+         Config-      Config-Entry       Config-
+         Entry)        je Instanz)       Entry)
 ```
 
-## Finale Domain-Liste
-
-| Domain                | Anzeigename            |
-| --------------------- | ---------------------- |
-| `bennis_toolbox`      | Benni's Toolbox        |
-| `wake_planner`        | Wake Planner           |
-| `title_classifier`    | Title Classifier       |
-| `benni_context`       | Benni Context          |
-| `benni_media_context` | Benni Media Context    |
-| `notification_router` | Notification Router    |
-| `plug_policy_engine`  | Plug Policy Engine     |
-| `stash_ha`            | Stash HA               |
-| `maw`                 | Media Art Wrapper      |
-
-Geschichte der Umbenennung siehe [migration.md](migration.md).
+Jeder Config-Entry hat Domain `bennis_toolbox`, sein `data["_module_id"]`
+benennt das Modul. Das ist HA-Standard — mehrere Entries pro Integration
+sind ein bewährtes Pattern.
 
 ## Schichten
 
-| Schicht                | Wer            | Erlaubt                                     | Verboten                       |
-| ---------------------- | -------------- | ------------------------------------------- | ------------------------------ |
-| Fachschicht            | Teilintegrationen | Eigene Domain, eigene Entities, eigene Logik | Cross-Imports anderer Teile    |
-| Dach-/Observerschicht  | `bennis_toolbox` | Statusabfrage über `homeassistant.loader`, `config_entries.async_entries(domain)`, Diagnostics, Health-Sensoren, Navigation, Legacy-Domain-Erkennung als Warnhinweis | Fachliche Entscheidungen, Automationen, harte Imports der Teile, automatische Migration |
+| Schicht              | Wer                  | Aufgabe                                                                 |
+| -------------------- | -------------------- | ----------------------------------------------------------------------- |
+| Dispatch             | `bennis_toolbox/__init__.py` | Setup/Unload pro Entry an das richtige Modul weiterleiten          |
+| Platform-Dispatch    | `<platform>.py`      | Plattform-Setup pro Entry an das Modul weiterleiten                     |
+| Service-Registry     | `services.py`        | Modul-Services unter `bennis_toolbox.<module>_<action>` registrieren    |
+| WebSocket-Registry   | `websocket_api.py`   | `bennis_toolbox/<module>/<cmd>` registrieren                            |
+| Storage-Helper       | `storage.py`         | `Store(..., bennis_toolbox_<module>_<suffix>)`                          |
+| Modul-Registry       | `modules/__init__.py`| Welche Module gibt es, lazy import per ID                                |
+| Modul-Contract       | `modules/base.py`    | `ModuleSpec`, `ModuleStatus`                                            |
+| Fachlogik            | `modules/<id>/…`     | Eigene Coordinator, Entities, Logik — entkoppelt von anderen Modulen     |
 
 ## Entkopplungsregeln
 
-1. **Keine harten Imports** zwischen Teilintegrationen — auch nicht von der
-   Toolbox aus. Die Toolbox liest ausschließlich öffentliche HA-APIs
-   (`async_get_integration`, `config_entries`, `states`).
-2. **Keine geteilten Storage-Keys.** Wenn gemeinsame Helpers nötig werden,
-   wandern sie nach `custom_components/bennis_toolbox/_shared/` und sind
-   reine Funktionen ohne State.
-3. **Jede Teilintegration bleibt einzeln installierbar.** Wer nur
-   `wake_planner` will, kopiert ausschließlich diesen Ordner.
-4. **Dach kennt Teile, Teile kennen Dach nicht.** Die Liste der Member steht
-   in `bennis_toolbox/const.py:KNOWN_MEMBERS`. Teilintegrationen
-   importieren das nie.
-5. **Legacy-Domains nie als Zielnamen.** `LEGACY_DOMAINS` in
-   `bennis_toolbox/const.py` dient ausschließlich der Erkennung
-   versehentlich verbliebener Alt-Config-Entries und produziert nur
-   Hinweise — keine Migration, keine doppelte Anzeige.
+1. **Module importieren sich nicht gegenseitig.** Test
+   `test_no_cross_module_imports` sperrt das ab.
+2. **Module reden nur über HA-Bus oder über Entity-States miteinander**,
+   nicht über Python-Imports. Wenn `notification_router` z. B. einen
+   Quiet-Mode-Status braucht, liest er ihn aus einer Entity, die
+   `benni_media_context` exponiert — nicht aus dessen Modulen.
+3. **Modul-IDs sind die einzige Cross-Modul-Namensquelle** (für Storage-
+   und Service-Präfixe). Sie sind im Code als Strings festgepinnt und im
+   Test gegen den Ordnernamen verifiziert.
+4. **Kein `toolbox_`-Präfix in Modul-IDs.** Organisatorische Zugehörigkeit
+   sitzt in der Toolbox, nicht im Namen jedes Moduls.
 
-## Health-Modell
+## Status-Modell
 
-Die Toolbox erzeugt:
+Jedes Modul deklariert in seinem `SPEC` einen Status:
 
-- 1 Overall-Sensor `sensor.bennis_toolbox_status` → `"<healthy>/<total> healthy"`,
-  Attribut `members` listet alle Module mit Detailstatus.
-- 1 Sensor je bekannter (finaler) Teilintegration. Werte:
-  `healthy | warning | not_loaded | missing | unknown`. `warning` z. B.
-  wenn ein Legacy-Config-Entry erkannt wurde.
+- **READY** — voll lauffähig. Umbrella ruft `async_setup_entry`, lädt
+  Platforms, registriert Services/WebSockets/Panels.
+- **PENDING** — Spec da, Logik noch nicht portiert. Umbrella legt den
+  Entry als no-op an, damit der User das Modul vormerken kann. Kein
+  Crash, keine Entities.
+- **STUB** — Platzhalter ohne Logik.
+- **HIDDEN** — wird im Selector nicht angezeigt.
 
-Erkennung läuft über `async_get_integration` (installiert?) und
-`hass.config_entries.async_entries(domain)` (konfiguriert/geladen?).
+## Tests
 
-## Wiederverwendbarkeit für `parents_toolbox`
+Alle Tests laufen aus dem Repo-Root mit `pytest tests/`. Der Strukturtest
+([tests/test_repo_structure.py](../tests/test_repo_structure.py))
+garantiert:
 
-Das Muster (Dach mit `KNOWN_MEMBERS` + `LEGACY_DOMAINS` + `status.py` +
-Health-Sensor + Diagnostics) ist generisch. Für `parents_toolbox` reicht
-es, das `bennis_toolbox/`-Verzeichnis zu klonen, `DOMAIN` /
-`KNOWN_MEMBERS` zu ersetzen und neue Teilintegrationen daneben zu legen.
+- nur `bennis_toolbox/` unter `custom_components/`
+- alle 8 erwarteten Module sind vorhanden, jedes hat ein gültiges SPEC
+- Modul-`__init__.py` ist ohne `homeassistant`-Abhängigkeit ladbar
+  (damit die Registry beim Boot keine Importfallen hat)
+- keine Cross-Modul-Imports
+- keine Alt-Domain-Tokens im Produktivcode
+- alle Platform-Dispatcher delegieren an `async_setup_platform_for`
+
+Modul-spezifische Tests (z. B. `tests/benni_media_context/test_logic.py`)
+testen reine Python-Logik der Module ohne HA-Mock.
