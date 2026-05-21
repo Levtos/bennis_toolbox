@@ -5,14 +5,103 @@
         "title": "Benni's Toolbox",
         "description": "Pick which module to add to the toolbox. Modules marked \"pending\" exist in the repo but are not yet fully wired — you can still create an entry for them.",
         "data": { "_module_id": "Module" }
+      },
+      "module_step": {
+        "title": "Module setup",
+        "description": "Cover Policy: pick the cover entity, optional triggers, and apply behaviour. Per-mode target positions live under \"Configure\" → \"Target positions\".",
+        "data": {
+          "name": "Display name",
+          "cover_entity": "Cover entity (the blind to drive)",
+          "window_state_entity": "Trigger: window open (activates \"window open\" mode)",
+          "bio_state_entity": "Bio state (triggers sleep / wake)",
+          "presence_household_entity": "Household presence (privacy trigger)",
+          "presence_personal_entity": "Personal presence (privacy trigger)",
+          "day_state_entity": "Day state (morning / afternoon / night …)",
+          "day_context_entity": "Day context (workday / weekend / holiday)",
+          "lux_entity": "Lux sensor (glare threshold)",
+          "sun_entity": "Sun (above/below horizon)",
+          "weather_entity": "Weather entity",
+          "media_context_entity": "Media context (triggers TV glare)",
+          "gaming_source_entity": "Gaming source (triggers PC glare)",
+          "heat_protect_entity": "Trigger: heat protection active",
+          "apply_enabled": "Actually drive the cover (otherwise decision sensors only)",
+          "manual_override_duration": "Manual override holds … seconds",
+          "startup_block_seconds": "Block apply for … seconds after HA start"
+        }
       }
     },
     "abort": {
       "missing_module": "Config entry is missing its module identifier.",
       "unknown_module": "This module is no longer registered.",
-      "invalid_flow_state": "Broken flow state."
+      "invalid_flow_state": "Broken flow state.",
+      "already_configured": "This module instance already exists.",
+      "single_instance_allowed": "Only one instance per module allowed."
     },
-    "error": { "unknown_module": "Unknown module." }
+    "error": {
+      "unknown_module": "Unknown module.",
+      "cannot_connect": "Connection failed.",
+      "invalid_url": "URL missing or invalid.",
+      "required": "Required field."
+    }
   },
-  "options": { "step": { "init": { "title": "Module options" } } }
+  "options": {
+    "step": {
+      "init": {
+        "title": "Module options",
+        "menu_options": {
+          "sources": "Triggers & sources",
+          "profile": "Target positions per mode",
+          "runtime": "Runtime / apply behaviour",
+          "entities": "Source entities",
+          "thresholds": "Thresholds",
+          "globals": "Global sources",
+          "add_device": "Add device",
+          "edit_device": "Edit device",
+          "remove_device": "Remove device",
+          "calendar": "Calendars",
+          "special_rules": "Special rules"
+        }
+      },
+      "sources": {
+        "title": "Triggers & sources",
+        "description": "Which HA entity decides which mode is active. Leave a field empty to disable that trigger.",
+        "data": {
+          "window_state_entity": "Window open (window-open trigger)",
+          "bio_state_entity": "Bio state (sleep / wake)",
+          "presence_household_entity": "Household presence (privacy)",
+          "presence_personal_entity": "Personal presence (privacy)",
+          "day_state_entity": "Day state",
+          "day_context_entity": "Day context (workday / weekend / holiday)",
+          "lux_entity": "Lux sensor",
+          "sun_entity": "Sun",
+          "weather_entity": "Weather",
+          "media_context_entity": "Media context (TV glare trigger)",
+          "gaming_source_entity": "Gaming source (PC glare trigger)",
+          "heat_protect_entity": "Heat protection active (heat-protect trigger)"
+        }
+      },
+      "profile": {
+        "title": "Target positions per mode",
+        "description": "When a trigger activates a mode, the cover moves to this position. 0 % = closed / down, 100 % = open / up.",
+        "data": {
+          "open": "Open — fallback when no other mode fires",
+          "sleep": "Sleep — bio state = sleep or night phase",
+          "wake": "Wake — bio state = waking",
+          "privacy": "Privacy / Away — truly away + empty household (bei_eltern doesn't count)",
+          "heat_protect": "Heat protection — heat-protect trigger active",
+          "glare_tv": "TV glare — media context TV/movie at daytime",
+          "glare_pc": "PC glare — gaming on PC at daytime",
+          "window_open": "Window open — window-open trigger active (absolute override)"
+        }
+      },
+      "runtime": {
+        "title": "Runtime / apply behaviour",
+        "data": {
+          "apply_enabled": "Actually drive the cover (otherwise decision sensors only)",
+          "manual_override_duration": "Manual override holds … seconds",
+          "startup_block_seconds": "Block apply for … seconds after HA start"
+        }
+      }
+    }
+  }
 }

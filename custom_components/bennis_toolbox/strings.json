@@ -4,24 +4,104 @@
       "user": {
         "title": "Benni's Toolbox",
         "description": "Wähle das Modul, das du der Toolbox hinzufügen willst. Module mit Status \"pending\" sind im Repo angelegt, aber noch nicht voll aktiv — sie können dennoch vorgemerkt werden.",
+        "data": { "_module_id": "Modul" }
+      },
+      "module_step": {
+        "title": "Modulkonfiguration",
+        "description": "Cover Policy: Cover-Entity, optionale Auslöser und Apply-Verhalten. Die Zielpositionen pro Modus pflegst du nach dem Anlegen unter \"Konfigurieren\" → \"Zielpositionen\".",
         "data": {
-          "_module_id": "Modul"
+          "name": "Anzeigename",
+          "cover_entity": "Cover-Entity (das zu steuernde Rollo)",
+          "window_state_entity": "Auslöser: Fenster offen (Trigger Modus \"Fenster offen\")",
+          "bio_state_entity": "Bio-Status (löst Schlafen / Aufwachen aus)",
+          "presence_household_entity": "Haushalts-Anwesenheit (für Privatsphäre)",
+          "presence_personal_entity": "Persönliche Anwesenheit (für Privatsphäre)",
+          "day_state_entity": "Tageszustand (Morgen / Nachmittag / Nacht …)",
+          "day_context_entity": "Tageskontext (Werktag / Wochenende / Feiertag)",
+          "lux_entity": "Lux-Sensor (Glare-Schwelle)",
+          "sun_entity": "Sonne (über/unter Horizont)",
+          "weather_entity": "Wetter-Entity",
+          "media_context_entity": "Medien-Kontext (löst Blendschutz TV aus)",
+          "gaming_source_entity": "Gaming-Quelle (löst Blendschutz PC aus)",
+          "heat_protect_entity": "Auslöser: Hitzeschutz aktiv (Trigger Modus \"Hitzeschutz\")",
+          "apply_enabled": "Cover wirklich fahren? (sonst nur Decision-Sensoren)",
+          "manual_override_duration": "Manueller Override hält … Sekunden",
+          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"
         }
-      }
+      },
+      "thresholds": { "title": "Schwellwerte" }
     },
     "abort": {
       "missing_module": "Fehlender Modul-Identifikator im Config-Entry.",
       "unknown_module": "Dieses Modul ist nicht (mehr) registriert.",
-      "invalid_flow_state": "Flow-Zustand kaputt."
+      "invalid_flow_state": "Flow-Zustand kaputt.",
+      "already_configured": "Diese Modul-Instanz existiert schon.",
+      "single_instance_allowed": "Nur eine Instanz pro Modul erlaubt."
     },
     "error": {
-      "unknown_module": "Unbekanntes Modul."
+      "unknown_module": "Unbekanntes Modul.",
+      "cannot_connect": "Verbindung fehlgeschlagen.",
+      "invalid_url": "URL fehlt oder ist ungültig.",
+      "required": "Pflichtfeld."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Modul-Optionen"
+        "title": "Modul-Optionen",
+        "menu_options": {
+          "sources": "Auslöser & Quellen",
+          "profile": "Zielpositionen pro Modus",
+          "runtime": "Laufzeit / Apply-Verhalten",
+          "entities": "Quell-Entities",
+          "thresholds": "Schwellwerte",
+          "globals": "Globale Quellen",
+          "add_device": "Gerät hinzufügen",
+          "edit_device": "Gerät bearbeiten",
+          "remove_device": "Gerät entfernen",
+          "calendar": "Kalender",
+          "special_rules": "Spezialregeln"
+        }
+      },
+      "sources": {
+        "title": "Auslöser & Quellen",
+        "description": "Welche HA-Entity entscheidet, welcher Modus aktiv ist. Felder leer lassen, wenn ein Auslöser nicht verwendet werden soll.",
+        "data": {
+          "window_state_entity": "Fenster offen (Trigger \"Fenster offen\")",
+          "bio_state_entity": "Bio-Status (Trigger Schlafen / Aufwachen)",
+          "presence_household_entity": "Haushalts-Anwesenheit (Trigger Privatsphäre)",
+          "presence_personal_entity": "Persönliche Anwesenheit (Trigger Privatsphäre)",
+          "day_state_entity": "Tageszustand",
+          "day_context_entity": "Tageskontext (Werktag / Wochenende / Feiertag)",
+          "lux_entity": "Lux-Sensor",
+          "sun_entity": "Sonne",
+          "weather_entity": "Wetter",
+          "media_context_entity": "Medien-Kontext (Trigger Blendschutz TV)",
+          "gaming_source_entity": "Gaming-Quelle (Trigger Blendschutz PC)",
+          "heat_protect_entity": "Hitzeschutz aktiv (Trigger Hitzeschutz)"
+        }
+      },
+      "profile": {
+        "title": "Zielpositionen pro Modus",
+        "description": "Wenn ein Auslöser den Modus aktiviert, fährt das Cover auf diese Position. 0 % = geschlossen / unten, 100 % = offen / oben.",
+        "data": {
+          "open": "Offen — wenn kein anderer Modus passt",
+          "sleep": "Schlafen — Bio-Status = sleep oder Nachtphase",
+          "wake": "Aufwachen — Bio-Status = waking",
+          "privacy": "Privatsphäre / Abwesend — wirklich abwesend + Haushalt leer (bei_eltern zählt nicht)",
+          "heat_protect": "Hitzeschutz — Hitzeschutz-Auslöser aktiv",
+          "glare_tv": "Blendschutz TV — Medien-Kontext TV/Film bei Tag",
+          "glare_pc": "Blendschutz PC — Gaming auf PC bei Tag",
+          "window_open": "Fenster offen — Fenster-Auslöser aktiv (überschreibt alles)"
+        }
+      },
+      "runtime": {
+        "title": "Laufzeit / Apply-Verhalten",
+        "data": {
+          "apply_enabled": "Cover wirklich fahren (sonst nur Decision-Sensoren)",
+          "manual_override_duration": "Manueller Override hält … Sekunden",
+          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"
+        }
       }
     }
   }

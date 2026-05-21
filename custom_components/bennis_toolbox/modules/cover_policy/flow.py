@@ -100,11 +100,33 @@ def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema({**base.schema, **sources, **runtime})
 
 
+def _position_selector() -> selector.NumberSelector:
+    """0..100 % slider for one target position.
+
+    Convention: 0 = closed/down, 100 = open/up (HA standard).
+    """
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=0, max=100, step=1,
+            mode=selector.NumberSelectorMode.SLIDER,
+            unit_of_measurement="%",
+        )
+    )
+
+
 def _profile_schema(profile: dict[str, int]) -> vol.Schema:
+    """Position profile editor.
+
+    One slider per mode; translations under `options.step.profile.data.*`
+    explain what each mode means (Schlafen / Aufwachen / Hitzeschutz / …).
+    Slider values are coerced back to int to keep the wire format stable
+    with `policy.decide()`.
+    """
     fields: dict[Any, Any] = {}
     for m in PROFILE_MODES:
-        fields[vol.Required(m, default=int(profile.get(m, DEFAULT_PROFILE[m])))] = (
-            vol.All(int, vol.Range(min=0, max=100))
+        default = int(profile.get(m, DEFAULT_PROFILE[m]))
+        fields[vol.Required(m, default=default)] = vol.All(
+            _position_selector(), vol.Coerce(int), vol.Range(min=0, max=100),
         )
     return vol.Schema(fields)
 
