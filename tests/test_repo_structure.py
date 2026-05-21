@@ -30,6 +30,7 @@ EXPECTED_MODULE_IDS: set[str] = {
     "wake_planner",
     "maw",
     "stash_ha",
+    "cover_policy",
 }
 
 LEGACY_TOP_LEVEL_DOMAINS: set[str] = {

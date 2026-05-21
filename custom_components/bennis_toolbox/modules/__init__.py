@@ -28,6 +28,7 @@ REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
     "wake_planner",
     "maw",
     "stash_ha",
+    "cover_policy",
 )
 
 

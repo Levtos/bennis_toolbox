@@ -25,6 +25,7 @@ verfügbaren Module:
 | ----------------------- | ---------------------- | --------------- |
 | `benni_context`         | Benni Context          | **ready**       |
 | `benni_media_context`   | Benni Media Context    | **ready**       |
+| `cover_policy`          | Cover Policy           | **ready**       |
 | `notification_router`   | Notification Router    | **ready**       |
 | `plug_policy_engine`    | Plug Policy Engine     | **ready**       |
 | `title_classifier`      | Title Classifier       | **ready**       |

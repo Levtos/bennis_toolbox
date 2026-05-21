@@ -45,6 +45,7 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 | ----------------------- | -------- | --------------- | ----------------------------------- |
 | `benni_context`         | **READY**| voll portiert: pure logic, Coordinator, Sensoren, Binary-Sensor, Services, 2-Step-Flow, Options-Menü | — |
 | `benni_media_context`   | **READY**| pure `logic.py` + `const.py` schon im Modul; jetzt voll portiert: Coordinator (Debounce + ATV-Rollback), 7 Sensoren, 4 Binary-Sensoren, 5 Services, Single-Step-Flow, Options | — |
+| `cover_policy`          | **READY**| frischer Neubau: Pure Policy Engine, Coordinator, 4 Sensoren, Binary-Sensor, 4 Services, Config-/Options-Flow, Storage | — |
 | `notification_router`   | **READY**| voll portiert: pure routing engine, NotificationRouter mit Rate-Limit/Dedupe/Cooldowns, 2 Sensoren + DND Binary-Sensor, 3 Services, Single-Step-Flow, Options | — |
 | `plug_policy_engine`    | **READY**| voll portiert: Decision-Engine, Coordinator, Sensoren, Binary-Sensoren, Services, Config-/Options-Flow, Storage | — |
 | `title_classifier`      | **READY**| voll portiert: Storage, Runtime, Sensoren, Number, Services, WS, Panel, Multi-Step-Flow | — |

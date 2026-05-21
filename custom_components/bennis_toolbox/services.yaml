@@ -366,3 +366,52 @@ stash_ha_save_activity:
           min: 0
           step: 1
           mode: box
+
+# --- Cover Policy ------------------------------------------------------------
+
+cover_policy_apply_now:
+  name: Cover Policy — Apply now
+  description: Evaluates and applies the current cover target if all policy gates allow it.
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+
+cover_policy_set_manual_override:
+  name: Cover Policy — Set manual override
+  description: Blocks normal policy apply for the configured duration.
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+    duration:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          mode: box
+
+cover_policy_clear_manual_override:
+  name: Cover Policy — Clear manual override
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+
+cover_policy_set_position_profile:
+  name: Cover Policy — Set position profile
+  description: Updates one or more target positions. Values are percentages from 0 to 100.
+  fields:
+    entry_id:
+      required: false
+      selector:
+        text:
+    profile:
+      required: true
+      selector:
+        object:
