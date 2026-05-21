@@ -15,6 +15,8 @@
   Einmal-Ausnahmen ergänzt.
 - Wake Planner Kalenderkonfliktlogik mit Routinedauer und optionalem
   früherem Wecken ergänzt.
+- Wake Planner Calendar Cache mit Throttle, Coalescing und
+  Last-known-good-Fallback für CalDAV-Resilienz ergänzt.
 - `docs/upcoming_features.md` für akzeptierte Folgearbeiten ergänzt,
   darunter bio-aware Wake/Sleep-Tracking und zukünftige Media-Art-
   Module.
@@ -31,6 +33,8 @@
   HA beim Platform-Setup gültige `Platform`-Werte bekommt.
 - CalDAV-basierte Kalenderabfragen prüfen fehlende, nicht verfügbare
   oder durch Startup-Races noch nicht geladene Kalender.
+- Wake Planner fragt Feiertage/Termine als Range über den Cache ab,
+  statt pro Tag wiederholt Live-CalDAV-Abfragen auszulösen.
 - Startup-Refresh wartet auf Home-Assistant-Startup und refreshed
   geladene Entries ohne First-Refresh-APIs im falschen Entry-State zu
   verwenden.
@@ -46,10 +50,13 @@
 - Modul-Setup-Fehler durch Enum-Stringifizierung als `_P.SENSOR`
   behoben.
 - Frontend-WebSocket-Regressionen werden durch Strukturtests verhindert.
+- CalDAV-Verbindungsabbrüche blockieren Wake Planner nicht mehr hart:
+  bei Fehlern wird ein vorhandener Cache genutzt oder defensiv ein
+  degradierter/leerer Event-Satz zurückgegeben.
 
 ### Tests
 
-- Full test suite at release preparation: `322 passed, 1 warning`.
+- Full test suite at release preparation: `333 passed, 1 warning`.
 
 ### Bekannte Einschränkungen
 
