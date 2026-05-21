@@ -124,6 +124,26 @@ def _install_ha_stubs() -> None:
         if not hasattr(ha_sel, attr):
             setattr(ha_sel, attr, value)
 
+    # Earlier test files may have stubbed `NumberSelectorMode` without a
+    # SLIDER member; cover_policy/flow.py needs it. Patch it on idempotently
+    # even when the parent module already exists.
+    nsmode = getattr(ha_sel, "NumberSelectorMode", _NSMode)
+    if not hasattr(nsmode, "SLIDER"):
+        try:
+            nsmode.SLIDER = "slider"
+        except Exception:
+            pass
+    if not hasattr(nsmode, "BOX"):
+        try:
+            nsmode.BOX = "box"
+        except Exception:
+            pass
+
+    # Earlier stubs may have a strict NumberSelectorConfig signature that
+    # doesn't accept `unit_of_measurement`. Force ours, which is permissive.
+    ha_sel.NumberSelectorConfig = _NSCfg
+    ha_sel.NumberSelector = _NS
+
     ha_cv = sys.modules.setdefault(
         "homeassistant.helpers.config_validation",
         types.ModuleType("homeassistant.helpers.config_validation"),
