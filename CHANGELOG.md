@@ -1,0 +1,83 @@
+# Changelog
+
+## 0.3.0 - 2026-05-21
+
+### Hinzugefügt
+
+- Produktive Module in die Umbrella-Integration portiert:
+  `wake_planner`, `title_classifier`, `benni_context`,
+  `benni_media_context`, `plug_policy_engine`, `notification_router`,
+  `stash_ha` und `cover_policy`.
+- Modul-eigene Entities, Services, Config-Flows, Options-Flows,
+  Storage-Helper, WebSocket-Namespaces und Panels ergänzt, wo das Modul
+  sie benötigt.
+- Wake Planner Profil-UX mit Werktag-, Wochenende-, Feiertag- und
+  Einmal-Ausnahmen ergänzt.
+- Wake Planner Kalenderkonfliktlogik mit Routinedauer und optionalem
+  früherem Wecken ergänzt.
+- `docs/upcoming_features.md` für akzeptierte Folgearbeiten ergänzt,
+  darunter bio-aware Wake/Sleep-Tracking und zukünftige Media-Art-
+  Module.
+- Release-Prozess dokumentiert.
+
+### Geändert
+
+- Wake Planner Frontend nutzt durchgehend den WebSocket-Namespace
+  `bennis_toolbox/wake_planner/*`.
+- Wake Planner ruft keine Home-Assistant-Kalender-REST-Endpunkte mehr
+  direkt aus dem Panel auf. Kalenderdaten laufen über das Modul-Backend,
+  damit rohe CalDAV-Fehler nicht mehr über den UI-Pfad eskalieren.
+- Modul-Plattformen werden außerhalb des Event-Loops normalisiert, damit
+  HA beim Platform-Setup gültige `Platform`-Werte bekommt.
+- CalDAV-basierte Kalenderabfragen prüfen fehlende, nicht verfügbare
+  oder durch Startup-Races noch nicht geladene Kalender.
+- Startup-Refresh wartet auf Home-Assistant-Startup und refreshed
+  geladene Entries ohne First-Refresh-APIs im falschen Entry-State zu
+  verwenden.
+- HACS- und Migrationsdoku bilden den aktuellen READY/STUB-Stand ab.
+
+### Behoben
+
+- Wake Planner erkennt jetzt all-day Feiertags-Events korrekt.
+- Wake Planner Thread-Safety-Warnung durch Refresh-Scheduling aus einem
+  Nicht-Event-Loop-Callback behoben.
+- Wake Planner Today-Ansicht trennt die heutige Entscheidung und den
+  nächsten zukünftigen Weckzeitpunkt.
+- Modul-Setup-Fehler durch Enum-Stringifizierung als `_P.SENSOR`
+  behoben.
+- Frontend-WebSocket-Regressionen werden durch Strukturtests verhindert.
+
+### Tests
+
+- Full test suite at release preparation: `322 passed, 1 warning`.
+
+### Bekannte Einschränkungen
+
+- `maw` bleibt ein Stub. Media-Art-Fallback und Combined-Media-Player-
+  Logik werden als getrennte Toolbox-Module neu gebaut, statt den alten
+  verschmolzenen MAW/CMP-Code direkt zu portieren.
+- Wake Planner bio-aware Sleep-Tracking ist geplant, aber nicht Teil von
+  0.3.0.
+
+## 0.2.0 - 2026-05-20
+
+### Hinzugefügt
+
+- Projekt als echte Home-Assistant-Umbrella-Integration mit einer
+  öffentlichen Domain neu aufgebaut: `bennis_toolbox`.
+- Modul-Registry, gemeinsamen Modul-Contract, Platform-Dispatcher,
+  Service-/WebSocket-Dispatch-Helper, Diagnostics, Übersetzungen und
+  HACS-fähiges Paketlayout ergänzt.
+- Erste Module-Specs für die Toolbox-Module registriert.
+- Erste Struktur- und Logiktests ergänzt.
+
+### Geändert
+
+- Alten Einzelintegrations-Code aus `custom_components/` nach
+  `_reference/` verschoben, damit HACS nur
+  `custom_components/bennis_toolbox/` installiert.
+
+### Bekannte Einschränkungen
+
+- 0.2.0 war ein Umbrella-Foundation-Release. Die meisten Module waren zu
+  diesem Zeitpunkt noch pending oder stubs.

@@ -51,13 +51,18 @@ domain: bennis_toolbox
 
 zeigt die Toolbox-Entries und die durch READY-Module erzeugten Entities.
 
-## Bekannte Einschränkungen Stand 0.2.0
+## Bekannte Einschränkungen Stand 0.3.0
 
-- Phase-1-Module stehen auf `PENDING`. Sie können in der UI ausgewählt
-  und als Entry angelegt werden, registrieren aber noch keine Entities
-  oder Services, bis ihre Fachlogik aus `_reference/` portiert ist
-  (siehe `docs/module_adapter.md`).
-- `maw` und `stash_ha` sind `STUB` und vorerst rein deklarativ.
+- `maw` ist weiterhin `STUB`. Media-Art-Fallback und Combined-Media-
+  Player werden später als getrennte Toolbox-Module neu gebaut.
+- Wake Planner kann CalDAV-Kalender nutzen, bleibt aber von der
+  Provider-Stabilität abhängig. Die Toolbox fängt fehlende oder noch
+  nicht verfügbare Kalender ab; CalDAV-Serverfehler des Providers können
+  trotzdem in Home Assistant selbst auftauchen.
+- Module, die HA-Entities aus deiner Installation konsumieren
+  (`benni_context`, `benni_media_context`, `notification_router`,
+  `plug_policy_engine`, `cover_policy`), werden erst fachlich sinnvoll,
+  wenn die passenden Quellen/Targets in HA existieren.
 
 ## Update
 

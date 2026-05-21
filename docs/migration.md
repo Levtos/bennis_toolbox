@@ -1,10 +1,15 @@
 # Migration & Historie
 
-## Stand 0.2.0
+## Stand 0.3.0
 
 Architektur-Pivot: aus dem Monorepo mit acht eigenständigen
 HA-Integrationsdomains wurde eine **echte Umbrella-Integration** mit
 genau einer HA-Domain (`bennis_toolbox`) und internen Modulen.
+
+Die produktiven Pipeline-Module sind in 0.3.0 unter der Umbrella-Domain
+READY. Nur `maw` bleibt bewusst STUB, weil Media Art Fallback und
+Combined Media Player als getrennte, neu gebaute Toolbox-Module geplant
+sind.
 
 Die Zielinstallation ist eine **frische HAOS-V3**. Es gibt keinen
 automatischen Migrationspfad für alte Config-Entries der früheren
@@ -20,6 +25,12 @@ manuell entfernen und „Benni's Toolbox" neu hinzufügen.
   `bennis_toolbox/modules/<id>/`. Phase-1-Module sind als Spec
   registriert (`PENDING`), Fachlogik wird modulweise aus dem
   Referenzcode portiert.
+- **0.3.0** — READY-Port der produktiven Module:
+  `wake_planner`, `title_classifier`, `benni_context`,
+  `benni_media_context`, `plug_policy_engine`, `notification_router`,
+  `stash_ha` und `cover_policy`. Wake Planner wurde zusätzlich mit
+  Profil-/Ausnahme-UX, Kalenderkonfliktlogik und CalDAV-Startup-Guards
+  gehärtet.
 
 ## Source of Truth
 
@@ -49,8 +60,8 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 | `notification_router`   | **READY**| voll portiert: pure routing engine, NotificationRouter mit Rate-Limit/Dedupe/Cooldowns, 2 Sensoren + DND Binary-Sensor, 3 Services, Single-Step-Flow, Options | — |
 | `plug_policy_engine`    | **READY**| voll portiert: Decision-Engine, Coordinator, Sensoren, Binary-Sensoren, Services, Config-/Options-Flow, Storage | — |
 | `title_classifier`      | **READY**| voll portiert: Storage, Runtime, Sensoren, Number, Services, WS, Panel, Multi-Step-Flow | — |
-| `wake_planner`          | **READY**| voll portiert: Coordinator, Sensoren, Binary-Sensor, Services, WS, Panel, Flow | — |
-| `maw`                   | STUB     | SPEC            | (später)                            |
+| `wake_planner`          | **READY**| voll portiert: Coordinator, Sensoren, Binary-Sensor, Services, WS, Panel, Flow, Profil-/Ausnahme-UX, Kalenderkonfliktlogik | Bio-aware Sleep/Wake-Tracking |
+| `maw`                   | STUB     | SPEC            | wird nicht 1:1 portiert; `media_art_fallback` + `combined_media_player` sind als getrennte Neubauten geplant |
 | `stash_ha`              | **READY**| voll portiert: GraphQL-Client, Library + Playback Coordinator, 13 Sensoren + Cover-Image + Media-Player, 7 Services, Config-Flow mit Validate, Webhook | — |
 
 Vorgehen pro Modul siehe [module_adapter.md](module_adapter.md).
