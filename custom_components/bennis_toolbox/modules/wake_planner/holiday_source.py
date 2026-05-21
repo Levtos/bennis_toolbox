@@ -27,6 +27,9 @@ class HolidaySource:
         """Return the first full-day holiday event summary for check_date."""
         if not self.entity_id:
             return None
+        state = self.hass.states.get(self.entity_id)
+        if state is None or state.state in {"unavailable", "unknown"}:
+            return None
         start = datetime.combine(check_date, time.min)
         end = datetime.combine(check_date, time.max)
         try:

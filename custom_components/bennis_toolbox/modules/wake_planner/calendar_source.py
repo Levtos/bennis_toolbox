@@ -73,6 +73,10 @@ class CalendarSource:
         if not self.calendar_entity_id:
             self.status.ha_calendar = "not_configured"
             return []
+        state = self.hass.states.get(self.calendar_entity_id)
+        if state is None or state.state in {"unavailable", "unknown"}:
+            self.status.ha_calendar = "unavailable"
+            return []
         try:
             response = await self.hass.services.async_call(
                 "calendar",

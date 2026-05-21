@@ -62,8 +62,13 @@ def test_holiday_map_uses_date_only_calendar_events():
                 events.append({"start": {"date": "2026-05-25"}, "summary": "Pfingstmontag"})
             return {"calendar.feiertage": {"events": events}}
 
+    class _States:
+        def get(self, _entity_id):
+            return type("State", (), {"state": "on"})()
+
     class _Hass:
         services = _Services()
+        states = _States()
 
     holidays = asyncio.run(
         holiday_source.async_holiday_map(
@@ -75,3 +80,28 @@ def test_holiday_map_uses_date_only_calendar_events():
     )
 
     assert holidays[date(2026, 5, 25)] == (True, "Pfingstmontag")
+
+
+def test_holiday_map_skips_unavailable_calendar_without_service_call():
+    class _Services:
+        async def async_call(self, *_args, **_kwargs):
+            raise AssertionError("calendar.get_events should not be called")
+
+    class _States:
+        def get(self, _entity_id):
+            return type("State", (), {"state": "unavailable"})()
+
+    class _Hass:
+        services = _Services()
+        states = _States()
+
+    holidays = asyncio.run(
+        holiday_source.async_holiday_map(
+            _Hass(),
+            "calendar.feiertage",
+            date(2026, 5, 25),
+            date(2026, 5, 25),
+        )
+    )
+
+    assert holidays == {}

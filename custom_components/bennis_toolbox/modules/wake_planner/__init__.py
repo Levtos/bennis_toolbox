@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import HomeAssistant
 
 from ...const import DATA_ENTRIES, DOMAIN
@@ -45,15 +45,24 @@ __all__ = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = WakePlannerCoordinator(hass, entry)
     await coordinator.async_load()
-    await coordinator.async_config_entry_first_refresh()
 
     bucket = hass.data[DOMAIN][DATA_ENTRIES].setdefault(entry.entry_id, {})
     bucket["coordinator"] = coordinator
+    if hass.is_running:
+        await coordinator.async_config_entry_first_refresh()
+    else:
+        bucket["wake_planner_startup_unsub"] = hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STARTED,
+            lambda _event: hass.async_create_task(coordinator.async_config_entry_first_refresh()),
+        )
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     bucket = hass.data.get(DOMAIN, {}).get(DATA_ENTRIES, {}).get(entry.entry_id)
     if bucket:
+        unsub = bucket.pop("wake_planner_startup_unsub", None)
+        if unsub:
+            unsub()
         bucket.pop("coordinator", None)
     return True
