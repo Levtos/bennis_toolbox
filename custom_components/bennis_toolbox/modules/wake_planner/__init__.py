@@ -53,7 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     else:
         @callback
         def _async_refresh_after_started(_event) -> None:
-            hass.async_create_task(coordinator.async_config_entry_first_refresh())
+            hass.async_create_task(coordinator.async_request_refresh())
 
         bucket["wake_planner_startup_unsub"] = hass.bus.async_listen_once(
             EVENT_HOMEASSISTANT_STARTED,

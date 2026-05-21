@@ -175,7 +175,7 @@ class WakePlannerPanel extends HTMLElement {
   }
 
   async _loadCalendarData() {
-    await Promise.all([this._loadSchedule(), this._loadCalendarEvents()]);
+    await this._loadSchedule();
   }
 
   async _loadSchedule() {
@@ -236,32 +236,7 @@ class WakePlannerPanel extends HTMLElement {
   }
 
   async _loadCalendarEvents() {
-    if (!this._state || !this._state.global) return;
-    const ids = [this._state.global.calendar_entity_id, this._state.global.holiday_calendar_entity_id].filter(Boolean);
-    if (!ids.length) { this._calendarEvents = {}; return; }
-    const start = new Date(); start.setHours(0,0,0,0);
-    const end = new Date(start); end.setDate(end.getDate() + 14);
-    const map = {};
-    for (const id of ids) {
-      try {
-        const events = await this._hass.callApi(
-          "GET", `calendars/${id}?start=${start.toISOString()}&end=${end.toISOString()}`
-        );
-        for (const evt of (events || [])) {
-          const raw = evt.start?.dateTime || evt.start?.date || "";
-          if (!raw) continue;
-          let key;
-          if (raw.length <= 10) {
-            key = raw.substring(0, 10); // all-day
-          } else {
-            const d = new Date(raw);
-            key = isNaN(d.getTime()) ? raw.substring(0, 10) : localDateKey(d);
-          }
-          (map[key] = map[key] || []).push(evt);
-        }
-      } catch (_e) { /* ignore */ }
-    }
-    this._calendarEvents = map;
+    this._calendarEvents = {};
   }
 
   _toast(message, isError = false) {
