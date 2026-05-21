@@ -50,6 +50,25 @@ Der unportierte Code dieser Repos liegt im Monorepo unter `_reference/`
 zur Konsultation während der Portierung. `_reference/` wird **nicht**
 von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 
+## Cover Policy Entity-IDs
+
+`cover_policy` schlägt seit Release 0.3.2 sinnvolle `entity_id`s vor,
+abgeleitet aus der konfigurierten `cover_entity`. Bei
+`cover.living_blackout_blind` werden initial diese IDs vergeben:
+
+- `sensor.living_blackout_blind_cover_mode`
+- `sensor.living_blackout_blind_target_position`
+- `sensor.living_blackout_blind_policy_reason`
+- `sensor.living_blackout_blind_policy_debug`
+- `binary_sensor.living_blackout_blind_apply_blocked`
+
+Bestehende Entity-Registry-Einträge bleiben unangetastet — HA respektiert
+`suggested_object_id` nur beim erstmaligen Anlegen einer Entity. Manuelle
+Umbenennungen aus älteren Setups bleiben erhalten. `unique_id` ist
+unverändert an die `entry_id` gebunden (`bennis_toolbox_cover_policy_<entry_id>_<suffix>`);
+ein Wechsel der Cover-Entity ändert die `suggested_object_id`, behält
+aber die Identität in der Entity-Registry.
+
 ## Portierungsstatus pro Modul
 
 | Modul                   | Status   | Was steht schon | Was fehlt                           |

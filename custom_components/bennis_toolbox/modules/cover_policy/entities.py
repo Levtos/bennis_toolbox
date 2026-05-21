@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import EntityCategory
 
 from ...const import DOMAIN, unique_id
 from .const import (
+    CONF_COVER_ENTITY,
     MODULE_ID,
     UID_APPLY_BLOCKED,
     UID_DEBUG,
@@ -20,6 +21,27 @@ from .const import (
     UID_TARGET,
 )
 from .coordinator import CoverPolicyCoordinator, coordinator_from_hass
+
+
+def _base_slug(entry: ConfigEntry) -> str:
+    """Derive a sensible object-id stem from the configured cover entity.
+
+    `cover.living_blackout_blind` → `living_blackout_blind`. Used purely
+    for `suggested_object_id` on entity creation; unique_id is untouched
+    so existing entries keep their identity even if the cover entity is
+    later swapped out.
+    """
+    cover = (entry.data.get(CONF_COVER_ENTITY) or "").strip()
+    if "." in cover:
+        cover = cover.split(".", 1)[1]
+    # Fall back to the entry-id slug when no cover entity is configured —
+    # better than an empty object_id that HA would auto-suffix with random
+    # noise.
+    return cover or f"cover_policy_{entry.entry_id}"
+
+
+def _suggested_id(entry: ConfigEntry, suffix: str) -> str:
+    return f"{_base_slug(entry)}_{suffix}"
 
 
 def _device_info(entry: ConfigEntry) -> dict[str, Any]:
@@ -76,6 +98,7 @@ class ModeSensor(_SubscribingMixin, SensorEntity):
         _SubscribingMixin.__init__(self, coord, entry)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, UID_MODE)
         self._attr_name = "Cover Mode"
+        self._attr_suggested_object_id = _suggested_id(entry, "cover_mode")
 
     @property
     def native_value(self) -> str | None:
@@ -91,6 +114,7 @@ class TargetPositionSensor(_SubscribingMixin, SensorEntity):
         _SubscribingMixin.__init__(self, coord, entry)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, UID_TARGET)
         self._attr_name = "Target Position"
+        self._attr_suggested_object_id = _suggested_id(entry, "target_position")
 
     @property
     def native_value(self) -> int | None:
@@ -105,6 +129,7 @@ class ReasonSensor(_SubscribingMixin, SensorEntity):
         _SubscribingMixin.__init__(self, coord, entry)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, UID_REASON)
         self._attr_name = "Policy Reason"
+        self._attr_suggested_object_id = _suggested_id(entry, "policy_reason")
 
     @property
     def native_value(self) -> str | None:
@@ -130,6 +155,7 @@ class ApplyBlockedBinarySensor(_SubscribingMixin, BinarySensorEntity):
         _SubscribingMixin.__init__(self, coord, entry)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, UID_APPLY_BLOCKED)
         self._attr_name = "Apply Blocked"
+        self._attr_suggested_object_id = _suggested_id(entry, "apply_blocked")
 
     @property
     def is_on(self) -> bool:
@@ -150,6 +176,7 @@ class DebugSensor(_SubscribingMixin, SensorEntity):
         _SubscribingMixin.__init__(self, coord, entry)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, UID_DEBUG)
         self._attr_name = "Policy Debug"
+        self._attr_suggested_object_id = _suggested_id(entry, "policy_debug")
 
     @property
     def native_value(self) -> str | None:
