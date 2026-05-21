@@ -98,11 +98,11 @@ def test_rule_matches_cycle():
 # --------------------------------------------------------------------- engine
 
 
-def _engine(holiday=False, holiday_behavior=C.HOLIDAY_SKIP):
+def _engine(holiday=False, holiday_behavior=C.HOLIDAY_SKIP, calendar_decisions=None):
     holiday_map = {date(2026, 1, 12): (True, "Test holiday")} if holiday else {}
     return RE.RuleEngine(
         runtime_states={},
-        calendar_decisions={},
+        calendar_decisions=calendar_decisions or {},
         holiday_by_date=holiday_map,
         holiday_behavior=holiday_behavior,
     )
@@ -176,6 +176,33 @@ def test_engine_holiday_weekend_profile_ignores_non_holiday_weekday_rule():
     assert decision.matched_rule_id == "rw"
 
 
+def test_engine_profile_holiday_rule_only_replaces_weekday_holidays():
+    weekday = _wake_rule(id="profile_weekday", on_holiday=False)
+    weekend = _wake_rule(
+        id="profile_weekend",
+        name="Weekend",
+        weekdays={5, 6},
+        wake_time=time(9, 30),
+        on_holiday=None,
+    )
+    holiday = _wake_rule(
+        id="profile_holiday",
+        name="Holiday",
+        weekdays={0, 1, 2, 3, 4},
+        wake_time=time(9, 30),
+        on_holiday=True,
+        priority=90,
+    )
+    engine = _engine(holiday=True)
+    monday = datetime(2026, 1, 12, 6, 0, tzinfo=timezone.utc)
+    monday_decision = engine.decide(_person([weekday, weekend, holiday]), monday)
+    assert monday_decision.wake_time == time(9, 30)
+    assert monday_decision.matched_rule_id == "profile_holiday"
+
+    assert RE.rule_matches(weekend, date(2026, 1, 17), is_holiday=True)
+    assert not RE.rule_matches(holiday, date(2026, 1, 17), is_holiday=True)
+
+
 def test_engine_skip_action():
     skip_rule = C.Rule(
         id="r2", name="No-go", priority=10, enabled=True,
@@ -210,6 +237,46 @@ def test_engine_override_active():
     decision = engine.decide(person, now)
     assert decision.state == C.WakeState.OVERRIDDEN
     assert decision.wake_time == time(5, 30)
+
+
+def test_engine_warns_when_early_calendar_event_conflicts_with_routine():
+    person = _person()
+    calendar = {
+        (person.slug, date(2026, 1, 12)): C.CalendarDecision(
+            early_event_time=time(6, 30),
+            summary="Früher Termin",
+            source="calendar",
+        )
+    }
+    engine = _engine(calendar_decisions=calendar)
+    now = datetime(2026, 1, 12, 5, 0, tzinfo=timezone.utc)
+    decision = engine.decide(person, now)
+    assert decision.wake_time == time(7, 0)
+    assert decision.calendar_conflict_time == time(6, 30)
+    assert decision.calendar_suggested_wake_time == time(5, 30)
+
+
+def test_engine_can_wake_earlier_for_calendar_conflict():
+    person = C.PersonConfig(
+        slug="p1",
+        name="Person 1",
+        person_entity_id=None,
+        rules=[_wake_rule()],
+        routine_duration_minutes=60,
+        calendar_conflict_behavior=C.CONFLICT_WAKE_EARLIER,
+    )
+    calendar = {
+        (person.slug, date(2026, 1, 12)): C.CalendarDecision(
+            early_event_time=time(6, 30),
+            summary="Früher Termin",
+            source="calendar",
+        )
+    }
+    engine = _engine(calendar_decisions=calendar)
+    now = datetime(2026, 1, 12, 5, 0, tzinfo=timezone.utc)
+    decision = engine.decide(person, now)
+    assert decision.wake_time == time(5, 30)
+    assert decision.decided_by == "calendar_conflict"
 
 
 def test_engine_next_wake_skips_holidays():

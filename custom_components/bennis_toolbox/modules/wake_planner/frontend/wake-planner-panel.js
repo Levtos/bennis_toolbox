@@ -5,14 +5,15 @@
 // `wake_planner/*` WS commands implemented in websocket_api.py.
 
 const WEEKDAYS = [
-  { idx: 0, short: "Mon", long: "Monday" },
-  { idx: 1, short: "Tue", long: "Tuesday" },
-  { idx: 2, short: "Wed", long: "Wednesday" },
-  { idx: 3, short: "Thu", long: "Thursday" },
-  { idx: 4, short: "Fri", long: "Friday" },
-  { idx: 5, short: "Sat", long: "Saturday" },
-  { idx: 6, short: "Sun", long: "Sunday" },
+  { idx: 0, short: "Mo", long: "Montag" },
+  { idx: 1, short: "Di", long: "Dienstag" },
+  { idx: 2, short: "Mi", long: "Mittwoch" },
+  { idx: 3, short: "Do", long: "Donnerstag" },
+  { idx: 4, short: "Fr", long: "Freitag" },
+  { idx: 5, short: "Sa", long: "Samstag" },
+  { idx: 6, short: "So", long: "Sonntag" },
 ];
+const PROFILE_RULE_IDS = new Set(["profile_weekday", "profile_weekend", "profile_holiday"]);
 
 const STYLES = `
 :host { display:block; padding:16px 20px 40px; color:var(--primary-text-color); background:var(--primary-background-color); font-family:var(--paper-font-body1_-_font-family,system-ui); }
@@ -279,11 +280,11 @@ class WakePlannerPanel extends HTMLElement {
     }
     const persons = this._state?.persons || [];
     const tabs = ["today", "calendar", "people", "settings"];
-    const labels = { today: "Today", calendar: "14 days", people: "People & rules", settings: "Settings" };
+    const labels = { today: "Heute", calendar: "14 Tage", people: "Profile & Regeln", settings: "Einstellungen" };
 
     let body = "";
     if (persons.length === 0 && this._tab !== "settings" && this._tab !== "people") {
-      body = `<div class="card empty"><h2>No persons yet</h2><p class="muted">Add the first person under <b>People & rules</b>.</p><button class="btn primary" data-tab="people">Open People & rules</button></div>`;
+      body = `<div class="card empty"><h2>Noch keine Personen</h2><p class="muted">Lege die erste Person unter <b>Profile & Regeln</b> an.</p><button class="btn primary" data-tab="people">Profile öffnen</button></div>`;
     } else if (this._tab === "today") {
       body = `<div class="grid">${persons.map(p => this._renderToday(p)).join("")}</div>`;
     } else if (this._tab === "calendar") {
@@ -298,7 +299,7 @@ class WakePlannerPanel extends HTMLElement {
       <style>${STYLES}</style>
       <header>
         <h1>Wake Planner</h1>
-        <span class="muted">${persons.length} ${persons.length === 1 ? "person" : "people"}</span>
+        <span class="muted">${persons.length} ${persons.length === 1 ? "Person" : "Personen"}</span>
       </header>
       <div class="tabs">
         ${tabs.map(t => `<button class="tab ${this._tab === t ? "active" : ""}" data-tab="${t}">${labels[t]}</button>`).join("")}
@@ -397,24 +398,24 @@ class WakePlannerPanel extends HTMLElement {
   _renderPeople(persons) {
     const list = persons.length
       ? persons.map(p => this._renderPersonCard(p)).join("")
-      : `<div class="card empty"><p>No persons yet. Add the first one to get started.</p></div>`;
+      : `<div class="card empty"><p>Noch keine Personen. Lege die erste Person an.</p></div>`;
     const personOptions = this._personEntityOptions();
     return `${list}
       <ha-card>
-        <h2>Add person</h2>
+        <h2>Person hinzufügen</h2>
         <div class="row" style="margin-top:8px;align-items:flex-end">
           <label class="field" style="flex:1;min-width:160px"><span class="label">Name</span>
             <input type="text" id="add-name" placeholder="e.g. Benni">
           </label>
-          <label class="field" style="flex:1;min-width:200px"><span class="label">Link to HA person (optional)</span>
+          <label class="field" style="flex:1;min-width:200px"><span class="label">HA-Person verknüpfen (optional)</span>
             <select id="add-person-entity">
               <option value="">— none —</option>
               ${personOptions.map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${o.id})</option>`).join("")}
             </select>
           </label>
-          <button class="btn primary" data-action="add-person">Add</button>
+          <button class="btn primary" data-action="add-person">Hinzufügen</button>
         </div>
-        <p class="muted" style="margin-top:8px">A default weekday-mornings rule (Mon–Fri 07:00) is created automatically. The HA person link lets future features (presence-based skip etc.) hook in.</p>
+        <p class="muted" style="margin-top:8px">Es wird automatisch ein Standardprofil mit Werktag, Wochenende und Feiertag erstellt. Spezialregeln bleiben im Advanced-Bereich möglich.</p>
       </ha-card>`;
   }
 
@@ -427,32 +428,83 @@ class WakePlannerPanel extends HTMLElement {
   }
 
   _renderPersonCard(person) {
-    const rulesHtml = (person.rules || []).length
-      ? (person.rules || []).map((r, idx) => this._renderRule(person.slug, r, idx)).join("")
-      : `<p class="muted">No rules yet — without a rule this person will be inactive.</p>`;
+    const customRules = (person.rules || []).filter(r => !PROFILE_RULE_IDS.has(r.id));
+    const rulesHtml = customRules.length
+      ? customRules.map((r, idx) => this._renderRule(person.slug, r, idx)).join("")
+      : `<p class="muted">Keine Spezialregeln. Das normale Wake-Profil reicht für Werktag, Wochenende und Feiertage.</p>`;
     const linkLabel = person.person_entity_id
-      ? `linked to <code>${escapeHtml(person.person_entity_id)}</code>`
-      : `<span style="opacity:.6">no HA person linked</span>`;
+      ? `verknüpft mit <code>${escapeHtml(person.person_entity_id)}</code>`
+      : `<span style="opacity:.6">keine HA-Person verknüpft</span>`;
     return `<ha-card data-person-card="${person.slug}">
       <div class="row">
         <h2>${escapeHtml(person.name)}</h2>
         <span class="muted">slug: ${person.slug} · ${linkLabel}</span>
         <span class="space"></span>
-        <button class="btn" data-action="edit-person" data-person="${person.slug}">Edit</button>
-        <button class="btn danger" data-action="remove-person" data-person="${person.slug}">Delete</button>
+        <button class="btn" data-action="edit-person" data-person="${person.slug}">Bearbeiten</button>
+        <button class="btn danger" data-action="remove-person" data-person="${person.slug}">Löschen</button>
       </div>
-      <p class="muted" style="margin:8px 0 12px">Rules are evaluated in priority order (lowest number first). The first matching rule wins.</p>
-      <div data-rules-list="${person.slug}">${rulesHtml}</div>
+      ${this._renderWakeProfile(person)}
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-weight:700">Advanced Rules</summary>
+        <p class="muted" style="margin:8px 0 12px">Spezialregeln werden vor oder nach dem Profil nach Priorität ausgewertet. Niedrigere Zahl gewinnt.</p>
+        <div data-rules-list="${person.slug}">${rulesHtml}</div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" data-action="add-rule" data-person="${person.slug}">+ Spezialregel</button>
+        </div>
+      </details>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" data-action="add-rule" data-person="${person.slug}">+ Add rule</button>
         <span class="space"></span>
         <label class="field" style="flex-direction:row;align-items:center;gap:8px">
-          <span class="label">Wake window (min)</span>
+          <span class="label">Weckfenster (min)</span>
           <input type="number" min="1" max="120" value="${person.wake_window_minutes || 5}" data-window-for="${person.slug}" style="width:80px">
         </label>
-        <button class="btn" data-action="save-window" data-person="${person.slug}">Save</button>
+        <button class="btn" data-action="save-window" data-person="${person.slug}">Speichern</button>
       </div>
     </ha-card>`;
+  }
+
+  _renderWakeProfile(person) {
+    const rules = this._profileRules(person);
+    const holidayAction = rules.holiday.action === "skip" ? "skip" : "wake";
+    return `<section class="settings-section" style="margin-top:12px">
+      <h3>Wake-Profil</h3>
+      <div class="row" style="gap:14px;margin-top:8px;align-items:flex-end">
+        <label class="field"><span class="label">Werktage</span>
+          <input type="time" value="${rules.weekday.wake_time || "07:00"}" data-profile-field="${person.slug}|weekday_time">
+        </label>
+        <label class="field"><span class="label">Wochenende</span>
+          <input type="time" value="${rules.weekend.wake_time || "09:30"}" data-profile-field="${person.slug}|weekend_time">
+        </label>
+        <label class="field"><span class="label">Feiertage</span>
+          <select data-profile-field="${person.slug}|holiday_action">
+            <option value="weekend" ${holidayAction === "wake" ? "selected" : ""}>wie Wochenende</option>
+            <option value="skip" ${holidayAction === "skip" ? "selected" : ""}>nicht wecken</option>
+          </select>
+        </label>
+        <label class="field"><span class="label">Routine (min)</span>
+          <input type="number" min="0" max="240" value="${person.routine_duration_minutes ?? 60}" data-profile-field="${person.slug}|routine_duration_minutes" style="width:90px">
+        </label>
+        <label class="field"><span class="label">Frühe Termine</span>
+          <select data-profile-field="${person.slug}|calendar_conflict_behavior">
+            <option value="warn_only" ${(person.calendar_conflict_behavior || "warn_only") === "warn_only" ? "selected" : ""}>nur warnen</option>
+            <option value="wake_earlier" ${person.calendar_conflict_behavior === "wake_earlier" ? "selected" : ""}>früher wecken</option>
+            <option value="ignore" ${person.calendar_conflict_behavior === "ignore" ? "selected" : ""}>ignorieren</option>
+          </select>
+        </label>
+        <span class="space"></span>
+        <button class="btn primary" data-action="save-profile" data-person="${person.slug}">Profil speichern</button>
+      </div>
+      <p class="muted" style="margin-top:8px">Frühe Termine nutzen die Routine-Dauer: Termin 06:30 und Routine 60 min ergibt vorgeschlagen 05:30.</p>
+    </section>`;
+  }
+
+  _profileRules(person) {
+    const byId = Object.fromEntries((person.rules || []).map(r => [r.id, r]));
+    return {
+      weekday: byId.profile_weekday || { id: "profile_weekday", name: "Werktage", priority: 100, enabled: true, weekdays: [0,1,2,3,4], on_holiday: false, action: "wake", wake_time: "07:00" },
+      weekend: byId.profile_weekend || { id: "profile_weekend", name: "Wochenende", priority: 110, enabled: true, weekdays: [5,6], on_holiday: null, action: "wake", wake_time: "09:30" },
+      holiday: byId.profile_holiday || { id: "profile_holiday", name: "Feiertage", priority: 90, enabled: true, weekdays: [0,1,2,3,4], on_holiday: true, action: "wake", wake_time: byId.profile_weekend?.wake_time || "09:30" },
+    };
   }
 
   _renderRule(slug, rule, index) {
@@ -629,6 +681,7 @@ class WakePlannerPanel extends HTMLElement {
       if (ok) this._renderShell();
     }
     else if (action === "edit-person") this._openEditPersonDialog(slug);
+    else if (action === "save-profile") await this._saveProfile(slug, el);
     else if (action === "add-rule") await this._addRule(slug, el);
     else if (action === "delete-rule") await this._deleteRule(slug, el.dataset.rule);
     else if (action === "save-rule") await this._saveRule(slug, el.dataset.rule, el);
@@ -684,16 +737,74 @@ class WakePlannerPanel extends HTMLElement {
     if (!person) return;
     const newRule = {
       id: cryptoRandomId(),
-      name: "New rule",
-      priority: 50,
+      name: "Spezialregel",
+      priority: 200,
       enabled: true,
-      weekdays: [0,1,2,3,4],
+      weekdays: null,
+      on_holiday: null,
       action: "wake",
       wake_time: "07:00",
     };
     const rules = [...person.rules, newRule];
     const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules });
     if (ok) { this._flashSuccess(btn); this._updatePersonCard(slug); this._updateTodayCard(slug); }
+  }
+
+  async _saveProfile(slug, btn) {
+    const person = this._state.persons.find(p => p.slug === slug);
+    if (!person) return;
+    const read = (field) => this.querySelector(`[data-profile-field="${slug}|${field}"]`)?.value;
+    const weekdayTime = read("weekday_time") || "07:00";
+    const weekendTime = read("weekend_time") || "09:30";
+    const holidayAction = read("holiday_action") || "weekend";
+    const routine = Math.max(0, Math.min(240, parseInt(read("routine_duration_minutes") || "60", 10)));
+    const conflict = read("calendar_conflict_behavior") || "warn_only";
+    const profileRules = [
+      {
+        id: "profile_weekday",
+        name: "Werktage",
+        priority: 100,
+        enabled: true,
+        weekdays: [0, 1, 2, 3, 4],
+        on_holiday: false,
+        action: "wake",
+        wake_time: weekdayTime,
+      },
+      {
+        id: "profile_weekend",
+        name: "Wochenende",
+        priority: 110,
+        enabled: true,
+        weekdays: [5, 6],
+        on_holiday: null,
+        action: "wake",
+        wake_time: weekendTime,
+      },
+      {
+        id: "profile_holiday",
+        name: "Feiertage",
+        priority: 90,
+        enabled: true,
+        weekdays: [0, 1, 2, 3, 4],
+        on_holiday: true,
+        action: holidayAction === "skip" ? "skip" : "wake",
+        wake_time: holidayAction === "skip" ? null : weekendTime,
+      },
+    ];
+    const customRules = (person.rules || []).filter(r => !PROFILE_RULE_IDS.has(r.id));
+    const rulesOk = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules: [...profileRules, ...customRules] });
+    if (!rulesOk) return;
+    const personOk = await this._ws("bennis_toolbox/wake_planner/update_person", {
+      person_id: slug,
+      routine_duration_minutes: routine,
+      calendar_conflict_behavior: conflict,
+    });
+    if (personOk) {
+      this._flashSuccess(btn);
+      this._toast("Profil gespeichert");
+      this._updatePersonCard(slug);
+      this._updateTodayCard(slug);
+    }
   }
 
   async _deleteRule(slug, ruleId) {

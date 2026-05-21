@@ -108,6 +108,8 @@ async def ws_remove_person(hass, connection, msg):
     vol.Optional("name"): str,
     vol.Optional("person_entity_id"): vol.Any(str, None),
     vol.Optional("wake_window_minutes"): vol.All(int, vol.Range(min=1, max=120)),
+    vol.Optional("routine_duration_minutes"): vol.All(int, vol.Range(min=0, max=240)),
+    vol.Optional("calendar_conflict_behavior"): vol.In(["ignore", "warn_only", "wake_earlier"]),
 })
 @websocket_api.async_response
 async def ws_update_person(hass, connection, msg):
@@ -115,7 +117,16 @@ async def ws_update_person(hass, connection, msg):
     if not coordinator:
         connection.send_error(msg["id"], "unknown_person", "Unknown person")
         return
-    updates = {k: v for k, v in msg.items() if k in {"name", "person_entity_id", "wake_window_minutes"}}
+    updates = {
+        k: v for k, v in msg.items()
+        if k in {
+            "name",
+            "person_entity_id",
+            "wake_window_minutes",
+            "routine_duration_minutes",
+            "calendar_conflict_behavior",
+        }
+    }
     if updates:
         await coordinator.async_update_person(msg["person_id"], **updates)
     connection.send_result(msg["id"], _serialise_state(coordinator))

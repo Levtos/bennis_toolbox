@@ -6,6 +6,9 @@ from datetime import date, datetime, time, timedelta
 import logging
 
 from .const import (
+    CONFLICT_IGNORE,
+    CONFLICT_WAKE_EARLIER,
+    CONFLICT_WARN_ONLY,
     HOLIDAY_SKIP,
     HOLIDAY_WEEKEND_PROFILE,
     RULE_ACTION_SKIP,
@@ -182,13 +185,14 @@ class RuleEngine:
                 matched_rule_id=matched.id,
             )
 
-        return self._build(
+        decision = self._build(
             person, day, matched.wake_time, now.tzinfo,
             WakeState.SCHEDULED, f"rule:{matched.name}",
             f"Rule '{matched.name}': {matched.wake_time.strftime('%H:%M') if matched.wake_time else ''}",
             holiday_name=holiday_name, skip_active=runtime.skip_next,
             matched_rule_id=matched.id,
         )
+        return self._apply_calendar_conflict(person, day, now, decision, calendar)
 
     def _match_rule(self, person: PersonConfig, day: date, is_holiday: bool = False) -> Rule | None:
         """Return the highest-priority rule matching the day, or None."""
@@ -224,3 +228,53 @@ class RuleEngine:
             wake_window_end=wake_dt + window,
             matched_rule_id=matched_rule_id,
         )
+
+    def _apply_calendar_conflict(
+        self,
+        person: PersonConfig,
+        day: date,
+        now: datetime,
+        decision: WakeDecision,
+        calendar: CalendarDecision | None,
+    ) -> WakeDecision:
+        """Warn about or adjust wake time for early timed calendar events."""
+        if (
+            calendar is None
+            or calendar.early_event_time is None
+            or decision.wake_time is None
+            or person.calendar_conflict_behavior == CONFLICT_IGNORE
+        ):
+            return decision
+
+        event_dt = datetime.combine(day, calendar.early_event_time, tzinfo=now.tzinfo)
+        suggested_dt = event_dt - timedelta(minutes=person.routine_duration_minutes)
+        wake_dt = datetime.combine(day, decision.wake_time, tzinfo=now.tzinfo)
+        if suggested_dt >= wake_dt:
+            return decision
+
+        suggested_time = suggested_dt.time().replace(second=0, microsecond=0)
+        if person.calendar_conflict_behavior == CONFLICT_WAKE_EARLIER:
+            adjusted = self._build(
+                person,
+                day,
+                suggested_time,
+                now.tzinfo,
+                WakeState.SCHEDULED,
+                "calendar_conflict",
+                f"Earlier appointment {calendar.early_event_time.strftime('%H:%M')}: wake {person.routine_duration_minutes} min before",
+                matched_rule_id=decision.matched_rule_id,
+            )
+            adjusted.calendar_conflict_time = calendar.early_event_time
+            adjusted.calendar_suggested_wake_time = suggested_time
+            adjusted.calendar_conflict_summary = calendar.summary
+            return adjusted
+
+        if person.calendar_conflict_behavior == CONFLICT_WARN_ONLY:
+            decision.reason = (
+                f"{decision.reason} · Appointment {calendar.early_event_time.strftime('%H:%M')} "
+                f"would suggest {suggested_time.strftime('%H:%M')}"
+            )
+            decision.calendar_conflict_time = calendar.early_event_time
+            decision.calendar_suggested_wake_time = suggested_time
+            decision.calendar_conflict_summary = calendar.summary
+        return decision

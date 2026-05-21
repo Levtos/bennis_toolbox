@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 import logging
 import re
 from typing import Any
@@ -45,14 +45,28 @@ class CalendarSource:
     ) -> dict[tuple[str, date], CalendarDecision]:
         """Return calendar-derived decisions for each person/date."""
         decisions: dict[tuple[str, date], CalendarDecision] = {}
+        early_events: dict[date, CalendarDecision] = {}
         for event in await self._async_get_ha_events(start, end):
             summary = str(event.get("summary") or event.get("title") or "")
             event_date = self._event_date(event, start.date())
             decision = self._parse_summary(summary, bool(event.get("all_day")))
             if decision is None:
+                event_time = self._event_time(event)
+                if event_time is None:
+                    continue
+                current = early_events.get(event_date)
+                if current is None or event_time < current.early_event_time:
+                    early_events[event_date] = CalendarDecision(
+                        early_event_time=event_time,
+                        summary=summary,
+                        source="calendar",
+                    )
                 continue
             for slug in person_slugs:
                 decisions[(slug, event_date)] = decision
+        for event_date, decision in early_events.items():
+            for slug in person_slugs:
+                decisions.setdefault((slug, event_date), decision)
         return decisions
 
     async def _async_get_ha_events(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
@@ -106,3 +120,14 @@ class CalendarSource:
                 except ValueError:
                     return fallback
         return fallback
+
+    def _event_time(self, event: dict[str, Any]) -> time | None:
+        raw = event.get("start") or event.get("start_time")
+        if isinstance(raw, dict):
+            raw = raw.get("dateTime")
+        if not isinstance(raw, str) or len(raw) <= 10:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).time().replace(tzinfo=None)
+        except ValueError:
+            return None

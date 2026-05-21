@@ -12,9 +12,15 @@ from .const import (
     CONF_PERSON_ENTITY_ID,
     CONF_PERSON_NAME,
     CONF_PERSONS,
+    CONF_CALENDAR_CONFLICT_BEHAVIOR,
+    CONF_ROUTINE_DURATION_MINUTES,
     CONF_RULES,
     CONF_SLUG,
     CONF_WAKE_WINDOW_MINUTES,
+    CONFLICT_BEHAVIORS,
+    CONFLICT_WARN_ONLY,
+    DEFAULT_ROUTINE_DURATION_MINUTES,
+    DEFAULT_WEEKEND_WAKE_TIME,
     DAYS,
     DEFAULT_WAKE_TIME,
     DEFAULT_WAKE_WINDOW_MINUTES,
@@ -29,17 +35,38 @@ _WEEKDAY_INDEX = {day: i for i, day in enumerate(DAYS)}
 
 
 def default_rules() -> list[dict[str, Any]]:
-    """Return a single default weekday-mornings rule for new persons."""
+    """Return the standard wake profile rules for new persons."""
     return [
         {
-            "id": str(uuid.uuid4()),
-            "name": "Weekday mornings",
+            "id": "profile_weekday",
+            "name": "Werktage",
             "priority": 100,
             "enabled": True,
             "weekdays": [0, 1, 2, 3, 4],
+            "on_holiday": False,
             "action": RULE_ACTION_WAKE,
             "wake_time": DEFAULT_WAKE_TIME,
-        }
+        },
+        {
+            "id": "profile_weekend",
+            "name": "Wochenende",
+            "priority": 110,
+            "enabled": True,
+            "weekdays": [5, 6],
+            "on_holiday": None,
+            "action": RULE_ACTION_WAKE,
+            "wake_time": DEFAULT_WEEKEND_WAKE_TIME,
+        },
+        {
+            "id": "profile_holiday",
+            "name": "Feiertage",
+            "priority": 90,
+            "enabled": True,
+            "weekdays": [0, 1, 2, 3, 4],
+            "on_holiday": True,
+            "action": RULE_ACTION_WAKE,
+            "wake_time": DEFAULT_WEEKEND_WAKE_TIME,
+        },
     ]
 
 
@@ -190,6 +217,14 @@ def persons_from_entry(entry: ConfigEntry) -> list[PersonConfig]:
                 person_entity_id=raw.get(CONF_PERSON_ENTITY_ID),
                 rules=rules,
                 wake_window_minutes=int(raw.get(CONF_WAKE_WINDOW_MINUTES, DEFAULT_WAKE_WINDOW_MINUTES)),
+                routine_duration_minutes=int(
+                    raw.get(CONF_ROUTINE_DURATION_MINUTES, DEFAULT_ROUTINE_DURATION_MINUTES)
+                ),
+                calendar_conflict_behavior=(
+                    raw.get(CONF_CALENDAR_CONFLICT_BEHAVIOR)
+                    if raw.get(CONF_CALENDAR_CONFLICT_BEHAVIOR) in CONFLICT_BEHAVIORS
+                    else CONFLICT_WARN_ONLY
+                ),
             )
         )
     return persons

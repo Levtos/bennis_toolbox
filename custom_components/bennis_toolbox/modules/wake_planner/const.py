@@ -19,6 +19,8 @@ CONF_PERSON_ENTITY_ID = "person_entity_id"
 CONF_SLUG = "slug"
 CONF_RULES = "rules"
 CONF_WAKE_WINDOW_MINUTES = "wake_window_minutes"
+CONF_ROUTINE_DURATION_MINUTES = "routine_duration_minutes"
+CONF_CALENDAR_CONFLICT_BEHAVIOR = "calendar_conflict_behavior"
 CONF_HOLIDAY_CALENDAR_ENTITY_ID = "holiday_calendar_entity_id"
 CONF_HOLIDAY_BEHAVIOR = "holiday_behavior"
 CONF_MANUAL_HOLIDAY_DATES = "manual_holiday_dates"
@@ -27,12 +29,18 @@ CONF_CALENDAR_WAKE_PATTERN = "calendar_wake_pattern"
 CONF_CALENDAR_SKIP_TITLES = "calendar_skip_titles"
 
 DEFAULT_WAKE_TIME = "07:00"
+DEFAULT_WEEKEND_WAKE_TIME = "09:30"
 DEFAULT_WAKE_WINDOW_MINUTES = 5
+DEFAULT_ROUTINE_DURATION_MINUTES = 60
 DEFAULT_CALENDAR_WAKE_PATTERN = r"(?:wake:\s*)?(?P<time>[0-2]?\d:[0-5]\d)"
 DEFAULT_CALENDAR_SKIP_TITLES = "no-wake,schlaf aus"
 
 HOLIDAY_SKIP = "skip"
 HOLIDAY_WEEKEND_PROFILE = "weekend_profile"
+CONFLICT_IGNORE = "ignore"
+CONFLICT_WARN_ONLY = "warn_only"
+CONFLICT_WAKE_EARLIER = "wake_earlier"
+CONFLICT_BEHAVIORS = {CONFLICT_IGNORE, CONFLICT_WARN_ONLY, CONFLICT_WAKE_EARLIER}
 
 DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 WEEKEND_DAYS = {"saturday", "sunday"}
@@ -94,6 +102,8 @@ class PersonConfig:
     person_entity_id: str | None
     rules: list[Rule] = field(default_factory=list)
     wake_window_minutes: int = DEFAULT_WAKE_WINDOW_MINUTES
+    routine_duration_minutes: int = DEFAULT_ROUTINE_DURATION_MINUTES
+    calendar_conflict_behavior: str = CONFLICT_WARN_ONLY
 
 
 @dataclass(slots=True)
@@ -102,6 +112,7 @@ class CalendarDecision:
     skip: bool = False
     summary: str | None = None
     source: str = "not_configured"
+    early_event_time: time | None = None
 
 
 @dataclass(slots=True)
@@ -117,6 +128,9 @@ class WakeDecision:
     wake_window_start: datetime | None = None
     wake_window_end: datetime | None = None
     matched_rule_id: str | None = None
+    calendar_conflict_time: time | None = None
+    calendar_suggested_wake_time: time | None = None
+    calendar_conflict_summary: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +145,9 @@ class WakeDecision:
             "wake_window_start": self.wake_window_start.isoformat() if self.wake_window_start else None,
             "wake_window_end": self.wake_window_end.isoformat() if self.wake_window_end else None,
             "matched_rule_id": self.matched_rule_id,
+            "calendar_conflict_time": self.calendar_conflict_time.strftime("%H:%M") if self.calendar_conflict_time else None,
+            "calendar_suggested_wake_time": self.calendar_suggested_wake_time.strftime("%H:%M") if self.calendar_suggested_wake_time else None,
+            "calendar_conflict_summary": self.calendar_conflict_summary,
         }
 
 

@@ -31,9 +31,13 @@ from .const import (
     CONF_PERSON_ENTITY_ID,
     CONF_PERSON_NAME,
     CONF_PERSONS,
+    CONF_CALENDAR_CONFLICT_BEHAVIOR,
+    CONF_ROUTINE_DURATION_MINUTES,
     CONF_RULES,
     CONF_SLUG,
     CONF_WAKE_WINDOW_MINUTES,
+    CONFLICT_WARN_ONLY,
+    DEFAULT_ROUTINE_DURATION_MINUTES,
     DEFAULT_CALENDAR_SKIP_TITLES,
     DEFAULT_CALENDAR_WAKE_PATTERN,
     DEFAULT_WAKE_WINDOW_MINUTES,
@@ -208,6 +212,8 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
             CONF_PERSON_NAME: name,
             CONF_PERSON_ENTITY_ID: person_entity_id or None,
             CONF_WAKE_WINDOW_MINUTES: DEFAULT_WAKE_WINDOW_MINUTES,
+            CONF_ROUTINE_DURATION_MINUTES: DEFAULT_ROUTINE_DURATION_MINUTES,
+            CONF_CALENDAR_CONFLICT_BEHAVIOR: CONFLICT_WARN_ONLY,
             CONF_RULES: default_rules(),
         })
         await self._save_persons(persons)
@@ -295,6 +301,8 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
             "name": person.name,
             "person_entity_id": person.person_entity_id,
             "wake_window_minutes": person.wake_window_minutes,
+            "routine_duration_minutes": person.routine_duration_minutes,
+            "calendar_conflict_behavior": person.calendar_conflict_behavior,
             "rules": [rule_to_dict(r) for r in person.rules],
             "decision": decision.as_dict() if decision else None,
             "next_wake": self.next_wakes.get(person.slug).isoformat()
