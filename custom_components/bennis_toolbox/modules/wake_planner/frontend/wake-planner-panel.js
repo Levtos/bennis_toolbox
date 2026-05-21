@@ -36,7 +36,8 @@ ha-card, .card { display:block; border-radius:16px; padding:16px 18px; backgroun
 .b-holiday { background:#b71c1c; color:#fff; }
 .b-inactive { background:#37474f; color:#fff; }
 .b-calendar { background:#0277bd; color:#fff; }
-.time { font-size:clamp(40px,9vw,60px); font-weight:800; letter-spacing:-0.04em; margin:6px 0 4px; line-height:1; }
+.time { font-size:clamp(40px,9vw,60px); font-weight:800; letter-spacing:0; margin:6px 0 4px; line-height:1; }
+.time.no-wake { font-size:clamp(24px,5vw,34px); line-height:1.15; margin-top:18px; }
 .reason { opacity:.8; font-size:13px; margin:8px 0 12px; }
 button.btn { background:var(--card-background-color); color:var(--primary-text-color); border:1px solid var(--divider-color); border-radius:10px; padding:8px 12px; font-size:13px; cursor:pointer; min-height:38px; transition:background-color .2s, color .2s, border-color .2s, transform .08s; }
 button.btn:active { transform:scale(0.97); }
@@ -312,32 +313,48 @@ class WakePlannerPanel extends HTMLElement {
   _renderToday(person) {
     const dec = person.decision || {};
     const nextWake = person.next_wake ? new Date(person.next_wake) : null;
-    const displayTime = nextWake ? nextWake.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+    const state = dec.state || "inactive";
+    const stateLabels = {
+      scheduled: "geplant",
+      skipped: "übersprungen",
+      overridden: "override",
+      holiday: "Feiertag",
+      inactive: "inaktiv",
+    };
+    const emptyLabels = {
+      skipped: "Heute kein Wecker",
+      holiday: "Feiertag",
+      inactive: "Kein Wecker geplant",
+    };
+    const displayTime = nextWake
+      ? nextWake.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : (emptyLabels[state] || "Kein Wecker geplant");
     const dayLabel = nextWake ? nextWake.toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" }) : "";
     const decidedBy = dec.decided_by || "";
-    let badgeClass = `b-${dec.state || "inactive"}`;
+    let badgeClass = `b-${state}`;
     if (decidedBy === "calendar") badgeClass = "b-calendar";
     const overrideInfo = person.override_time
-      ? `<div class="muted">Override active: ${person.override_time}${person.override_until ? ` until ${person.override_until}` : ""}</div>`
+      ? `<div class="muted">Override aktiv: ${person.override_time}${person.override_until ? ` bis ${person.override_until}` : ""}</div>`
       : "";
-    const skipInfo = person.skip_next ? `<div class="muted">⚠ Next wake will be skipped</div>` : "";
+    const skipInfo = person.skip_next ? `<div class="muted">Nächster Wecker wird übersprungen</div>` : "";
     const skipClass = person.skip_next ? "btn state-skip" : "btn";
     const overrideClass = person.override_time ? "btn state-override" : "btn";
-    const skipLabel = person.skip_next ? "✓ Skipping next" : "Skip next";
+    const skipLabel = person.skip_next ? "Überspringt nächsten" : "Nächsten überspringen";
+    const timeClass = nextWake ? "time" : "time no-wake";
     return `<ha-card data-today-card="${person.slug}">
       <div class="row">
         <h2>${escapeHtml(person.name)}</h2>
         <span class="space"></span>
-        <span class="badge ${badgeClass}">${dec.state || "inactive"}</span>
+        <span class="badge ${badgeClass}">${stateLabels[state] || state}</span>
       </div>
-      <div class="time">${displayTime}</div>
+      <div class="${timeClass}">${displayTime}</div>
       <div class="muted">${dayLabel}</div>
       <div class="reason">${escapeHtml(dec.reason || "")}</div>
       ${overrideInfo}${skipInfo}
       <div class="row" style="margin-top:14px">
         <button class="${skipClass}" data-action="skip" data-person="${person.slug}">${skipLabel}</button>
-        <button class="${overrideClass}" data-action="override" data-person="${person.slug}">${person.override_time ? `✓ Override ${person.override_time}` : "Override…"}</button>
-        ${person.override_time || person.skip_next ? `<button class="btn" data-action="clear-override" data-person="${person.slug}">Clear</button>` : ""}
+        <button class="${overrideClass}" data-action="override" data-person="${person.slug}">${person.override_time ? `Override ${person.override_time}` : "Override…"}</button>
+        ${person.override_time || person.skip_next ? `<button class="btn" data-action="clear-override" data-person="${person.slug}">Zurücksetzen</button>` : ""}
       </div>
     </ha-card>`;
   }
