@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, DATA_ENTRIES
 from .modules import all_specs
+from .modules.base import platform_value
 
 
 async def async_get_config_entry_diagnostics(
@@ -28,11 +29,11 @@ async def async_get_config_entry_diagnostics(
                 "module_id": s.module_id,
                 "name": s.name,
                 "status": s.status.value,
-                "platforms": [p.value for p in s.platforms],
+                "platforms": [platform_value(p) for p in s.platforms],
                 "has_panel": s.has_panel,
                 "has_websocket": s.has_websocket,
                 "has_services": s.has_services,
             }
-            for s in all_specs()
+            for s in await hass.async_add_executor_job(all_specs)
         ],
     }

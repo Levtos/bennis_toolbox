@@ -26,7 +26,7 @@ from .const import (
     DOMAIN,
 )
 from .modules import REGISTERED_MODULE_IDS, get_spec, load_module
-from .modules.base import ModuleStatus
+from .modules.base import ModuleStatus, platform_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     hass.data.setdefault(DOMAIN, {DATA_ENTRIES: {}, DATA_SERVICES_REGISTERED: False})
     if not hass.data[DOMAIN][DATA_SERVICES_REGISTERED]:
         await svc_dispatcher.async_register_all(hass)
-        ws_dispatcher.async_register_all(hass)
+        await ws_dispatcher.async_register_all(hass)
         hass.data[DOMAIN][DATA_SERVICES_REGISTERED] = True
         _LOGGER.debug("toolbox services + websockets registered")
     # Panels werden lazy registriert, wenn ein Modul mit `has_panel=True`
@@ -54,7 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("entry %s references unknown module %r", entry.entry_id, module_id)
         return False
 
-    spec = get_spec(module_id)
+    spec = await hass.async_add_executor_job(get_spec, module_id)
     if spec.status in (ModuleStatus.STUB, ModuleStatus.PENDING):
         _LOGGER.warning(
             "module %s is %s — entry %s will load as no-op",
@@ -63,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN][DATA_ENTRIES][entry.entry_id] = {"module_id": module_id, "status": spec.status.value}
         return True
 
-    mod = load_module(module_id)
+    mod = await hass.async_add_executor_job(load_module, module_id)
     setup = getattr(mod, "async_setup_entry", None)
     if setup is None:
         _LOGGER.error("module %s exposes no async_setup_entry", module_id)
@@ -86,7 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if spec.platforms:
         # spec.platforms kann mit HA-freien Enum-Werten deklariert sein —
         # auf HA's Platform-Enum normalisieren.
-        platforms = [p if isinstance(p, Platform) else Platform(str(p)) for p in spec.platforms]
+        platforms = [p if isinstance(p, Platform) else Platform(platform_value(p)) for p in spec.platforms]
         await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     if spec.has_panel:
@@ -108,11 +108,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not module_id or state.get("status") != "ready":
         return True
 
-    spec = get_spec(module_id)
+    spec = await hass.async_add_executor_job(get_spec, module_id)
     if spec.platforms:
-        platforms = [p if isinstance(p, Platform) else Platform(str(p)) for p in spec.platforms]
+        platforms = [p if isinstance(p, Platform) else Platform(platform_value(p)) for p in spec.platforms]
         await hass.config_entries.async_unload_platforms(entry, platforms)
-    mod = load_module(module_id)
+    mod = await hass.async_add_executor_job(load_module, module_id)
     unload = getattr(mod, "async_unload_entry", None)
     if unload:
         try:

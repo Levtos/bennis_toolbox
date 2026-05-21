@@ -39,7 +39,7 @@ class BennisToolboxConfigFlow(ConfigFlow, domain=DOMAIN):
     # --- Step: Modul auswählen ------------------------------------------------
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        specs = selectable_specs()
+        specs = await self.hass.async_add_executor_job(selectable_specs)
         options = [
             selector.SelectOptionDict(value=s.module_id, label=f"{s.name} ({s.status.value})")
             for s in specs
@@ -62,7 +62,7 @@ class BennisToolboxConfigFlow(ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=schema, errors={"base": "unknown_module"}
             )
 
-        spec = get_spec(module_id)
+        spec = await self.hass.async_add_executor_job(get_spec, module_id)
         if spec.status in (ModuleStatus.PENDING, ModuleStatus.STUB):
             # Erstelle trotzdem einen Entry, damit der Nutzer das Modul
             # vormerken kann; Setup ist no-op (siehe __init__.async_setup_entry).
@@ -132,7 +132,7 @@ class BennisToolboxOptionsFlow(OptionsFlow):
         if not module_id:
             return False
         try:
-            mod = load_module(module_id)
+            mod = await self.hass.async_add_executor_job(load_module, module_id)
         except Exception:  # noqa: BLE001
             return False
         helper_cls = getattr(mod, "OptionsFlowHelper", None)
@@ -168,14 +168,15 @@ class BennisToolboxOptionsFlow(OptionsFlow):
 
 async def _maybe_make_helper(hass, module_id: str, flow):
     """Modul-spezifischen Flow-Helfer instantiieren, falls vorhanden."""
-    mod = load_module(module_id)
+    mod = await hass.async_add_executor_job(load_module, module_id)
     helper_cls = getattr(mod, "ConfigFlowHelper", None)
     if helper_cls is None:
+        spec = await hass.async_add_executor_job(get_spec, module_id)
         # Fallback: leerer Entry, das Modul hat nichts zu konfigurieren.
         class _Empty:
             async def async_step_init(self_inner) -> FlowResult:
                 return flow.async_create_entry(
-                    title=get_spec(module_id).name,
+                    title=spec.name,
                     data={CONF_MODULE_ID: module_id},
                 )
         return _Empty()

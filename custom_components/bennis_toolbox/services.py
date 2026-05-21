@@ -44,7 +44,7 @@ async def async_register_all(hass: HomeAssistant) -> None:
     """
     for module_id in REGISTERED_MODULE_IDS:
         try:
-            mod = load_module(module_id)
+            mod = await hass.async_add_executor_job(load_module, module_id)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("skip services for %s: %s", module_id, err)
             continue
@@ -64,7 +64,7 @@ async def async_register_all(hass: HomeAssistant) -> None:
 async def async_unregister_all(hass: HomeAssistant) -> None:
     for module_id in REGISTERED_MODULE_IDS:
         try:
-            mod = load_module(module_id)
+            mod = await hass.async_add_executor_job(load_module, module_id)
         except Exception:  # noqa: BLE001
             continue
         services: dict[str, ServiceDef] = getattr(mod, "SERVICES", {}) or {}

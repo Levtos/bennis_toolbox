@@ -32,7 +32,7 @@ async def async_setup_platform_for(
         _LOGGER.error("entry %s missing %s", entry.entry_id, CONF_MODULE_ID)
         return
     try:
-        mod = load_module(module_id)
+        mod = await hass.async_add_executor_job(load_module, module_id)
     except Exception as err:  # noqa: BLE001
         _LOGGER.error("cannot load module %s: %s", module_id, err)
         return

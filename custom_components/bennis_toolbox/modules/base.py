@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from homeassistant.const import Platform
@@ -48,3 +48,9 @@ class ModuleSpec:
     has_websocket: bool = False
     has_services: bool = False
     icon: str = "mdi:puzzle"
+
+
+def platform_value(platform: Any) -> str:
+    """Return the raw HA platform value from HA or HA-free enum declarations."""
+    value = getattr(platform, "value", platform)
+    return str(value)

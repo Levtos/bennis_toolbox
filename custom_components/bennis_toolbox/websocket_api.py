@@ -23,10 +23,10 @@ from .modules import REGISTERED_MODULE_IDS, load_module
 _LOGGER = logging.getLogger(__name__)
 
 
-def async_register_all(hass: HomeAssistant) -> None:
+async def async_register_all(hass: HomeAssistant) -> None:
     for module_id in REGISTERED_MODULE_IDS:
         try:
-            mod = load_module(module_id)
+            mod = await hass.async_add_executor_job(load_module, module_id)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("skip websockets for %s: %s", module_id, err)
             continue

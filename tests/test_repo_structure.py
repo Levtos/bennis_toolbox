@@ -143,6 +143,53 @@ def test_module_spec_loadable_without_homeassistant(module_id: str) -> None:
     assert mod.SPEC.module_id == module_id
 
 
+@pytest.mark.parametrize("module_id", sorted(EXPECTED_MODULE_IDS))
+def test_module_spec_platform_values_are_normalisable(module_id: str) -> None:
+    """HA-free enum platform declarations must expose raw values like sensor."""
+    module_dir = MODULES_DIR / module_id
+    spec_file = module_dir / "_spec.py"
+    init_file = module_dir / "__init__.py"
+    target = spec_file if spec_file.exists() else init_file
+
+    pkg_name = f"bt_platforms_test_{module_id}"
+    pkg = ModuleType(pkg_name)
+    pkg.__path__ = [str(MODULES_DIR)]
+    sys.modules[pkg_name] = pkg
+
+    base_spec = importlib.util.spec_from_file_location(
+        f"{pkg_name}.base", MODULES_DIR / "base.py"
+    )
+    mod_base = importlib.util.module_from_spec(base_spec)
+    sys.modules[f"{pkg_name}.base"] = mod_base
+    base_spec.loader.exec_module(mod_base)
+
+    sub_pkg_name = f"{pkg_name}.{module_id}"
+    sub_pkg = ModuleType(sub_pkg_name)
+    sub_pkg.__path__ = [str(module_dir)]
+    sys.modules[sub_pkg_name] = sub_pkg
+
+    full_name = f"{sub_pkg_name}._spec" if target is spec_file else sub_pkg_name
+    spec = importlib.util.spec_from_file_location(full_name, target)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[full_name] = mod
+    spec.loader.exec_module(mod)
+
+    values = [mod_base.platform_value(p) for p in mod.SPEC.platforms]
+    assert all("." not in v for v in values), values
+    assert set(values) <= {
+        "binary_sensor",
+        "button",
+        "calendar",
+        "cover",
+        "image",
+        "media_player",
+        "number",
+        "sensor",
+        "switch",
+        "text",
+    }
+
+
 # ------------------------------------------------------------------ legacy ban
 
 
