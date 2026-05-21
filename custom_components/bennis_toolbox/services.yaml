@@ -247,3 +247,77 @@ plug_policy_engine_set_manual_recently_on:
       required: true
       selector:
         text:
+
+# --- Notification Router -----------------------------------------------------
+
+notification_router_route:
+  name: Notification Router — Route event
+  description: Routes a single event through every active Notification-Router
+    instance. Fires bennis_toolbox_notification_router_routed on the bus and
+    drives configured push/light/media targets.
+  fields:
+    event_type:
+      required: true
+      selector:
+        select:
+          options:
+            - doorbell
+            - security
+            - appliance_done
+            - device_health
+            - lock
+            - climate
+            - media
+            - info
+    severity:
+      required: false
+      default: normal
+      selector:
+        select:
+          options:
+            - info
+            - normal
+            - urgent
+            - critical
+    title:
+      required: false
+      default: ""
+      selector:
+        text:
+    message:
+      required: false
+      default: ""
+      selector:
+        text:
+    payload:
+      required: false
+      default: {}
+      selector:
+        object:
+    dedupe_key:
+      required: false
+      selector:
+        text:
+
+notification_router_clear:
+  name: Notification Router — Clear dedupe / cooldowns
+  description: Clears the entire dedupe and cooldown caches, or just one key.
+  fields:
+    dedupe_key:
+      required: false
+      selector:
+        text:
+
+notification_router_set_dnd:
+  name: Notification Router — Set DND window
+  description: Enables Do-Not-Disturb for `duration` seconds. 0 clears DND.
+  fields:
+    duration:
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          mode: box
