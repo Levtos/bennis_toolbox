@@ -151,6 +151,31 @@ def test_engine_holiday_weekend_profile_uses_saturday_rule():
     assert decision.matched_rule_id == "rs"
 
 
+def test_engine_holiday_does_not_match_non_holiday_weekday_rule():
+    weekday_non_holiday = _wake_rule(on_holiday=False)
+    weekend_rule = _wake_rule(
+        id="rw", name="Weekend", weekdays={5, 6}, wake_time=time(9, 30), on_holiday=None
+    )
+    engine = _engine(holiday=True)
+    now = datetime(2026, 1, 12, 6, 0, tzinfo=timezone.utc)
+    decision = engine.decide(_person([weekday_non_holiday, weekend_rule]), now)
+    assert decision.state == C.WakeState.HOLIDAY
+    assert decision.wake_time is None
+
+
+def test_engine_holiday_weekend_profile_ignores_non_holiday_weekday_rule():
+    weekday_non_holiday = _wake_rule(on_holiday=False)
+    weekend_rule = _wake_rule(
+        id="rw", name="Weekend", weekdays={5, 6}, wake_time=time(9, 30), on_holiday=None
+    )
+    engine = _engine(holiday=True, holiday_behavior=C.HOLIDAY_WEEKEND_PROFILE)
+    now = datetime(2026, 1, 12, 6, 0, tzinfo=timezone.utc)
+    decision = engine.decide(_person([weekday_non_holiday, weekend_rule]), now)
+    assert decision.state == C.WakeState.SCHEDULED
+    assert decision.wake_time == time(9, 30)
+    assert decision.matched_rule_id == "rw"
+
+
 def test_engine_skip_action():
     skip_rule = C.Rule(
         id="r2", name="No-go", priority=10, enabled=True,

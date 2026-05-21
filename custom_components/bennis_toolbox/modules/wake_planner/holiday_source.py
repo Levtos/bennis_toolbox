@@ -21,8 +21,12 @@ class HolidaySource:
 
     async def is_holiday(self, check_date: date) -> bool:
         """Return true if check_date has a full-day event in the holiday calendar."""
+        return (await self.holiday_name(check_date)) is not None
+
+    async def holiday_name(self, check_date: date) -> str | None:
+        """Return the first full-day holiday event summary for check_date."""
         if not self.entity_id:
-            return False
+            return None
         start = datetime.combine(check_date, time.min)
         end = datetime.combine(check_date, time.max)
         try:
@@ -39,9 +43,12 @@ class HolidaySource:
             )
         except Exception as err:  # noqa: BLE001 - holiday source must not break coordinator
             _LOGGER.debug("Holiday calendar fetch failed for %s: %s", self.entity_id, err)
-            return False
+            return None
         events = (response or {}).get(self.entity_id, {}).get("events", [])
-        return any(event.get("all_day") for event in events)
+        for event in events:
+            if _is_all_day_event(event):
+                return str(event.get("summary") or event.get("title") or "Holiday calendar")
+        return None
 
 
 async def async_holiday_map(
@@ -62,10 +69,26 @@ async def async_holiday_map(
     while current <= end:
         if current.weekday() >= 5:
             holidays[current] = (True, "Weekend")
-        elif await source.is_holiday(current):
-            holidays[current] = (True, "Holiday calendar")
+        elif holiday_name := await source.holiday_name(current):
+            holidays[current] = (True, holiday_name)
         current += timedelta(days=1)
     return holidays
+
+
+def _is_all_day_event(event: dict[str, Any]) -> bool:
+    """Return true for HA calendar full-day event shapes.
+
+    Different calendar backends expose all-day events either through an
+    explicit `all_day` flag or through date-only start values.
+    """
+    if event.get("all_day") is True:
+        return True
+    raw = event.get("start") or event.get("start_time") or event.get("date")
+    if isinstance(raw, dict):
+        return bool(raw.get("date") and not raw.get("dateTime"))
+    if isinstance(raw, str):
+        return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw[:10])) and len(raw) <= 10
+    return False
 
 
 def _manual_holiday_map(
