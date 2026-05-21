@@ -321,3 +321,48 @@ notification_router_set_dnd:
           max: 86400
           step: 1
           mode: box
+
+# --- Stash HA ----------------------------------------------------------------
+
+stash_ha_metadata_scan:
+  name: Stash HA — Metadata scan
+  description: Runs metadataScan on every loaded Stash server.
+
+stash_ha_metadata_clean:
+  name: Stash HA — Metadata clean
+  description: Runs metadataClean on every loaded Stash server.
+
+stash_ha_metadata_generate:
+  name: Stash HA — Metadata generate
+  description: Runs metadataGenerate on every loaded Stash server.
+
+stash_ha_metadata_auto_tag:
+  name: Stash HA — Metadata auto-tag
+  description: Runs metadataAutoTag on every loaded Stash server.
+
+stash_ha_metadata_identify:
+  name: Stash HA — Metadata identify (StashDB)
+  description: Runs metadataIdentify with the public StashDB source.
+
+stash_ha_generate_screenshot:
+  name: Stash HA — Generate screenshot for a scene
+  fields:
+    scene_id:
+      required: true
+      selector:
+        text:
+
+stash_ha_save_activity:
+  name: Stash HA — Save scene activity (resume time)
+  fields:
+    scene_id:
+      required: true
+      selector:
+        text:
+    position:
+      required: true
+      selector:
+        number:
+          min: 0
+          step: 1
+          mode: box

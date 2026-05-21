@@ -50,6 +50,6 @@ von HACS ausgeliefert (liegt nicht unter `custom_components/`).
 | `title_classifier`      | **READY**| voll portiert: Storage, Runtime, Sensoren, Number, Services, WS, Panel, Multi-Step-Flow | — |
 | `wake_planner`          | **READY**| voll portiert: Coordinator, Sensoren, Binary-Sensor, Services, WS, Panel, Flow | — |
 | `maw`                   | STUB     | SPEC            | (später)                            |
-| `stash_ha`              | STUB     | SPEC            | (später)                            |
+| `stash_ha`              | **READY**| voll portiert: GraphQL-Client, Library + Playback Coordinator, 13 Sensoren + Cover-Image + Media-Player, 7 Services, Config-Flow mit Validate, Webhook | — |
 
 Vorgehen pro Modul siehe [module_adapter.md](module_adapter.md).

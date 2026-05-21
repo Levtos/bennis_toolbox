@@ -30,7 +30,7 @@ verfügbaren Module:
 | `title_classifier`      | Title Classifier       | **ready**       |
 | `wake_planner`          | Wake Planner           | **ready**       |
 | `maw`                   | Media Art Wrapper      | stub            |
-| `stash_ha`              | Stash HA               | stub            |
+| `stash_ha`              | Stash HA               | **ready**       |
 
 **Statuswerte:**
 - `ready` — voll lauffähig, Entities/Services aktiv.
