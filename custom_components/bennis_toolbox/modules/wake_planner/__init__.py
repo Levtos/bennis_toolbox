@@ -15,7 +15,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 
 from ...const import DATA_ENTRIES, DOMAIN
 from ._spec import SPEC  # SPEC ist HA-frei deklariert
@@ -51,9 +51,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if hass.is_running:
         await coordinator.async_config_entry_first_refresh()
     else:
+        @callback
+        def _async_refresh_after_started(_event) -> None:
+            hass.async_create_task(coordinator.async_config_entry_first_refresh())
+
         bucket["wake_planner_startup_unsub"] = hass.bus.async_listen_once(
             EVENT_HOMEASSISTANT_STARTED,
-            lambda _event: hass.async_create_task(coordinator.async_config_entry_first_refresh()),
+            _async_refresh_after_started,
         )
     return True
 
