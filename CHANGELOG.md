@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.1 - 2026-05-22
+
+### Geändert
+
+- Cover Policy Options-UX verbessert:
+  - Zielpositionen werden als 0-100 %-Slider angezeigt.
+  - Profilfelder sind nutzerverständlich beschriftet, z. B.
+    `Hitzeschutz`, `Blendschutz TV`, `Blendschutz PC`, `Schlafen`,
+    `Aufwachen`, `Fenster offen`.
+  - Quellen/Auslöser, Zielpositionen und Laufzeitverhalten bleiben im
+    Options-Flow klar getrennt.
+- Options-Menüs nutzen lesbare Labels statt nackter Step-IDs.
+
+### Behoben
+
+- Cover Policy bleibt fachlich unverändert, aber die Bedienung trennt nun
+  deutlicher zwischen Auslösern und Zielpositionen.
+- Tests gegen Collection-Order-abhängige Selector-Stubs gehärtet.
+
+### Tests
+
+- Full test suite at release preparation: `342 passed, 1 warning`.
+
 ## 0.3.0 - 2026-05-21
 
 ### Hinzugefügt
