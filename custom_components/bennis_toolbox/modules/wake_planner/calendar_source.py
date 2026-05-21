@@ -1,8 +1,14 @@
-"""Calendar source for Wake Planner (HA calendar entities only)."""
+"""Calendar source for Wake Planner (HA calendar entities only).
+
+Fetches go through `CalendarCache` so concurrent callers coalesce, the
+HA calendar service is hit at most once per `min_refresh_interval`, and
+intermittent CalDAV failures fall back to the last-known-good events
+instead of returning empty results.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 import logging
 import re
@@ -10,6 +16,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from .calendar_cache import CalendarCache
 from .const import CalendarDecision, DEFAULT_CALENDAR_WAKE_PATTERN
 from .rule_engine import parse_time
 
@@ -18,9 +25,25 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class CalendarSourceStatus:
-    """Current health of the configured calendar source."""
+    """Current health of the configured calendar source.
+
+    `ha_calendar` keeps the legacy short string for backward compatibility
+    (`not_configured` / `ok` / `unavailable` / `error` / `using_cache`).
+    `detail` carries the structured payload from CalendarCache.
+    """
 
     ha_calendar: str = "not_configured"
+    detail: dict[str, Any] = field(default_factory=dict)
+
+
+_CACHE_STATUS_TO_LEGACY = {
+    "not_configured": "not_configured",
+    "unavailable": "unavailable",
+    "never_fetched": "never_fetched",
+    "ok": "ok",
+    "using_cache": "using_cache",
+    "error_no_cache": "error",
+}
 
 
 class CalendarSource:
@@ -33,11 +56,13 @@ class CalendarSource:
         calendar_entity_id: str | None,
         wake_pattern: str,
         skip_titles: list[str],
+        cache: CalendarCache,
     ) -> None:
         self.hass = hass
         self.calendar_entity_id = calendar_entity_id or None
         self.wake_re = re.compile(wake_pattern or DEFAULT_CALENDAR_WAKE_PATTERN, re.IGNORECASE)
         self.skip_titles = [title.strip().lower() for title in skip_titles if title.strip()]
+        self.cache = cache
         self.status = CalendarSourceStatus()
 
     async def async_get_decisions(
@@ -70,32 +95,14 @@ class CalendarSource:
         return decisions
 
     async def _async_get_ha_events(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        if not self.calendar_entity_id:
-            self.status.ha_calendar = "not_configured"
-            return []
-        state = self.hass.states.get(self.calendar_entity_id)
-        if state is None or state.state in {"unavailable", "unknown"}:
-            self.status.ha_calendar = "unavailable"
-            return []
-        try:
-            response = await self.hass.services.async_call(
-                "calendar",
-                "get_events",
-                {
-                    "entity_id": self.calendar_entity_id,
-                    "start_date_time": start.isoformat(),
-                    "end_date_time": end.isoformat(),
-                },
-                blocking=True,
-                return_response=True,
-            )
-            self.status.ha_calendar = "ok"
-        except Exception as err:  # noqa: BLE001 - source health must not break coordinator
-            self.status.ha_calendar = "error"
-            _LOGGER.debug("HA calendar fetch failed: %s", err)
-            return []
-        entity_payload = (response or {}).get(self.calendar_entity_id, {})
-        return list(entity_payload.get("events", []))
+        events, detail = await self.cache.async_get_events(
+            self.calendar_entity_id, start, end
+        )
+        self.status.detail = detail
+        self.status.ha_calendar = _CACHE_STATUS_TO_LEGACY.get(
+            detail.get("status", "not_configured"), detail.get("status", "ok"),
+        )
+        return events
 
     def _parse_summary(self, summary: str, all_day: bool) -> CalendarDecision | None:
         normalized = summary.strip().lower()

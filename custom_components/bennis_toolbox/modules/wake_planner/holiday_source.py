@@ -1,4 +1,10 @@
-"""Holiday source helpers using weekends and optional HA holiday calendars."""
+"""Holiday source helpers using weekends and optional HA holiday calendars.
+
+Holiday events are now fetched as a **single range query** through
+`CalendarCache` instead of one-call-per-day. Failures fall back to the
+last-known-good event list, so a flaky CalDAV holiday calendar can no
+longer break the entire wake-planner update loop.
+"""
 
 from __future__ import annotations
 
@@ -9,49 +15,61 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from .calendar_cache import CalendarCache
+
 _LOGGER = logging.getLogger(__name__)
 
 
 class HolidaySource:
     """Read full-day holiday events from a Home Assistant calendar entity."""
 
-    def __init__(self, hass: HomeAssistant, holiday_calendar_entity_id: str | None) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        holiday_calendar_entity_id: str | None,
+        *,
+        cache: CalendarCache,
+    ) -> None:
         self.hass = hass
         self.entity_id = holiday_calendar_entity_id or None
+        self.cache = cache
+        self.last_status: dict[str, Any] = {}
 
-    async def is_holiday(self, check_date: date) -> bool:
-        """Return true if check_date has a full-day event in the holiday calendar."""
-        return (await self.holiday_name(check_date)) is not None
+    async def async_fetch_range(
+        self, start: date, end: date
+    ) -> tuple[dict[date, str], dict[str, Any]]:
+        """Fetch the holiday calendar once for the whole range.
 
-    async def holiday_name(self, check_date: date) -> str | None:
-        """Return the first full-day holiday event summary for check_date."""
+        Returns a mapping ``date -> first matching all-day summary`` and the
+        cache status dict.
+        """
         if not self.entity_id:
-            return None
-        state = self.hass.states.get(self.entity_id)
-        if state is None or state.state in {"unavailable", "unknown"}:
-            return None
-        start = datetime.combine(check_date, time.min)
-        end = datetime.combine(check_date, time.max)
-        try:
-            response = await self.hass.services.async_call(
-                "calendar",
-                "get_events",
-                {
-                    "entity_id": self.entity_id,
-                    "start_date_time": start.isoformat(),
-                    "end_date_time": end.isoformat(),
-                },
-                blocking=True,
-                return_response=True,
-            )
-        except Exception as err:  # noqa: BLE001 - holiday source must not break coordinator
-            _LOGGER.debug("Holiday calendar fetch failed for %s: %s", self.entity_id, err)
-            return None
-        events = (response or {}).get(self.entity_id, {}).get("events", [])
+            return {}, {
+                "status": "not_configured",
+                "last_success": None, "last_error": None, "last_error_at": None,
+                "using_cached": False, "event_count": 0,
+            }
+        # Day boundaries so the same range key is hit on coordinator ticks
+        # and on-demand WS requests.
+        start_dt = datetime.combine(start, time.min)
+        end_dt = datetime.combine(end + timedelta(days=1), time.min)
+        events, status = await self.cache.async_get_events(
+            self.entity_id, start_dt, end_dt
+        )
+        self.last_status = status
+        out: dict[date, str] = {}
         for event in events:
-            if _is_all_day_event(event):
-                return str(event.get("summary") or event.get("title") or "Holiday calendar")
-        return None
+            if not _is_all_day_event(event):
+                continue
+            event_date = _event_date(event)
+            if event_date is None:
+                continue
+            if start <= event_date <= end:
+                out.setdefault(
+                    event_date,
+                    str(event.get("summary") or event.get("title") or "Holiday calendar"),
+                )
+        return out, status
 
 
 async def async_holiday_map(
@@ -60,30 +78,47 @@ async def async_holiday_map(
     start: date,
     end: date,
     manual_holiday_dates: Any = None,
+    *,
+    cache: CalendarCache,
 ) -> dict[date, tuple[bool, str | None]]:
-    """Build a date keyed holiday map from weekends and configured holiday sources."""
-    source = HolidaySource(hass, holiday_calendar_entity_id)
+    """Build a date-keyed holiday map from weekends and configured sources.
+
+    The holiday calendar (if any) is read **once** for the whole range
+    instead of per day; failures fall back to the cached event list.
+    """
+    source = HolidaySource(hass, holiday_calendar_entity_id, cache=cache)
+    holiday_events, _status = await source.async_fetch_range(start, end)
+
     holidays: dict[date, tuple[bool, str | None]] = _manual_holiday_map(
-        manual_holiday_dates,
-        start,
-        end,
+        manual_holiday_dates, start, end,
     )
     current = start
     while current <= end:
         if current.weekday() >= 5:
             holidays[current] = (True, "Weekend")
-        elif holiday_name := await source.holiday_name(current):
-            holidays[current] = (True, holiday_name)
+        elif current in holiday_events:
+            holidays[current] = (True, holiday_events[current])
         current += timedelta(days=1)
     return holidays
 
 
-def _is_all_day_event(event: dict[str, Any]) -> bool:
-    """Return true for HA calendar full-day event shapes.
+def _event_date(event: dict[str, Any]) -> date | None:
+    raw = event.get("start") or event.get("start_time") or event.get("date")
+    if isinstance(raw, dict):
+        raw = raw.get("date") or raw.get("dateTime")
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+        except ValueError:
+            try:
+                return date.fromisoformat(raw[:10])
+            except ValueError:
+                return None
+    return None
 
-    Different calendar backends expose all-day events either through an
-    explicit `all_day` flag or through date-only start values.
-    """
+
+def _is_all_day_event(event: dict[str, Any]) -> bool:
+    """Return true for HA calendar full-day event shapes."""
     if event.get("all_day") is True:
         return True
     raw = event.get("start") or event.get("start_time") or event.get("date")

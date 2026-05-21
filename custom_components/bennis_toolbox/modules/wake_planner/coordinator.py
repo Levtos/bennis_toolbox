@@ -20,6 +20,7 @@ from homeassistant.util import slugify
 
 from ...const import DOMAIN, DATA_ENTRIES
 from ...storage import make_store
+from .calendar_cache import CalendarCache
 from .calendar_source import CalendarSource
 from .const import (
     CONF_CALENDAR_ENTITY_ID,
@@ -69,6 +70,11 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
         self.store = make_store(hass, MODULE_ID, f"state_{entry.entry_id}")
         self.runtime_states: dict[str, RuntimePersonState] = {}
         self.persons: list[PersonConfig] = persons_from_entry(entry)
+        # Shared cache so the regular wake-planner calendar, the holiday
+        # calendar and on-demand WS schedule lookups coalesce their HA
+        # calendar.get_events calls and degrade to last-known-good on
+        # CalDAV hiccups.
+        self.calendar_cache = CalendarCache(hass)
         self.calendar_source = self._build_calendar_source()
         self.last_update_iso: str | None = None
         self.next_wakes: dict[str, datetime | None] = {}
@@ -118,6 +124,7 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
             start.date(),
             (start + timedelta(days=30)).date(),
             self.options.get(CONF_MANUAL_HOLIDAY_DATES),
+            cache=self.calendar_cache,
         )
         engine = RuleEngine(
             runtime_states=self.runtime_states,
@@ -256,7 +263,45 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
             calendar_entity_id=options.get(CONF_CALENDAR_ENTITY_ID),
             wake_pattern=options.get(CONF_CALENDAR_WAKE_PATTERN, DEFAULT_CALENDAR_WAKE_PATTERN),
             skip_titles=skip_titles,
+            cache=self.calendar_cache,
         )
+
+    def calendar_status(self) -> dict[str, Any]:
+        """Aggregate cache status for panel/WS consumers."""
+        opts = self.options
+        cal_status = self.calendar_cache.status_for(opts.get(CONF_CALENDAR_ENTITY_ID) or "")
+        hol_status = self.calendar_cache.status_for(
+            opts.get(CONF_HOLIDAY_CALENDAR_ENTITY_ID) or ""
+        )
+        return {
+            "calendar": cal_status,
+            "holiday": hol_status,
+            "using_cached_calendar": cal_status.get("using_cached", False)
+            or hol_status.get("using_cached", False),
+        }
+
+    async def async_refresh_calendar(self) -> dict[str, Any]:
+        """Force-refresh both calendars (bypassing the throttle) and trigger
+        a coordinator update."""
+        now = dt_util.now()
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=30)
+        cal_id = self.options.get(CONF_CALENDAR_ENTITY_ID)
+        hol_id = self.options.get(CONF_HOLIDAY_CALENDAR_ENTITY_ID)
+        results: dict[str, Any] = {}
+        if cal_id:
+            _events, status = await self.calendar_cache.async_force_refresh(cal_id, start, end)
+            results["calendar"] = status
+        if hol_id:
+            from datetime import time as _dtime
+            results_start = datetime.combine(start.date(), _dtime.min)
+            results_end = datetime.combine(end.date() + timedelta(days=1), _dtime.min)
+            _events, status = await self.calendar_cache.async_force_refresh(
+                hol_id, results_start, results_end,
+            )
+            results["holiday"] = status
+        await self.async_request_refresh()
+        return results
 
     async def async_get_schedule(self, days: int = 14) -> list[dict[str, Any]]:
         now = dt_util.now()
@@ -271,6 +316,7 @@ class WakePlannerCoordinator(DataUpdateCoordinator[dict[str, WakeDecision]]):
             start.date(),
             end.date(),
             self.options.get(CONF_MANUAL_HOLIDAY_DATES),
+            cache=self.calendar_cache,
         )
         engine = RuleEngine(
             runtime_states=self.runtime_states,
