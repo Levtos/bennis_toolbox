@@ -314,6 +314,7 @@ class WakePlannerPanel extends HTMLElement {
     const dec = person.decision || {};
     const nextWake = person.next_wake ? new Date(person.next_wake) : null;
     const state = dec.state || "inactive";
+    const todayWakeTime = dec.wake_time || null;
     const stateLabels = {
       scheduled: "geplant",
       skipped: "übersprungen",
@@ -326,10 +327,10 @@ class WakePlannerPanel extends HTMLElement {
       holiday: "Feiertag",
       inactive: "Kein Wecker geplant",
     };
-    const displayTime = nextWake
-      ? nextWake.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      : (emptyLabels[state] || "Kein Wecker geplant");
-    const dayLabel = nextWake ? nextWake.toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" }) : "";
+    const displayTime = todayWakeTime || emptyLabels[state] || "Kein Wecker geplant";
+    const nextWakeLabel = nextWake
+      ? `Nächster Wecker: ${nextWake.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} ${nextWake.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+      : "";
     const decidedBy = dec.decided_by || "";
     let badgeClass = `b-${state}`;
     if (decidedBy === "calendar") badgeClass = "b-calendar";
@@ -340,7 +341,7 @@ class WakePlannerPanel extends HTMLElement {
     const skipClass = person.skip_next ? "btn state-skip" : "btn";
     const overrideClass = person.override_time ? "btn state-override" : "btn";
     const skipLabel = person.skip_next ? "Überspringt nächsten" : "Nächsten überspringen";
-    const timeClass = nextWake ? "time" : "time no-wake";
+    const timeClass = todayWakeTime ? "time" : "time no-wake";
     return `<ha-card data-today-card="${person.slug}">
       <div class="row">
         <h2>${escapeHtml(person.name)}</h2>
@@ -348,7 +349,7 @@ class WakePlannerPanel extends HTMLElement {
         <span class="badge ${badgeClass}">${stateLabels[state] || state}</span>
       </div>
       <div class="${timeClass}">${displayTime}</div>
-      <div class="muted">${dayLabel}</div>
+      <div class="muted">${nextWakeLabel}</div>
       <div class="reason">${escapeHtml(dec.reason || "")}</div>
       ${overrideInfo}${skipInfo}
       <div class="row" style="margin-top:14px">
