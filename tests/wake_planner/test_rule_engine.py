@@ -203,6 +203,44 @@ def test_engine_profile_holiday_rule_only_replaces_weekday_holidays():
     assert not RE.rule_matches(holiday, date(2026, 1, 17), is_holiday=True)
 
 
+def test_engine_one_day_exception_overrides_profile():
+    weekday = _wake_rule(id="profile_weekday", on_holiday=False)
+    exception = _wake_rule(
+        id="exception_late",
+        name="Ausnahme",
+        priority=20,
+        weekdays=None,
+        specific_dates=[date(2026, 1, 12)],
+        wake_time=time(8, 0),
+        on_holiday=None,
+    )
+    engine = _engine()
+    now = datetime(2026, 1, 12, 6, 0, tzinfo=timezone.utc)
+    decision = engine.decide(_person([weekday, exception]), now)
+    assert decision.wake_time == time(8, 0)
+    assert decision.matched_rule_id == "exception_late"
+
+
+def test_engine_exception_range_can_skip_profile():
+    weekday = _wake_rule(id="profile_weekday", on_holiday=False)
+    exception = C.Rule(
+        id="exception_vacation",
+        name="Urlaub",
+        priority=20,
+        enabled=True,
+        weekdays=None,
+        date_from=date(2026, 1, 12),
+        date_to=date(2026, 1, 16),
+        action=C.RULE_ACTION_SKIP,
+        wake_time=None,
+    )
+    engine = _engine()
+    now = datetime(2026, 1, 14, 6, 0, tzinfo=timezone.utc)
+    decision = engine.decide(_person([weekday, exception]), now)
+    assert decision.state == C.WakeState.SKIPPED
+    assert decision.matched_rule_id == "exception_vacation"
+
+
 def test_engine_skip_action():
     skip_rule = C.Rule(
         id="r2", name="No-go", priority=10, enabled=True,

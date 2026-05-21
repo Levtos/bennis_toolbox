@@ -14,6 +14,7 @@ const WEEKDAYS = [
   { idx: 6, short: "So", long: "Sonntag" },
 ];
 const PROFILE_RULE_IDS = new Set(["profile_weekday", "profile_weekend", "profile_holiday"]);
+const EXCEPTION_PREFIX = "exception_";
 
 const STYLES = `
 :host { display:block; padding:16px 20px 40px; color:var(--primary-text-color); background:var(--primary-background-color); font-family:var(--paper-font-body1_-_font-family,system-ui); }
@@ -428,7 +429,8 @@ class WakePlannerPanel extends HTMLElement {
   }
 
   _renderPersonCard(person) {
-    const customRules = (person.rules || []).filter(r => !PROFILE_RULE_IDS.has(r.id));
+    const exceptions = (person.rules || []).filter(r => this._isExceptionRule(r));
+    const customRules = (person.rules || []).filter(r => !PROFILE_RULE_IDS.has(r.id) && !this._isExceptionRule(r));
     const rulesHtml = customRules.length
       ? customRules.map((r, idx) => this._renderRule(person.slug, r, idx)).join("")
       : `<p class="muted">Keine Spezialregeln. Das normale Wake-Profil reicht für Werktag, Wochenende und Feiertage.</p>`;
@@ -444,8 +446,9 @@ class WakePlannerPanel extends HTMLElement {
         <button class="btn danger" data-action="remove-person" data-person="${person.slug}">Löschen</button>
       </div>
       ${this._renderWakeProfile(person)}
+      ${this._renderExceptions(person, exceptions)}
       <details style="margin-top:14px">
-        <summary style="cursor:pointer;font-weight:700">Advanced Rules</summary>
+        <summary style="cursor:pointer;font-weight:700">Spezialregeln</summary>
         <p class="muted" style="margin:8px 0 12px">Spezialregeln werden vor oder nach dem Profil nach Priorität ausgewertet. Niedrigere Zahl gewinnt.</p>
         <div data-rules-list="${person.slug}">${rulesHtml}</div>
         <div class="row" style="margin-top:10px">
@@ -461,6 +464,70 @@ class WakePlannerPanel extends HTMLElement {
         <button class="btn" data-action="save-window" data-person="${person.slug}">Speichern</button>
       </div>
     </ha-card>`;
+  }
+
+  _isExceptionRule(rule) {
+    return String(rule?.id || "").startsWith(EXCEPTION_PREFIX);
+  }
+
+  _renderExceptions(person, exceptions) {
+    const list = exceptions.length
+      ? exceptions
+          .slice()
+          .sort((a, b) => this._exceptionSortKey(a).localeCompare(this._exceptionSortKey(b)))
+          .map(rule => this._renderException(person.slug, rule))
+          .join("")
+      : `<p class="muted">Keine Ausnahmen aktiv.</p>`;
+    const today = localDateKey(new Date());
+    return `<section class="settings-section" style="margin-top:12px">
+      <h3>Ausnahmen</h3>
+      <p class="muted" style="margin-top:4px">Für einzelne Tage oder Zeiträume. Ausnahmen haben Vorrang vor dem normalen Wake-Profil.</p>
+      <div>${list}</div>
+      <div class="row" style="gap:14px;margin-top:12px;align-items:flex-end">
+        <label class="field"><span class="label">Von</span>
+          <input type="date" value="${today}" data-exception-field="${person.slug}|date_from">
+        </label>
+        <label class="field"><span class="label">Bis (optional)</span>
+          <input type="date" data-exception-field="${person.slug}|date_to">
+        </label>
+        <label class="field"><span class="label">Aktion</span>
+          <select data-exception-field="${person.slug}|action">
+            <option value="wake">wecken um</option>
+            <option value="skip">nicht wecken</option>
+          </select>
+        </label>
+        <label class="field"><span class="label">Uhrzeit</span>
+          <input type="time" value="08:00" data-exception-field="${person.slug}|wake_time">
+        </label>
+        <label class="field" style="flex:1;min-width:180px"><span class="label">Notiz</span>
+          <input type="text" placeholder="z.B. später Termin" data-exception-field="${person.slug}|name">
+        </label>
+        <button class="btn primary" data-action="add-exception" data-person="${person.slug}">Ausnahme hinzufügen</button>
+      </div>
+    </section>`;
+  }
+
+  _renderException(slug, rule) {
+    const range = this._exceptionLabel(rule);
+    const action = rule.action === "skip" ? "nicht wecken" : `wecken ${rule.wake_time || ""}`;
+    return `<div class="row" style="gap:10px;padding:8px 0;border-bottom:1px solid var(--divider-color)">
+      <b>${escapeHtml(range)}</b>
+      <span>${escapeHtml(action)}</span>
+      <span class="muted">${escapeHtml(rule.name || "Ausnahme")}</span>
+      <span class="space"></span>
+      <button class="icon-btn" title="Ausnahme löschen" data-action="delete-rule" data-person="${slug}" data-rule="${rule.id}">🗑</button>
+    </div>`;
+  }
+
+  _exceptionLabel(rule) {
+    if (rule.specific_dates?.length) return rule.specific_dates.join(", ");
+    if (rule.date_from && rule.date_to) return `${rule.date_from} bis ${rule.date_to}`;
+    if (rule.date_from) return rule.date_from;
+    return "Ausnahme";
+  }
+
+  _exceptionSortKey(rule) {
+    return rule.specific_dates?.[0] || rule.date_from || "9999-12-31";
   }
 
   _renderWakeProfile(person) {
@@ -682,6 +749,7 @@ class WakePlannerPanel extends HTMLElement {
     }
     else if (action === "edit-person") this._openEditPersonDialog(slug);
     else if (action === "save-profile") await this._saveProfile(slug, el);
+    else if (action === "add-exception") await this._addException(slug, el);
     else if (action === "add-rule") await this._addRule(slug, el);
     else if (action === "delete-rule") await this._deleteRule(slug, el.dataset.rule);
     else if (action === "save-rule") await this._saveRule(slug, el.dataset.rule, el);
@@ -748,6 +816,41 @@ class WakePlannerPanel extends HTMLElement {
     const rules = [...person.rules, newRule];
     const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules });
     if (ok) { this._flashSuccess(btn); this._updatePersonCard(slug); this._updateTodayCard(slug); }
+  }
+
+  async _addException(slug, btn) {
+    const person = this._state.persons.find(p => p.slug === slug);
+    if (!person) return;
+    const read = (field) => this.querySelector(`[data-exception-field="${slug}|${field}"]`)?.value?.trim() || "";
+    const dateFrom = read("date_from");
+    const dateTo = read("date_to");
+    const action = read("action") || "wake";
+    const wakeTime = read("wake_time") || "08:00";
+    const note = read("name");
+    if (!dateFrom) return this._toast("Datum fehlt", true);
+    if (dateTo && dateTo < dateFrom) return this._toast("Bis-Datum liegt vor Von-Datum", true);
+    const isRange = Boolean(dateTo && dateTo !== dateFrom);
+    const label = note || (isRange ? `Ausnahme ${dateFrom} bis ${dateTo}` : `Ausnahme ${dateFrom}`);
+    const rule = {
+      id: `${EXCEPTION_PREFIX}${cryptoRandomId()}`,
+      name: label,
+      priority: 20,
+      enabled: true,
+      weekdays: null,
+      on_holiday: null,
+      action,
+      wake_time: action === "skip" ? null : wakeTime,
+      specific_dates: isRange ? null : [dateFrom],
+      date_from: isRange ? dateFrom : null,
+      date_to: isRange ? dateTo : null,
+    };
+    const ok = await this._ws("bennis_toolbox/wake_planner/set_rules", { person_id: slug, rules: [...person.rules, rule] });
+    if (ok) {
+      this._flashSuccess(btn);
+      this._toast("Ausnahme gespeichert");
+      this._updatePersonCard(slug);
+      this._updateTodayCard(slug);
+    }
   }
 
   async _saveProfile(slug, btn) {
