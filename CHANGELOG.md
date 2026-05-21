@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.2 - 2026-05-22
+
+### Geändert
+
+- Cover Policy schlägt bei neu angelegten Entries lesbare Entity-IDs aus
+  der konfigurierten Cover-Entity vor.
+  Beispiel: `cover.living_blackout_blind` erzeugt Vorschläge wie
+  `sensor.living_blackout_blind_target_position` und
+  `binary_sensor.living_blackout_blind_apply_blocked`.
+- Die technische `unique_id` der Cover-Policy-Entities bleibt unverändert
+  und weiterhin an den Config-Entry gebunden.
+
+### Dokumentiert
+
+- Migration-Hinweis ergänzt: Es gibt bewusst keine automatische
+  Entity-Registry-Massenumbenennung. Bestehende manuelle Renames bleiben
+  erhalten; neue Entries erhalten die lesbaren Vorschläge automatisch.
+
+### Tests
+
+- Full test suite at release preparation: `356 passed, 1 warning`.
+
 ## 0.3.1 - 2026-05-22
 
 ### Geändert
