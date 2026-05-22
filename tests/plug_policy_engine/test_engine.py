@@ -65,11 +65,14 @@ def test_hb_protects_active_device_even_when_away():
     assert "active" in d.blockers
 
 
-def test_hb_cuts_when_idle_and_truly_away():
+def test_hb_keeps_idle_truly_away_because_hb_is_baseline_not_away_cut():
+    """HB = Home Baseline must NEVER auto-off, not even on truly-away
+    + idle. Only AC (Away Cut) is allowed to schedule that cut."""
     cfg = _cfg(policy=C.POLICY_HB, power_entity="sensor.p", idle_threshold=2.0)
     st = _state(switch_state="on", power_w=0.5)
     d = E.evaluate(cfg, st, _ctx(presence=C.PRESENCE_AWAY))
-    assert d.desired_switch_state == C.DESIRED_OFF
+    assert d.desired_switch_state == C.DESIRED_KEEP
+    assert "HB" in d.reason and "away" in d.reason.lower()
 
 
 def test_hb_does_not_cut_when_at_parents():
@@ -169,8 +172,19 @@ def test_appliance_unknown_power_protected():
     assert d.desired_switch_state == C.DESIRED_KEEP
 
 
-def test_appliance_idle_and_away_cuts():
+def test_appliance_idle_and_away_keeps_under_hb():
+    """HB on an appliance never schedules an away-cut either.
+    Use AC for actual cuts (see next test)."""
     cfg = _cfg(kind=C.KIND_APPLIANCE, policy=C.POLICY_HB,
+               power_entity="sensor.p", idle_threshold=2.0,
+               unknown_behavior=C.UNK_ASSUME_IDLE)
+    st = _state(switch_state="on", power_w=0.0)
+    d = E.evaluate(cfg, st, _ctx(presence=C.PRESENCE_AWAY))
+    assert d.desired_switch_state == C.DESIRED_KEEP
+
+
+def test_appliance_idle_and_away_cuts_under_ac():
+    cfg = _cfg(kind=C.KIND_APPLIANCE, policy=C.POLICY_AC,
                power_entity="sensor.p", idle_threshold=2.0,
                unknown_behavior=C.UNK_ASSUME_IDLE)
     st = _state(switch_state="on", power_w=0.0)

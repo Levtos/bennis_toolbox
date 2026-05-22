@@ -306,22 +306,41 @@ def _decide_ao(cfg, state, ha_just_started, make, *, label: str = "AO") -> Decis
 
 
 def _decide_baseline_or_away(cfg, state, ctx, active_state, make, *, mode: str) -> Decision:
-    """HB and AC both cut only on real `abwesend`. HB additionally protects more cases."""
-    # Protect active / unknown-as-active
+    """Home Baseline vs. Away Cut.
+
+    HB is a *baseline* policy and must never schedule an automatic
+    off — even on truly-away + idle. AC is the actual cut policy:
+    only AC turns the device off when the household is truly away
+    and the device is idle. ``bei_eltern`` is treated as "still at
+    home" for both. Active / unknown-as-active is always protected
+    via ``never_cut_when_active``.
+    """
+    # Protect active / unknown-as-active for both HB and AC.
     if cfg.never_cut_when_active and _is_protected_active(active_state, cfg):
         return make(DESIRED_KEEP, f"{mode}: device active/unknown — never cut", ["active"])
 
-    if not ctx.is_truly_away:
-        # bei_eltern or zuhause → leave alone
-        if ctx.presence == PRESENCE_AT_PARENTS:
-            return make(DESIRED_KEEP, f"{mode}: bei_eltern is not a real away — no cut",
-                        ["presence=bei_eltern"])
-        return make(DESIRED_KEEP, f"{mode}: presence not away ({ctx.presence!r})")
+    if mode == "HB":
+        # HB never cuts. Surface a clear reason for each branch so the
+        # decision sensor stays informative.
+        if not ctx.is_truly_away:
+            if ctx.presence == PRESENCE_AT_PARENTS:
+                return make(DESIRED_KEEP, "HB: bei_eltern is not a real away — no cut",
+                            ["presence=bei_eltern"])
+            return make(DESIRED_KEEP, f"HB: presence not away ({ctx.presence!r})")
+        # Truly away + idle: HB still keeps. AC handles the actual cut.
+        return make(DESIRED_KEEP, "HB: away + idle — no baseline action (HB is not an away-cut policy)")
 
-    # Truly away + idle → cut
+    # AC: the real away-cut policy.
+    if not ctx.is_truly_away:
+        if ctx.presence == PRESENCE_AT_PARENTS:
+            return make(DESIRED_KEEP, "AC: bei_eltern is not a real away — no cut",
+                        ["presence=bei_eltern"])
+        return make(DESIRED_KEEP, f"AC: presence not away ({ctx.presence!r})")
+
+    # Truly away + idle → cut.
     if state.switch_state == "off":
-        return make(DESIRED_KEEP, f"{mode}: already off while away")
-    return make(DESIRED_OFF, f"{mode}: away + idle → cut")
+        return make(DESIRED_KEEP, "AC: already off while away")
+    return make(DESIRED_OFF, "AC: away + idle → cut")
 
 
 def _decide_schedule_context(cfg, state, ctx, active_state, make) -> Decision:
@@ -368,7 +387,13 @@ def _decide_pc(cfg, state, ctx, active_state, make) -> Decision:
 
 
 def _decide_appliance(cfg, state, ctx, active_state, make) -> Decision:
-    """Washer / dryer / dishwasher: never lose a running program."""
+    """Washer / dryer / dishwasher: never lose a running program.
+
+    Running or unknown power is always protected — we must never
+    interrupt a programme. For idle programmes, HB is a baseline
+    policy and keeps the plug as-is; only AC actually cuts on
+    truly-away + idle.
+    """
     # Any draw → protect
     if active_state == "active":
         return make(DESIRED_KEEP, "appliance running — never interrupt", ["program_running"])
@@ -376,13 +401,18 @@ def _decide_appliance(cfg, state, ctx, active_state, make) -> Decision:
         # If we cannot prove idle, do not cut.
         return make(DESIRED_KEEP, "appliance power unknown — protect program",
                     ["power_unknown"])
-    # Idle: HB/AC behavior applies, but only on real abwesend
-    if cfg.policy in (POLICY_HB, POLICY_AC):
+    # Idle:
+    if cfg.policy == POLICY_AC:
         if ctx.is_truly_away:
             if state.switch_state == "off":
                 return make(DESIRED_KEEP, "appliance idle + away, already off")
             return make(DESIRED_OFF, "appliance idle + truly away → cut")
         return make(DESIRED_KEEP, "appliance idle but presence not away")
+    if cfg.policy == POLICY_HB:
+        if ctx.is_truly_away:
+            return make(DESIRED_KEEP,
+                        "HB appliance: away + idle — no baseline action (HB is not an away-cut policy)")
+        return make(DESIRED_KEEP, "HB appliance: idle, presence not away — keep")
     return make(DESIRED_KEEP, "appliance idle — no cut policy active")
 
 

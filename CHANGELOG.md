@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.5.3 - 2026-05-22
+
+### Behoben
+
+- Plug Policy Engine: Policy `HB` (Home Baseline) hat fälschlich
+  auto-off ausgelöst, wenn der Haushalt wirklich abwesend war und das
+  Gerät idle. HB ist eine Baseline-Policy und darf niemals
+  automatisch ausschalten; nur Policy `AC` (Away Cut) ist dafür
+  zuständig. `_decide_baseline_or_away` ist nun in zwei klar
+  getrennte Zweige aufgeteilt:
+  - HB: aktive/unknown-as-aktive Geräte bleiben weiterhin per
+    `never_cut_when_active` geschützt; alle übrigen Fälle inklusive
+    truly-away + idle liefern `KEEP` mit aussagekräftigem Grund
+    („HB: away + idle — no baseline action (HB is not an away-cut
+    policy)").
+  - AC: schaltet weiterhin truly-away + idle aus, ignoriert
+    `bei_eltern` als zuhause-äquivalent.
+- Plug Policy Engine: Identischer Bug in `_decide_appliance` ebenfalls
+  korrigiert. Großgeräte mit Policy `HB` bleiben jetzt auch im
+  truly-away-Idle-Fall auf `KEEP`; nur `AC` darf hier abschalten.
+  Running- und Unknown-Power-Fälle bleiben über beide Policies hinweg
+  protected.
+
+### Tests
+
+- Neuer `test_hb_baseline_semantics.py` mit 12 Tests: generisches
+  Gerät HB vs. AC, Appliance HB vs. AC, never-cut-when-active,
+  `bei_eltern`, unknown-power-as-active.
+- Bestehende `test_hb_cuts_when_idle_and_truly_away` und
+  `test_appliance_idle_and_away_cuts` an die korrigierte Semantik
+  angepasst (alte Tests dokumentierten den Bug).
+- plug_policy_engine: 96 passed (+12).
+- Full test suite at release preparation: `423 passed, 2 warnings`.
+
 ## 0.3.5.2 - 2026-05-22
 
 ### Behoben
