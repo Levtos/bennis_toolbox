@@ -275,6 +275,11 @@ class OptionsFlowHelper:
         self.flow = flow
         self._editing_id: str | None = None
         self._draft: dict[str, Any] = {}
+        # Cache of the preset detected for the current draft's switch
+        # entity (None when nothing matched). Surfaced to the sensors
+        # and advanced steps via `description_placeholders` so the user
+        # always sees which preset is driving the defaults.
+        self._preset_label: str | None = None
 
     # ----- helpers ----------------------------------------------------------
 
@@ -335,7 +340,38 @@ class OptionsFlowHelper:
             )
         # Stash basics in the draft and move to sensors.
         self._draft.update(user_input)
+        # Add-flow only: fold the matching device preset into the draft.
+        # Edit preserves whatever the user already saved.
+        self._apply_preset_to_draft()
         return await self._show_sensors_step()
+
+    def _apply_preset_to_draft(self) -> None:
+        """Pull Einhornzentrale-canonical defaults for the chosen switch.
+
+        Add-flow only. We seed any key that's still missing from the
+        in-progress draft and remember the preset label so the next
+        steps can show "Preset erkannt: …" in the description.
+        The basics-stage ``kind`` is treated specially: if the user
+        kept the default ``generic`` we adopt the preset's kind, but a
+        deliberate non-default pick wins.
+        """
+        if self._editing_id:
+            self._preset_label = None
+            return
+        preset = _suggest.preset_for_switch(self._draft.get(CONF_SWITCH))
+        if preset is None:
+            self._preset_label = None
+            return
+        self._preset_label = preset.label
+        preset_kind = preset.values.get(CONF_KIND)
+        if preset_kind and self._draft.get(CONF_KIND) in (None, "generic"):
+            self._draft[CONF_KIND] = preset_kind
+        # All other CONF_* keys: only fill empty slots in the draft.
+        for key, value in preset.values.items():
+            if key == CONF_KIND:
+                continue
+            if key not in self._draft:
+                self._draft[key] = value
 
     async def _show_sensors_step(self) -> FlowResult:
         kind = self._draft.get(CONF_KIND, "generic")
@@ -361,21 +397,27 @@ class OptionsFlowHelper:
         for k, v in self._draft.items():
             if k in (CONF_POWER, CONF_BATTERY) and v:
                 defaults[k] = v
-        description = None
-        if suggestion.siblings:
-            # Show informational hint about voltage/current/energy IDs we
-            # spotted on the same slug. Purely cosmetic — engine doesn't
-            # use them.
-            description = {
-                "suggested_power": suggestion.power_entity or "—",
-                "suggested_battery": suggestion.battery_entity or "—",
-                "siblings": ", ".join(suggestion.siblings),
-            }
+        # Always supply description_placeholders for the sensors step
+        # so the translation file can render preset + suggestion +
+        # siblings consistently. Missing values render as em-dash.
+        description = {
+            "preset": self._preset_label_text(),
+            "suggested_power": suggestion.power_entity or "—",
+            "suggested_battery": suggestion.battery_entity or "—",
+            "siblings": ", ".join(suggestion.siblings) if suggestion.siblings else "—",
+        }
         return self.flow.async_show_form(
             step_id="device_sensors",
             data_schema=_sensors_schema(kind, defaults),
             description_placeholders=description,
         )
+
+    def _preset_label_text(self) -> str:
+        """Render the preset hint as plain text for description placeholders."""
+        if self._preset_label:
+            slug = _suggest.base_slug(self._draft.get(CONF_SWITCH)) or "—"
+            return f"{slug} / {self._preset_label}"
+        return "Kein bekanntes Preset, generische Defaults"
 
     async def async_step_device_sensors(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is None:
@@ -397,6 +439,7 @@ class OptionsFlowHelper:
         return self.flow.async_show_form(
             step_id="device_advanced",
             data_schema=_advanced_schema(kind, policy, defaults),
+            description_placeholders={"preset": self._preset_label_text()},
         )
 
     async def async_step_device_advanced(self, user_input: dict[str, Any] | None = None) -> FlowResult:

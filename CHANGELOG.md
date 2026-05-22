@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.5.1 - 2026-05-22
+
+### Hinzugefügt
+
+- Plug Policy Engine: Device-Presets für bekannte Einhornzentrale-Plug-
+  Rollen. Wird im Add-Flow ein bekannter Schalter wie
+  `switch.living_pc_plug`, `switch.living_denon_plug`,
+  `switch.kitchen_washing_machine_plug` oder die Kaffeemaschine
+  ausgewählt, setzt die Toolbox `kind`, `active_threshold`,
+  `idle_threshold`, `deadband_lower`/`deadband_upper`,
+  `unknown_behavior`, `never_cut_when_active` und `wake_signal_only`
+  automatisch auf die fachlich geprüften Defaults. Subwoofer (ohne
+  Power-Sensor) wird konservativ auf `assume_active` festgenagelt.
+- Presets erscheinen als Hinweis im Sensoren- und Erweitert-Step
+  ("Preset erkannt: living_pc_plug / PC safe defaults"). Bei
+  unbekannten Schaltern zeigt der Flow "Kein bekanntes Preset,
+  generische Defaults".
+
+### Verhalten
+
+- Presets greifen nur im Add-Flow und nur auf leere Slots im aktuellen
+  Draft. Nutzerwerte, die in basics oder sensors gerade gesetzt
+  wurden, werden nicht überschrieben.
+- Edit-Flow wendet niemals Presets an — bestehende Geräte behalten
+  ihre gespeicherten Schwellwerte und Hidden-/Legacy-Keys.
+- `enable_control` bleibt unverändert default `false`.
+
+### Tests
+
+- Plug Policy Engine: Preset-Lookup für PC, Switch, Denon, Appliance,
+  Coffee, TV, PS5, Subwoofer und die drei Großgeräte-Plugs. Preset +
+  Atomic-Power-Suggestion arbeiten zusammen. Edit-Flow überschreibt
+  weder bestehende Werte noch Legacy-Keys. Unbekannte Plugs fallen auf
+  generische Defaults zurück.
+- plug_policy_engine: 83 tests (+13 neu)
+- Full test suite at release preparation: `410 passed, 2 warnings`.
+
 ## 0.3.5 - 2026-05-22
 
 ### Geändert

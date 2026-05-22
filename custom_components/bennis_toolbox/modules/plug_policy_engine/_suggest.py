@@ -184,3 +184,169 @@ def sensors_for_kind(kind: str) -> tuple[str, ...]:
         # for charge level; battery is the policy-relevant one.
         return ("power_entity", "battery_entity")
     return ("power_entity",)
+
+
+# ---------------------------------------------------------------------------
+# Device presets for Einhornzentrale's known plug roles.
+#
+# Each preset gives the canonical safe defaults for one switch slug.
+# The flow applies them in the add-path to pre-fill empty slots; user
+# edits during the flow are preserved (the flow only sets keys that
+# are still missing from the in-progress draft). In the edit-path
+# presets are never applied — they only surface as a "preset detected"
+# hint in `description_placeholders`.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DevicePreset:
+    """Per-slug canonical defaults for a known plug role.
+
+    `label` is a short human-readable phrase shown to the user
+    ("PC safe defaults") so they know which preset matched.
+    `values` carries the actual CONF_* defaults the flow will fold
+    into the draft.
+    """
+
+    slug: str
+    label: str
+    values: dict
+
+
+# CONF keys are duplicated here as string literals on purpose so this
+# helper stays HA-free and import-cycle-free; const.py already pins
+# the canonical strings, the tests cross-check them.
+_PRESETS: dict[str, DevicePreset] = {
+    "living_pc_plug": DevicePreset(
+        slug="living_pc_plug",
+        label="PC safe defaults",
+        values={
+            "kind": "pc",
+            "active_threshold": 20.0,
+            "idle_threshold": 8.0,
+            "deadband_lower": 8.0,
+            "deadband_upper": 20.0,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+    "living_switch_plug": DevicePreset(
+        slug="living_switch_plug",
+        label="Switch safe defaults",
+        values={
+            "kind": "generic",
+            "active_threshold": 3.0,
+            "idle_threshold": 1.0,
+            "deadband_lower": 1.0,
+            "deadband_upper": 3.0,
+            "unknown_behavior": "assume_idle",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+    "living_ps5_plug": DevicePreset(
+        slug="living_ps5_plug",
+        label="PS5 safe defaults",
+        values={
+            "kind": "generic",
+            "active_threshold": 10.0,
+            "idle_threshold": 3.0,
+            "deadband_lower": 3.0,
+            "deadband_upper": 10.0,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+    "living_tv_plug": DevicePreset(
+        slug="living_tv_plug",
+        label="TV safe defaults",
+        values={
+            "kind": "generic",
+            "active_threshold": 8.0,
+            "idle_threshold": 3.0,
+            "deadband_lower": 3.0,
+            "deadband_upper": 8.0,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+    "living_denon_plug": DevicePreset(
+        slug="living_denon_plug",
+        label="Denon AVR safe defaults",
+        values={
+            "kind": "denon",
+            "active_threshold": 8.0,
+            "idle_threshold": 3.0,
+            "deadband_lower": 3.0,
+            "deadband_upper": 8.0,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+    "kitchen_coffee_machine_plug": DevicePreset(
+        slug="kitchen_coffee_machine_plug",
+        label="Coffee machine safe defaults",
+        values={
+            "kind": "coffee_maker",
+            "active_threshold": 5.0,
+            "idle_threshold": 2.0,
+            "deadband_lower": 2.0,
+            "deadband_upper": 5.0,
+            "unknown_behavior": "assume_idle",
+            "never_cut_when_active": True,
+            "wake_signal_only": True,
+        },
+    ),
+    "living_subwoofer_plug": DevicePreset(
+        slug="living_subwoofer_plug",
+        label="Subwoofer (no power sensor)",
+        values={
+            "kind": "generic",
+            "active_threshold": 0.0,
+            "idle_threshold": 0.0,
+            "deadband_lower": None,
+            "deadband_upper": None,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    ),
+}
+
+# All three large-appliance plugs share the same conservative preset.
+for _slug in (
+    "kitchen_washing_machine_plug",
+    "kitchen_dryer_plug",
+    "kitchen_dishwasher_plug",
+):
+    _PRESETS[_slug] = DevicePreset(
+        slug=_slug,
+        label="Major appliance safe defaults",
+        values={
+            "kind": "appliance",
+            "active_threshold": 3.0,
+            "idle_threshold": 1.0,
+            "deadband_lower": 1.0,
+            "deadband_upper": 3.0,
+            "unknown_behavior": "assume_active",
+            "never_cut_when_active": True,
+            "wake_signal_only": False,
+        },
+    )
+
+
+def preset_for_switch(switch_entity: str | None) -> DevicePreset | None:
+    """Return the canonical preset for a switch_entity, or ``None``.
+
+    Match is on the base slug; the domain prefix is stripped via
+    :func:`base_slug`. Tolerant of partial inputs so the flow can probe
+    early.
+    """
+    slug = base_slug(switch_entity)
+    if not slug:
+        return None
+    return _PRESETS.get(slug)

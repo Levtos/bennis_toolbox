@@ -121,7 +121,7 @@
       },
       "device_sensors": {
         "title": "Device — sensors",
-        "description": "Auto-detected from the switch slug — clear what you don't want to use.\nSuggested power: {suggested_power}\nSuggested battery: {suggested_battery}\nOther sensors found (informational): {siblings}",
+        "description": "Preset: {preset}\n\nAuto-detected from the switch slug — clear what you don't want to use.\nSuggested power: {suggested_power}\nSuggested battery: {suggested_battery}\nOther sensors found (informational): {siblings}",
         "data": {
           "power_entity": "Power sensor (W)",
           "battery_entity": "Battery sensor (%)"
@@ -129,7 +129,7 @@
       },
       "device_advanced": {
         "title": "Device — thresholds & behaviour",
-        "description": "Only fields relevant for this device kind are shown.",
+        "description": "Preset: {preset}\n\nOnly fields relevant for this device kind are shown.",
         "data": {
           "active_threshold": "Active above watts",
           "idle_threshold": "Idle below watts",
