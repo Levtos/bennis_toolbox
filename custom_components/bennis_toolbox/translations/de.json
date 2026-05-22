@@ -8,7 +8,7 @@
       },
       "module_step": {
         "title": "Modulkonfiguration",
-        "description": "Cover Policy: Cover-Entity, optionale Auslöser und Apply-Verhalten. Die Zielpositionen pro Modus pflegst du nach dem Anlegen unter \"Konfigurieren\" → \"Zielpositionen\".",
+        "description": "Konfiguriere die modulspezifischen Grundeinstellungen. Weitere Details kannst du nach dem Anlegen über \"Konfigurieren\" ändern.",
         "data": {
           "name": "Anzeigename",
           "cover_entity": "Cover-Entity (das zu steuernde Rollo)",
@@ -21,9 +21,16 @@
           "lux_entity": "Lux-Sensor (Glare-Schwelle)",
           "sun_entity": "Sonne (über/unter Horizont)",
           "weather_entity": "Wetter-Entity",
-          "media_context_entity": "Medien-Kontext (löst Blendschutz TV aus)",
+          "media_context_entity": "Medien-Kontext",
           "gaming_source_entity": "Gaming-Quelle (löst Blendschutz PC aus)",
           "heat_protect_entity": "Auslöser: Hitzeschutz aktiv (Trigger Modus \"Hitzeschutz\")",
+          "presence_entity": "Anwesenheits-Status",
+          "bio_entity": "Bio-Status",
+          "day_entity": "Tageszustand",
+          "entertainment_active_entity": "Entertainment aktiv",
+          "activity_entity": "Aktivitäts-Status",
+          "enable_control": "Schaltsteuerung aktivieren",
+          "scan_interval": "Scan-Intervall in Sekunden",
           "apply_enabled": "Cover wirklich fahren? (sonst nur Decision-Sensoren)",
           "manual_override_duration": "Manueller Override hält … Sekunden",
           "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"

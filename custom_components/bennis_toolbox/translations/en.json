@@ -8,7 +8,7 @@
       },
       "module_step": {
         "title": "Module setup",
-        "description": "Cover Policy: pick the cover entity, optional triggers, and apply behaviour. Per-mode target positions live under \"Configure\" → \"Target positions\".",
+        "description": "Configure the module-specific basic settings. You can change further details after setup via \"Configure\".",
         "data": {
           "name": "Display name",
           "cover_entity": "Cover entity (the blind to drive)",
@@ -21,9 +21,16 @@
           "lux_entity": "Lux sensor (glare threshold)",
           "sun_entity": "Sun (above/below horizon)",
           "weather_entity": "Weather entity",
-          "media_context_entity": "Media context (triggers TV glare)",
+          "media_context_entity": "Media context",
           "gaming_source_entity": "Gaming source (triggers PC glare)",
           "heat_protect_entity": "Trigger: heat protection active",
+          "presence_entity": "Presence state",
+          "bio_entity": "Bio state",
+          "day_entity": "Day state",
+          "entertainment_active_entity": "Entertainment active",
+          "activity_entity": "Activity state",
+          "enable_control": "Enable switch control",
+          "scan_interval": "Scan interval in seconds",
           "apply_enabled": "Actually drive the cover (otherwise decision sensors only)",
           "manual_override_duration": "Manual override holds … seconds",
           "startup_block_seconds": "Block apply for … seconds after HA start"

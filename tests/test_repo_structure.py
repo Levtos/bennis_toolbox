@@ -74,6 +74,44 @@ def test_manifest_domain_matches() -> None:
     assert manifest.get("config_flow") is True
 
 
+@pytest.mark.parametrize(
+    "translation_file",
+    [
+        INTEGRATION_DIR / "strings.json",
+        INTEGRATION_DIR / "translations" / "de.json",
+        INTEGRATION_DIR / "translations" / "en.json",
+    ],
+)
+def test_shared_module_step_translations_are_module_neutral(translation_file: Path) -> None:
+    """`module_step` is shared by every module add-flow.
+
+    Module-specific text here leaks into other modules because the whole
+    umbrella has one HA translation namespace. Keep this step generic and
+    include labels for shared field names used by several modules.
+    """
+    data = json.loads(translation_file.read_text(encoding="utf-8"))
+    step = data["config"]["step"]["module_step"]
+    description = step.get("description", "")
+    labels = step.get("data", {})
+
+    assert "Cover Policy" not in description
+    assert "cover policy" not in description.lower()
+    assert "Blendschutz" not in labels.get("media_context_entity", "")
+    assert "glare" not in labels.get("media_context_entity", "").lower()
+
+    for key in (
+        "presence_entity",
+        "bio_entity",
+        "day_entity",
+        "media_context_entity",
+        "entertainment_active_entity",
+        "activity_entity",
+        "enable_control",
+        "scan_interval",
+    ):
+        assert key in labels, f"{translation_file.name} misses {key}"
+
+
 # --------------------------------------------------------------------- modules
 
 
