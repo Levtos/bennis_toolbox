@@ -199,6 +199,44 @@ async def test_add_flow_subwoofer_keeps_assume_active_when_no_power_entity():
     assert _default_for(schema, "never_cut_when_active") is True
 
 
+@_run
+async def test_subwoofer_sensors_step_does_not_set_none_default_on_power_field():
+    """Regression for the HA UX "Entity None is neither a valid entity
+    ID" error: the sensors step must NOT declare ``default=None`` on
+    the EntitySelector slot when no sister sensor was detected — the
+    selector validator rejects None and the user can't submit the form."""
+    hass = _FakeHass([])  # subwoofer has no power sensor in the lab
+    helper = flow_module.OptionsFlowHelper(hass, _FakeEntry(), _FakeFlow())
+    await helper.async_step_add_device()
+    await helper.async_step_device_basics({
+        "name": "Subwoofer", "switch_entity": "switch.living_subwoofer_plug",
+        "policy": "HB", "kind": "generic",
+    })
+    sensors_form = helper.flow.last_form
+    assert sensors_form["step_id"] == "device_sensors"
+    schema = sensors_form["schema"]
+    # Find the power_entity marker; verify it has NO default (or one
+    # that resolves to a non-None value). vol.Optional without a
+    # default raises when `.default()` is called.
+    for marker in schema.schema:
+        if str(getattr(marker, "schema", marker)) == "power_entity":
+            try:
+                default_value = marker.default()
+            except Exception:
+                default_value = "<<unset>>"
+            assert default_value != None, (  # noqa: E711 — explicit None check
+                f"power_entity must not default to None on subwoofer; got {default_value!r}"
+            )
+            break
+    else:
+        pytest.fail("power_entity marker not found in sensors schema")
+
+    # And submitting an empty dict (user accepted the empty selector)
+    # must produce a clean handoff to the advanced step, not a crash.
+    result = await helper.async_step_device_sensors({})
+    assert result["step_id"] == "device_advanced"
+
+
 # ---------------------------------------------------------------------------
 # 3) Preset + atomic power suggestion cooperate.
 # ---------------------------------------------------------------------------

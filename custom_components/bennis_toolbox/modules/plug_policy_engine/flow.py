@@ -93,14 +93,17 @@ def _entity(domain=None) -> selector.EntitySelector:
 
 def _globals_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     d = defaults or {}
+    # Each global entity slot is optional; omit `default=None` so the
+    # EntitySelector validator doesn't reject empty submissions
+    # ("Entity None is neither a valid entity ID").
     return vol.Schema({
-        vol.Optional(CONF_PRESENCE, default=d.get(CONF_PRESENCE)): _entity(["input_select", "sensor"]),
-        vol.Optional(CONF_BIO, default=d.get(CONF_BIO)): _entity(["input_select", "sensor"]),
-        vol.Optional(CONF_DAY, default=d.get(CONF_DAY)): _entity(["input_select", "sensor"]),
-        vol.Optional(CONF_MEDIA, default=d.get(CONF_MEDIA)): _entity(["input_select", "sensor"]),
-        vol.Optional(CONF_ENTERTAINMENT, default=d.get(CONF_ENTERTAINMENT)):
+        _opt_entity(CONF_PRESENCE, d.get(CONF_PRESENCE)): _entity(["input_select", "sensor"]),
+        _opt_entity(CONF_BIO, d.get(CONF_BIO)): _entity(["input_select", "sensor"]),
+        _opt_entity(CONF_DAY, d.get(CONF_DAY)): _entity(["input_select", "sensor"]),
+        _opt_entity(CONF_MEDIA, d.get(CONF_MEDIA)): _entity(["input_select", "sensor"]),
+        _opt_entity(CONF_ENTERTAINMENT, d.get(CONF_ENTERTAINMENT)):
             _entity(["binary_sensor", "input_boolean"]),
-        vol.Optional(CONF_ACTIVITY, default=d.get(CONF_ACTIVITY)): _entity(["input_select", "sensor"]),
+        _opt_entity(CONF_ACTIVITY, d.get(CONF_ACTIVITY)): _entity(["input_select", "sensor"]),
         vol.Optional(CONF_ENABLE_CONTROL, default=d.get(CONF_ENABLE_CONTROL, False)): bool,
         vol.Optional(CONF_SCAN_INTERVAL, default=d.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)):
             vol.All(int, vol.Range(min=5, max=600)),
@@ -121,20 +124,36 @@ def _basics_schema(defaults: dict | None = None) -> vol.Schema:
 
 # ---- step 2: sensors (kind-aware) ----------------------------------------
 
+def _opt_entity(key: str, default: Any) -> vol.Optional:
+    """Build an Optional marker that omits the default when there is none.
+
+    HA's EntitySelector rejects ``None`` as a value, so we must NOT
+    declare ``default=None`` on optional entity slots — the user would
+    hit "Entity None is neither a valid entity ID" on submit. When the
+    suggestion / saved value is empty we leave the field defaultless;
+    HA renders an empty selector and an unset submit drops the key.
+    """
+    if default in (None, ""):
+        return vol.Optional(key)
+    return vol.Optional(key, default=default)
+
+
 def _sensors_schema(kind: str, defaults: dict | None = None) -> vol.Schema:
     """Render only the sensor slots the kind cares about.
 
     ``power_entity``/``battery_entity`` defaults are auto-detected from the
     chosen switch slug — they appear pre-filled but the user can clear or
-    swap them.
+    swap them. Devices without a power sensor (e.g. the lab subwoofer)
+    must be able to leave the slot empty without tripping the selector
+    validator.
     """
     d = defaults or {}
     schema: dict = {}
     fields = _suggest.sensors_for_kind(kind)
     if "power_entity" in fields:
-        schema[vol.Optional(CONF_POWER, default=d.get(CONF_POWER))] = _entity("sensor")
+        schema[_opt_entity(CONF_POWER, d.get(CONF_POWER))] = _entity("sensor")
     if "battery_entity" in fields:
-        schema[vol.Optional(CONF_BATTERY, default=d.get(CONF_BATTERY))] = _entity("sensor")
+        schema[_opt_entity(CONF_BATTERY, d.get(CONF_BATTERY))] = _entity("sensor")
     return vol.Schema(schema)
 
 

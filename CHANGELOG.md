@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.5.2 - 2026-05-22
+
+### Behoben
+
+- Plug Policy Engine: Der Sensor-Schritt im Add/Edit-Flow zeigte beim
+  Anlegen von Geräten ohne erkannten Leistungssensor (z. B.
+  Subwoofer) den Fehler „Entity None is neither a valid entity ID nor
+  a valid UUID" und blockierte das Speichern. Ursache: die Optional-
+  Marker für `power_entity` und `battery_entity` wurden mit
+  `default=None` registriert, was HAs EntitySelector als ungültigen
+  Wert ablehnt. Die Defaults werden nun nur noch gesetzt, wenn ein
+  echter Wert vorliegt — leere Slots bleiben einfach leer und
+  übergehen die Validierung.
+- Plug Policy Engine: Der gleiche Fix wurde auf alle globalen
+  Entity-Slots (Presence, Bio, Day, Media, Entertainment, Activity)
+  angewandt, damit auch der erste Anlege-Schritt nicht stolpert, wenn
+  ein Slot bewusst leer bleiben soll.
+
+### Tests
+
+- Regressionstest: Sensoren-Schritt für den Subwoofer (kein
+  Power-Sensor) darf keinen `None`-Default am `power_entity`-Slot
+  setzen und muss eine leere Submission sauber an den
+  Erweitert-Schritt weiterreichen.
+- plug_policy_engine: 84 passed (+1).
+- Full test suite at release preparation: `411 passed, 2 warnings`.
+
 ## 0.3.5.1 - 2026-05-22
 
 ### Hinzugefügt
