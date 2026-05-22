@@ -67,7 +67,20 @@
           "edit_device": "Gerät bearbeiten",
           "remove_device": "Gerät entfernen",
           "calendar": "Kalender",
-          "special_rules": "Spezialregeln"
+          "special_rules": "Spezialregeln",
+          "tuning": "Lautstärke & Debounce"
+        }
+      },
+      "tuning": {
+        "title": "Lautstärke & Debounce",
+        "description": "Feintuning für Benni Media Context. Die Werte beeinflussen Volume-Entscheidungen und Hysterese.",
+        "data": {
+          "debounce_seconds": "Debounce in Sekunden",
+          "quiet_ducking_level": "Quiet-Ducking-Pegel (0–1)",
+          "base_volume_homepods": "Basis-Lautstärke HomePods (0–1)",
+          "base_volume_denon": "Basis-Lautstärke Denon (0–1)",
+          "track_boost_offset": "Track-Boost-Offset",
+          "window_volume_offset": "Fenster-Offset"
         }
       },
       "sources": {

@@ -103,11 +103,18 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
     def _entity(self, key: str) -> Optional[str]:
-        v = self.entry.data.get(key)
+        # Source-entity edits from the OptionsFlow land in `entry.options`;
+        # the initial add-flow wrote them to `entry.data`. Merge so edits
+        # win but legacy entries keep working without migration.
+        v = self.entry.options.get(key)
+        if v in (None, ""):
+            v = self.entry.data.get(key)
         return v or None
 
     def _entities_list(self, key: str) -> list[str]:
-        v = self.entry.data.get(key)
+        v = self.entry.options.get(key)
+        if not v:
+            v = self.entry.data.get(key)
         if not v:
             return []
         if isinstance(v, list):
@@ -115,7 +122,12 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         return [v]
 
     def _app_map(self) -> dict[str, str]:
-        return self.entry.data.get(CONF_APPLETV_APP_MAP, DEFAULT_APPLETV_APP_MAP)
+        # App map currently has no UX surface, but follow the same
+        # merge pattern so a future options-step can override.
+        return (
+            self.entry.options.get(CONF_APPLETV_APP_MAP)
+            or self.entry.data.get(CONF_APPLETV_APP_MAP, DEFAULT_APPLETV_APP_MAP)
+        )
 
     # -- lifecycle --
     async def async_setup(self) -> None:

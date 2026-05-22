@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.5.6 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Über das Gear-Icon ließen sich nach dem
+  Anlegen nur noch die Volume-/Debounce-Knöpfe ändern. Die
+  Medienquellen (TV, AppleTV, PS5, HomePods, Title-Classifier, …)
+  waren im Options-Flow gar nicht erreichbar — ein Wechsel
+  erforderte bis dato Entry löschen und neu anlegen. Der
+  Options-Flow zeigt jetzt ein Menü mit zwei Schritten:
+  - **Auslöser & Quellen** — alle Medien-Source-Entities.
+  - **Lautstärke & Debounce** — die bisherigen Tuning-Knöpfe.
+- Benni Media Context: Coordinator liest Source-Entities nun via
+  Merge `entry.options` → `entry.data`. Bestehende Entries laufen
+  unverändert weiter (Werte bleiben in `data`); Edits aus dem neuen
+  Source-Step landen in `options` und überschreiben den Default
+  sofort, ohne Migration.
+
+### Tests
+
+- Neuer `test_options_sources_menu.py`: Menü zeigt `sources` und
+  `tuning`; Sources-Step rendert die Quellen-Schema, übernimmt
+  Defaults aus `entry.data`, persistiert in `entry.options`, lässt
+  leere Slots weg (damit der Data-Fallback im Coordinator greift)
+  und kollidiert nicht mit Tuning-Optionen.
+- benni_media_context: +6 Tests.
+- Full test suite at release preparation: `451 passed, 2 warnings`.
+
 ## 0.3.5.5 - 2026-05-22
 
 ### Behoben

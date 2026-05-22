@@ -66,7 +66,20 @@
           "edit_device": "Edit device",
           "remove_device": "Remove device",
           "calendar": "Calendars",
-          "special_rules": "Special rules"
+          "special_rules": "Special rules",
+          "tuning": "Volumes & debounce"
+        }
+      },
+      "tuning": {
+        "title": "Volumes & debounce",
+        "description": "Fine-tuning for Benni Media Context. These values drive volume decisions and hysteresis.",
+        "data": {
+          "debounce_seconds": "Debounce in seconds",
+          "quiet_ducking_level": "Quiet ducking level (0–1)",
+          "base_volume_homepods": "Base volume HomePods (0–1)",
+          "base_volume_denon": "Base volume Denon (0–1)",
+          "track_boost_offset": "Track boost offset",
+          "window_volume_offset": "Window volume offset"
         }
       },
       "sources": {

@@ -145,15 +145,61 @@ class ConfigFlowHelper:
 # ---------------------------------------------------------------------------
 
 
+def _merged(entry: ConfigEntry) -> dict[str, Any]:
+    """Defaults seen by edit forms: options win over original data."""
+    merged = dict(entry.data)
+    merged.update(entry.options)
+    merged.pop(CONF_MODULE_ID, None)
+    return merged
+
+
 class OptionsFlowHelper:
+    """Two-step options menu.
+
+    The 0.3.5.4 build only exposed the volume/debounce tuning. Users
+    couldn't change media sources after the initial add — every fix
+    required deleting and re-adding the entry. The new menu surfaces
+    both surfaces explicitly: ``sources`` for media-related entities,
+    ``tuning`` for the volume/debounce knobs.
+
+    Source values are stored in ``entry.options`` from here on (the
+    coordinator now reads merged options-over-data, so legacy entries
+    keep working without migration).
+    """
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, flow: OptionsFlow) -> None:
         self.hass = hass
         self.entry = entry
         self.flow = flow
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        return self.flow.async_show_menu(
+            step_id="init", menu_options=["sources", "tuning"],
+        )
+
+    async def async_step_sources(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:
-            return self.flow.async_create_entry(title="", data=user_input)
+            # Drop empty slots so the coordinator's merge keeps falling
+            # back to entry.data for keys the user cleared.
+            cleaned = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+            new_opts = {**self.entry.options}
+            # Wipe any source key the user *omitted* from the form (HA
+            # only submits the keys present in the schema) so legacy
+            # data-side values surface again instead of being overridden
+            # by stale options.
+            for k in cleaned:
+                new_opts[k] = cleaned[k]
+            new_opts.pop(CONF_MODULE_ID, None)
+            return self.flow.async_create_entry(title="", data=new_opts)
         return self.flow.async_show_form(
-            step_id="init", data_schema=_options_schema(self.entry.options),
+            step_id="sources", data_schema=_sources_schema(_merged(self.entry)),
+        )
+
+    async def async_step_tuning(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        if user_input is not None:
+            new_opts = {**self.entry.options, **user_input}
+            new_opts.pop(CONF_MODULE_ID, None)
+            return self.flow.async_create_entry(title="", data=new_opts)
+        return self.flow.async_show_form(
+            step_id="tuning", data_schema=_options_schema(_merged(self.entry)),
         )
