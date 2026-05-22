@@ -117,12 +117,21 @@ class BennisToolboxConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return BennisToolboxOptionsFlow(config_entry)
+        # Home Assistant 2024.12+ wires `config_entry` onto the OptionsFlow
+        # instance via a managed property — instantiate without arguments and
+        # rely on `self.config_entry` inside the flow. Assigning to the
+        # property on those versions raises AttributeError, which surfaces in
+        # the UI as a "500 Internal Server Error" when the user clicks the
+        # Gear-Icon. The target install (HAOS V3) ships HA new enough that
+        # this is the canonical path.
+        return BennisToolboxOptionsFlow()
 
 
 class BennisToolboxOptionsFlow(OptionsFlow):
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
+    def __init__(self) -> None:
+        # `self.config_entry` is provided by Home Assistant on modern
+        # versions (>= 2024.12). Do NOT assign to it here — see comment in
+        # `async_get_options_flow`.
         self._helper: Any | None = None
 
     async def _ensure_helper(self):

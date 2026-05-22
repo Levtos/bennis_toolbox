@@ -19,9 +19,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_state_change_event,
     async_track_time_interval,
 )
+
+try:  # HA helper module exists on 2023.x+; tests may run without HA installed.
+    from homeassistant.helpers.start import async_at_started
+except Exception:  # pragma: no cover - exercised only on bare-bones stubs
+    async_at_started = None  # type: ignore[assignment]
 
 from ...const import DATA_ENTRIES, DOMAIN
 from ...storage import make_store
@@ -91,6 +97,10 @@ class CoverPolicyCoordinator:
         self._manual_override_until: float | None = None
         self._last_decision: policy.Decision | None = None
 
+        # Cancel-handle for the one-shot startup-block expiry timer; lets us
+        # cancel during async_stop so a reload doesn't leak callbacks.
+        self._startup_unsub: CALLBACK_TYPE | None = None
+
     # ----- options helpers -----
     @property
     def _data_options(self) -> dict[str, Any]:
@@ -135,9 +145,16 @@ class CoverPolicyCoordinator:
     # ----- listeners -----
     @callback
     def async_start(self) -> None:
-        if self.hass.is_running:
-            self._ha_started = True
-            self._started_at = time.monotonic()
+        # Robust startup detection: `async_at_started` fires the callback
+        # immediately if HA is already running, otherwise once the
+        # EVENT_HOMEASSISTANT_STARTED event fires. Using `bus.async_listen_once`
+        # alone has a race where the event may have fired before we attach,
+        # leaving `_ha_started=False` forever — that is what caused
+        # `startup_block` to stick after >> startup_block_seconds.
+        if async_at_started is not None:
+            self._unsub.append(async_at_started(self.hass, self._on_started))
+        elif self.hass.is_running:
+            self._on_started(None)
         else:
             self._unsub.append(
                 self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self._on_started)
@@ -175,12 +192,37 @@ class CoverPolicyCoordinator:
         for unsub in self._unsub:
             unsub()
         self._unsub.clear()
+        if self._startup_unsub is not None:
+            self._startup_unsub()
+            self._startup_unsub = None
 
     @callback
     def _on_started(self, _event) -> None:
         self._ha_started = True
         self._started_at = time.monotonic()
+        self._schedule_startup_block_expiry()
         self.hass.async_create_task(self.async_evaluate())
+
+    def _schedule_startup_block_expiry(self) -> None:
+        """Guarantee a re-evaluation exactly when the startup block lifts.
+
+        Without this, if no source state changes after the startup window,
+        `binary_sensor.*_apply_blocked` keeps reporting `startup_block` until
+        the next 30-second interval tick — and in some HA setups even longer.
+        One-shot timer; cancelled on reload via `async_stop`.
+        """
+        if self._startup_unsub is not None:
+            self._startup_unsub()
+            self._startup_unsub = None
+        seconds = max(0, int(self.startup_block_seconds))
+
+        @callback
+        def _fire(_now) -> None:
+            self._startup_unsub = None
+            self.hass.async_create_task(self.async_evaluate())
+
+        # +1s safety margin so `_startup_ready()` definitely returns True.
+        self._startup_unsub = async_call_later(self.hass, seconds + 1, _fire)
 
     @callback
     def _on_interval(self, _now) -> None:
