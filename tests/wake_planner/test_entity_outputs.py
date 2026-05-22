@@ -96,9 +96,11 @@ def _install_ha_stubs() -> None:
         key: str
         translation_key: str | None = None
         device_class: str | None = None
+        options: list | None = None
 
     class _SensorDeviceClass:
         TIMESTAMP = "timestamp"
+        ENUM = "enum"
 
     if not hasattr(ha_sensor, "SensorEntity"):
         ha_sensor.SensorEntity = _SensorEntity
@@ -441,3 +443,60 @@ def test_wake_needed_uses_running_device_class():
     desc = entities.BINARY_DESCRIPTION
     assert desc.key == "wake_needed"
     assert desc.device_class == "running"
+
+
+# ---------------------------------------------------------------------------
+# 4) wake_state sensor: ENUM device-class + options so HA validation
+#    actually accepts the value instead of falling back to "unknown".
+# ---------------------------------------------------------------------------
+
+
+def test_wake_state_sensor_declares_enum_device_class_with_options():
+    """Regression for 0.3.5.4 bug: after the umbrella translations
+    started shipping `entity.sensor.wake_state.state.*`, HA validated
+    the value against `options`. Without options declared the entity
+    silently became `unknown` even though the WakeDecision was correct.
+    """
+    desc = entities.SENSOR_DESCRIPTIONS[0]
+    assert desc.key == "wake_state"
+    assert desc.device_class == "enum"
+    expected = {"scheduled", "skipped", "overridden", "holiday", "inactive"}
+    assert set(desc.options) == expected
+
+
+@pytest.mark.parametrize(
+    "state_attr,expected_value",
+    [
+        ("SCHEDULED", "scheduled"),
+        ("SKIPPED", "skipped"),
+        ("OVERRIDDEN", "overridden"),
+        ("HOLIDAY", "holiday"),
+        ("INACTIVE", "inactive"),
+    ],
+)
+def test_wake_state_native_value_is_concrete_string_when_decision_present(
+    _entry_object, state_attr, expected_value,
+):
+    state = getattr(wp_const.WakeState, state_attr)
+    decision = _StubDecision(state=state)
+    coord = _StubCoord(decision=decision)
+    sensor = entities.WakePlannerSensor(
+        coord, _entry_object, coord.persons[0], entities.SENSOR_DESCRIPTIONS[0],
+    )
+    val = sensor.native_value
+    assert val == expected_value
+    # Every value must be in the declared options — that's HA's
+    # acceptance criterion for ENUM sensors.
+    assert val in entities.SENSOR_DESCRIPTIONS[0].options
+
+
+def test_wake_state_native_value_none_only_when_no_decision(_entry_object):
+    """If the coordinator hasn't produced a decision yet (cold start),
+    native_value falls back to None which HA renders as `unknown` —
+    that's expected. The bug we're guarding is the "decision exists
+    but sensor still shows unknown" case above."""
+    coord = _StubCoord(decision=None)
+    sensor = entities.WakePlannerSensor(
+        coord, _entry_object, coord.persons[0], entities.SENSOR_DESCRIPTIONS[0],
+    )
+    assert sensor.native_value is None

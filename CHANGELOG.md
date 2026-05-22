@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.5.5 - 2026-05-22
+
+### Behoben
+
+- Wake Planner: `sensor.wake_planner_<slug>_wake_state` blieb seit
+  0.3.5.4 dauerhaft auf `unknown`, obwohl der Coordinator
+  Decisions korrekt produzierte und `next_wake` / `wake_needed` sauber
+  liefen. Ursache war eine HA-Validierungs-Stolperfalle: sobald die
+  Umbrella-Translations die `entity.sensor.wake_state.state.*`-Keys
+  ausspielen, behandelt HA den Sensor als Enum und prüft den Wert
+  gegen die `options`-Liste der Entity-Description. Die war nicht
+  gesetzt — also wurde jeder Zustand als ungültig verworfen und HA
+  fiel auf `unknown` zurück. Fix: `device_class=SensorDeviceClass.
+  ENUM` plus `options=[…alle WakeState-Werte…]` deklariert.
+
+### Tests
+
+- Regressionstest pinnt `device_class=enum` und `options` der
+  `wake_state`-Description, plus parametrisierter Test, der für jeden
+  `WakeState`-Wert (scheduled/skipped/overridden/holiday/inactive)
+  prüft, dass der Sensor den korrekten String liefert und nicht in
+  `unknown` fällt. Zusätzlicher Test bestätigt, dass `None` nur dann
+  durchkommt, wenn der Coordinator wirklich noch keine Decision hat.
+- wake_planner: +7 Tests.
+- Full test suite at release preparation: `445 passed, 2 warnings`.
+
 ## 0.3.5.4 - 2026-05-22
 
 ### Geändert

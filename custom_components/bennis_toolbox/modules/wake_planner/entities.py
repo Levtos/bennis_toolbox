@@ -37,8 +37,21 @@ from .coordinator import WakePlannerCoordinator, coordinator_from_hass
 from .util import rule_to_dict
 
 
+# `wake_state` is an enum sensor. As soon as the umbrella translations
+# carry `entity.sensor.wake_state.state.*` keys, HA validates the value
+# against `options`. If we don't declare them, every state is rejected
+# and the sensor reports `unknown` — even though the underlying
+# `WakeDecision.state` is correct. Pin both so the value flows through.
+_WAKE_STATE_OPTIONS: list[str] = [s.value for s in WakeState]
+
+
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(key="wake_state", translation_key="wake_state"),
+    SensorEntityDescription(
+        key="wake_state",
+        translation_key="wake_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=_WAKE_STATE_OPTIONS,
+    ),
     SensorEntityDescription(
         key="next_wake",
         translation_key="next_wake",
