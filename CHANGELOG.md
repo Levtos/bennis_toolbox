@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.3 - 2026-05-22
+
+### Behoben
+
+- Geteilte Add-Flow-Übersetzungen sind jetzt modulneutral. Dadurch zeigt
+  Plug Policy beim Anlegen nicht mehr die Cover-Policy-Beschreibung oder
+  Cover-spezifische Feldtexte.
+- `media_context_entity` wird im geteilten Add-Flow neutral beschriftet,
+  statt Cover-Policy-spezifisch als Blendschutz-TV-Auslöser.
+
+### Tests
+
+- Regressionstest ergänzt, der modul-spezifische Texte im geteilten
+  `module_step` verhindert.
+- Full test suite at release preparation: `359 passed, 1 warning`.
+
 ## 0.3.2 - 2026-05-22
 
 ### Geändert

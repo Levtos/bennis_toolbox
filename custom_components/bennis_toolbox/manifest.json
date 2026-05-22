@@ -1,7 +1,7 @@
 {
   "domain": "bennis_toolbox",
   "name": "Benni's Toolbox",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "documentation": "https://github.com/Levtos/bennis_toolbox",
   "issue_tracker": "https://github.com/Levtos/bennis_toolbox/issues",
   "codeowners": ["@Levtos"],
