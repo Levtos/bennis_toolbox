@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.4 - 2026-05-22
+
+### Behoben
+
+- Cover Policy: Der Options-Flow (Gear-Icon → „Konfigurieren") konnte
+  auf HA 2024.12 und neuer nicht geöffnet werden und meldete „500
+  Internal Server Error". Ursache war eine Zuweisung an
+  `OptionsFlow.config_entry`, das in modernen HA-Versionen eine vom
+  Framework gemanagte Property ist. Die Umbrella-Options-Flow nutzt
+  jetzt die HA-Konvention und lässt sich wieder öffnen — Menü mit
+  `sources`, `profile` und `runtime` erscheint wie vorgesehen.
+- Cover Policy: `binary_sensor.*_apply_blocked` blieb auch nach Ablauf
+  von `startup_block_seconds` dauerhaft mit `startup_block` markiert,
+  wenn nach dem HA-Start keine Source-Entity ihren Zustand änderte.
+  Ursache war eine Race-Condition mit `EVENT_HOMEASSISTANT_STARTED`
+  plus fehlende garantierte Re-Evaluation am Ablauf des Startup-
+  Fensters. Der Coordinator hört jetzt über `async_at_started`
+  (deckt „läuft schon" und „startet noch" sauber ab) und plant einen
+  einmaligen Timer, der nach `startup_block_seconds + 1` eine
+  Re-Evaluation auslöst — dadurch fällt der `startup_block`-Blocker
+  zuverlässig weg.
+
+### Tests
+
+- Neuer Regressionstest stellt sicher, dass der Options-Flow
+  instanziierbar bleibt, das Menü `sources`/`profile`/`runtime`
+  anzeigt und unbekannte Step-Namen an den Modul-Helper
+  durchgereicht werden — exakt nach HA-Konvention für die Property.
+- Neuer Regressionstest deckt das Startup-Block-Verhalten ab:
+  `async_at_started`-Registrierung, einmaliger Expiry-Timer mit
+  korrektem Delay, Wegfall des `startup_block`-Blockers nach Ablauf
+  und Cancel-Pfad beim Reload.
+- Full test suite at release preparation: `367 passed, 2 warnings`.
+
 ## 0.3.3 - 2026-05-22
 
 ### Behoben
