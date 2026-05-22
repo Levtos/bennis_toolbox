@@ -29,8 +29,15 @@ class SensorSuggestion:
     siblings: tuple[str, ...]  # voltage/current/energy if present (informational)
 
 
-_SUFFIX_POWER = ("_power", "_active_power", "_power_w")
-_SUFFIX_BATTERY = ("_battery", "_battery_level", "_battery_percent")
+# Priority is significant — Einhornzentrale wires every plug through an
+# `_atomic` aggregator entity that smooths the raw power reading, so we
+# prefer that over the underlying raw sensor. Battery follows the same
+# convention. Raw `_power`/`_battery` stay as canonical fallback so
+# vanilla setups still get a useful suggestion.
+_SUFFIX_POWER = ("_power_atomic", "_power", "_active_power", "_power_w")
+_SUFFIX_BATTERY = (
+    "_battery_atomic", "_battery", "_battery_level", "_battery_percent",
+)
 _SUFFIX_SIBLINGS = (
     "_voltage", "_current", "_energy", "_energy_total", "_today_energy",
 )

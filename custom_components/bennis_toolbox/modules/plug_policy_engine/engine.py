@@ -7,7 +7,7 @@ lives here so it can be unit-tested without HA.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace as dc_replace
 from typing import Any, Optional
 
 from .const import (
@@ -16,7 +16,7 @@ from .const import (
     KIND_TABLET, KIND_DENON, KIND_H14_DOCK, KIND_GENERIC,
     PRESENCE_HOME, PRESENCE_AWAY, PRESENCE_AT_PARENTS,
     BIO_AWAKE, BIO_SLEEP,
-    DAY_NIGHT,
+    DAY_MORNING, DAY_DAY, DAY_EVENING, DAY_NIGHT,
     UNK_ASSUME_ACTIVE, UNK_ASSUME_IDLE,
     DESIRED_ON, DESIRED_OFF, DESIRED_KEEP,
     DEFAULT_ACTIVE_THRESHOLD, DEFAULT_IDLE_THRESHOLD,
@@ -24,6 +24,37 @@ from .const import (
     DEFAULT_DIFFUSER_ON, DEFAULT_DIFFUSER_OFF,
     DEFAULT_STABLE_OFF, DEFAULT_MANUAL_COOLDOWN,
 )
+
+
+# --------------------------------------------------------------------------- #
+# Day-phase aliasing
+#
+# Einhornzentrale's `sensor.context_day_state_combined` reports
+# detailed phases (early_morning, late_morning, forenoon, afternoon,
+# early_evening, late_evening, early_night, late_night). The engine and
+# `allowed_contexts` use the coarse morning/day/evening/night vocabulary.
+# We normalise at the engine entry so:
+#   - existing morning/day/evening/night values still work unchanged,
+#   - detailed inputs fold to the right coarse bucket transparently.
+# Unknown strings pass through so user-defined phases keep working.
+# --------------------------------------------------------------------------- #
+_DAY_PHASE_ALIASES: dict[str, str] = {
+    "early_morning": DAY_MORNING,
+    "late_morning":  DAY_MORNING,
+    "forenoon":      DAY_MORNING,
+    "afternoon":     DAY_DAY,
+    "early_evening": DAY_EVENING,
+    "late_evening":  DAY_EVENING,
+    "early_night":   DAY_NIGHT,
+    "late_night":    DAY_NIGHT,
+}
+
+
+def _normalise_day_phase(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    key = str(value).strip().lower()
+    return _DAY_PHASE_ALIASES.get(key, value)
 
 
 # --------------------------------------------------------------------------- #
@@ -189,6 +220,11 @@ def evaluate(
 ) -> Decision:
     """Top-level dispatch."""
     blockers: list[str] = []
+    # Fold detailed day-phase variants (early_morning, late_evening, …)
+    # into the coarse vocabulary the rules below compare against.
+    normalised_phase = _normalise_day_phase(ctx.day_phase)
+    if normalised_phase != ctx.day_phase:
+        ctx = dc_replace(ctx, day_phase=normalised_phase)
     active_state = _classify_active(cfg, state)
     power = _power_float(state.power_w)
 

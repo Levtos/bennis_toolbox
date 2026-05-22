@@ -144,7 +144,7 @@
           "tablet_high": "Tablet: stop charging at battery %",
           "diffuser_on_minutes": "Diffuser: on phase (minutes)",
           "diffuser_off_minutes": "Diffuser: off phase (minutes)",
-          "allowed_contexts": "Allowed day contexts (policy SC)"
+          "allowed_contexts": "Allowed day contexts (policy SC) — morning / day / evening / night; detailed phase values (e.g. late_morning, afternoon, early_night) are mapped onto these four buckets internally"
         }
       }
     },

@@ -145,7 +145,7 @@
           "tablet_high": "Tablet: Laden stoppen ab Akkustand",
           "diffuser_on_minutes": "Diffuser: An-Phase in Minuten",
           "diffuser_off_minutes": "Diffuser: Aus-Phase in Minuten",
-          "allowed_contexts": "Erlaubte Tageskontexte (Policy SC)"
+          "allowed_contexts": "Erlaubte Tageskontexte (Policy SC) — morgens / tagsüber / abends / nachts; detaillierte Day-State-Werte (z. B. late_morning, afternoon, early_night) werden intern auf diese vier Buckets gemappt"
         }
       }
     },
