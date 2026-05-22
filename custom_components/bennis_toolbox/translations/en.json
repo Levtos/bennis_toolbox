@@ -156,5 +156,23 @@
         }
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "wake_needed": { "name": "Wake needed" }
+    },
+    "sensor": {
+      "wake_state": {
+        "name": "Wake state",
+        "state": {
+          "scheduled": "Scheduled",
+          "skipped": "Skipped",
+          "overridden": "Overridden",
+          "holiday": "Holiday",
+          "inactive": "Inactive"
+        }
+      },
+      "next_wake": { "name": "Next wake" }
+    }
   }
 }

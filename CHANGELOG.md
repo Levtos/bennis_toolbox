@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.5.4 - 2026-05-22
+
+### Geändert
+
+- Wake Planner: Eindeutige Entity-IDs für die Outputs, damit
+  `benni_context` ohne Rätselraten auf `wake_next` und `wake_needed`
+  zugreifen kann. Neue Entries landen jetzt auf:
+  - `binary_sensor.wake_planner_<slug>_wake_needed`
+  - `sensor.wake_planner_<slug>_next_wake`
+  - `sensor.wake_planner_<slug>_wake_state`
+  Der Wake-needed-Binary-Sensor ist exakt das Wake-Fenster: `on` nur
+  wenn der State `scheduled` oder `overridden` ist und `now` zwischen
+  `wake_window_start` und `wake_window_end` liegt.
+- Wake Planner: Die deutschen Namen „Wecken nötig", „Nächster Wecker",
+  „Weckstatus" sind jetzt aus der Umbrella-Translations-Datei
+  bedient, statt aus HAs Device-Class-Fallback (der zu
+  „Betriebszustand" und „Zeitstempel" führte). State-Übersetzungen
+  für `scheduled`/`skipped`/`overridden`/`holiday`/`inactive`
+  ergänzt.
+- `unique_id` aller Wake-Planner-Entities bleibt unverändert —
+  bestehende Registry-Einträge keep ihre Identität. Für lesbare
+  Entity-IDs in alten Setups manuell umbenennen oder Entry neu
+  anlegen (suggested_object_id greift nur beim Erstanlegen, das ist
+  HA-Konvention).
+
+### Tests
+
+- Neuer `tests/wake_planner/test_entity_outputs.py`: pin
+  suggested_object_id für alle drei Entities, halten unique_id
+  unverändert, decken die wake-needed-Wahrheitstabelle für alle
+  `WakeState`-Varianten ab (inside/outside window, missing window,
+  no decision) und prüfen, dass der next-wake-Sensor einen
+  timezone-aware Timestamp liefert.
+- wake_planner: +15 Tests.
+- Full test suite at release preparation: `438 passed, 2 warnings`.
+
 ## 0.3.5.3 - 2026-05-22
 
 ### Behoben

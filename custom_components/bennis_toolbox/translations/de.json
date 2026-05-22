@@ -157,5 +157,23 @@
         }
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "wake_needed": { "name": "Wecken nötig" }
+    },
+    "sensor": {
+      "wake_state": {
+        "name": "Weckstatus",
+        "state": {
+          "scheduled": "Geplant",
+          "skipped": "Übersprungen",
+          "overridden": "Überschrieben",
+          "holiday": "Feiertag",
+          "inactive": "Inaktiv"
+        }
+      },
+      "next_wake": { "name": "Nächster Wecker" }
+    }
   }
 }

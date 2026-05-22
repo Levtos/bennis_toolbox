@@ -99,6 +99,16 @@ class WakePlannerSensor(CoordinatorEntity[WakePlannerCoordinator], SensorEntity)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, person.slug, description.key)
         self._attr_translation_key = description.translation_key
         self._attr_device_info = _device_info(entry, person)
+        # Suggested object_id derived from the entity's purpose, not from
+        # the device-class. HA otherwise falls back to the device-class
+        # translation (`Zeitstempel`, `Betriebszustand`), which is
+        # semantically meaningless to downstream consumers like
+        # benni_context. The unique_id stays unchanged so existing
+        # registry entries keep their identity; only new entries pick
+        # up the readable slug.
+        self._attr_suggested_object_id = (
+            f"{MODULE_ID}_{person.slug}_{description.key}"
+        )
 
     @property
     def native_value(self) -> str | datetime | None:
@@ -140,6 +150,14 @@ class WakeNeededBinarySensor(CoordinatorEntity[WakePlannerCoordinator], BinarySe
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, person.slug, "wake_needed")
         self._attr_translation_key = BINARY_DESCRIPTION.translation_key
         self._attr_device_info = _device_info(entry, person)
+        # Same readable-object_id treatment as the timestamp sensor.
+        # The unique_id is `…_wake_needed` so existing entries don't
+        # break; new entries land on `binary_sensor.wake_planner_<slug>
+        # _wake_needed` directly instead of HA's German device-class
+        # fallback (`…_betriebszustand`).
+        self._attr_suggested_object_id = (
+            f"{MODULE_ID}_{person.slug}_wake_needed"
+        )
 
     @property
     def is_on(self) -> bool:
