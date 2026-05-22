@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.5 - 2026-05-22
+
+### Geändert
+
+- Plug Policy Engine: Add/Edit eines Geräts ist in drei klar getrennte
+  Schritte aufgeteilt — Grunddaten, Sensoren, erweiterte Schwellwerte.
+  Die UI zeigt nur noch Felder, die für die gewählte Geräteart und
+  Policy fachlich relevant sind. Tablet-, Diffuser-, Wake-Signal- und
+  Schedule-Context-Felder erscheinen nur dort, wo sie tatsächlich
+  wirken; `allowed_contexts` taucht nur bei Policy `SC` auf.
+- Plug Policy Engine: Wird ein Schalter wie `switch.living_pc_plug`
+  gewählt, schlägt die Toolbox passende Sensor-Entities automatisch
+  vor. Priorität bevorzugt Einhornzentrale-Atomic-Aggregatoren
+  (`sensor.<slug>_power_atomic`, `sensor.<slug>_battery_atomic`) vor
+  den Rohsensoren. Voltage/Current/Energy werden rein informativ
+  erwähnt; ein vom Nutzer gesetzter Wert wird nie überschrieben.
+- Plug Policy Engine: Detaillierte Day-State-Werte wie `late_morning`,
+  `afternoon`, `early_evening`, `early_night` werden im Engine zentral
+  auf die groben Buckets `morning` / `day` / `evening` / `night`
+  abgebildet, gegen die `allowed_contexts` matched. Bestehende
+  Coarse-Werte funktionieren unverändert; unbekannte Strings bleiben
+  durchgereicht.
+
+### UX
+
+- Plug Policy Engine: Übersetzungen für alle neuen Step-Titel und
+  Feldbeschriftungen in `de.json` und `en.json` ergänzt, inklusive
+  Hinweis am `allowed_contexts`-Label, dass das Day-State-Mapping
+  intern erfolgt.
+
+### Tests
+
+- Plug Policy Engine UX: Tests für Multi-Step Add/Edit, Auto-Detection
+  inklusive Atomic-Priorität, Kind-gefilterte Felder und Edit-Flow,
+  der bestehende und nicht gerenderte Legacy-Keys preserved.
+- Plug Policy Engine Engine: Tests für den Day-Phase-Mapper und das
+  SC-Matching unter `late_morning` / `late_evening` / `early_night`,
+  plus Backwards-Compat für die plain `morning`/`day`/`evening`/`night`-
+  Werte.
+- Full test suite at release preparation: `397 passed, 2 warnings`.
+
 ## 0.3.4 - 2026-05-22
 
 ### Behoben
