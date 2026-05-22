@@ -109,6 +109,52 @@
           "manual_override_duration": "Manueller Override hält … Sekunden",
           "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"
         }
+      },
+      "device_basics": {
+        "title": "Gerät — Grunddaten",
+        "description": "Name, Schalter und Geräteart. Sensoren und Schwellwerte kommen in den folgenden Schritten.",
+        "data": {
+          "name": "Anzeigename",
+          "switch_entity": "Steckdose / Schalter",
+          "policy": "Policy (Schaltlogik)",
+          "kind": "Geräteart"
+        }
+      },
+      "device_sensors": {
+        "title": "Gerät — Sensoren",
+        "description": "Die Toolbox hat anhand des Schalters folgende Sensoren erkannt — leer lassen, wenn du sie nicht verwenden willst.\nVorschlag Leistung: {suggested_power}\nVorschlag Batterie: {suggested_battery}\nWeitere gefundene Sensoren (rein informativ): {siblings}",
+        "data": {
+          "power_entity": "Leistungssensor (W)",
+          "battery_entity": "Batteriesensor (%)"
+        }
+      },
+      "device_advanced": {
+        "title": "Gerät — Schwellwerte & Verhalten",
+        "description": "Nur die für diese Geräteart relevanten Felder werden angezeigt.",
+        "data": {
+          "active_threshold": "Aktiv ab Watt",
+          "idle_threshold": "Inaktiv unter Watt",
+          "deadband_lower": "Deadband unten (W, optional)",
+          "deadband_upper": "Deadband oben (W, optional)",
+          "stable_off_seconds": "Ausschalten erst nach stabil inaktiv für Sekunden",
+          "unknown_behavior": "Bei unbekannter Leistung",
+          "never_cut_when_active": "Nie ausschalten, wenn aktiv",
+          "manual_on_cooldown_seconds": "Manuelles Einschalten schützen für Sekunden",
+          "wake_signal_only": "Nur als Wake-Signal verwenden",
+          "tablet_low": "Tablet: Laden ab Akkustand",
+          "tablet_high": "Tablet: Laden stoppen ab Akkustand",
+          "diffuser_on_minutes": "Diffuser: An-Phase in Minuten",
+          "diffuser_off_minutes": "Diffuser: Aus-Phase in Minuten",
+          "allowed_contexts": "Erlaubte Tageskontexte (Policy SC)"
+        }
+      }
+    },
+    "selector": {
+      "unknown_behavior": {
+        "options": {
+          "assume_active": "als aktiv schützen",
+          "assume_idle": "als inaktiv behandeln"
+        }
       }
     }
   }

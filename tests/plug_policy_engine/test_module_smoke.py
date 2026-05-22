@@ -206,6 +206,14 @@ def _load_with_const_remap(filename: str, new_name: str):
     src = src.replace("from ...services import", "from pp_toolbox_stub.services import")
     src = src.replace("from .const import", "from pp_const import")
     src = src.replace("from .coordinator import", "from pp_coordinator_stub import")
+    # `flow.py` uses `from . import _suggest`; load the suggestion helper
+    # as a flat module so it can be imported under that name.
+    src = src.replace("from . import _suggest", "import pp_suggest as _suggest")
+    if "pp_suggest" not in sys.modules:
+        sug_src = (MODULE_DIR / "_suggest.py").read_text(encoding="utf-8")
+        sug = types.ModuleType("pp_suggest")
+        sys.modules["pp_suggest"] = sug
+        exec(compile(sug_src, str(MODULE_DIR / "_suggest.py"), "exec"), sug.__dict__)
     mod = types.ModuleType(new_name)
     sys.modules[new_name] = mod
     exec(compile(src, str(MODULE_DIR / filename), "exec"), mod.__dict__)

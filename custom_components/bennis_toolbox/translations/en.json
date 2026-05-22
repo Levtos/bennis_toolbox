@@ -108,6 +108,52 @@
           "manual_override_duration": "Manual override holds … seconds",
           "startup_block_seconds": "Block apply for … seconds after HA start"
         }
+      },
+      "device_basics": {
+        "title": "Device — basics",
+        "description": "Name, switch and device kind. Sensors and thresholds follow in the next steps.",
+        "data": {
+          "name": "Display name",
+          "switch_entity": "Plug / switch",
+          "policy": "Policy (switching logic)",
+          "kind": "Device kind"
+        }
+      },
+      "device_sensors": {
+        "title": "Device — sensors",
+        "description": "Auto-detected from the switch slug — clear what you don't want to use.\nSuggested power: {suggested_power}\nSuggested battery: {suggested_battery}\nOther sensors found (informational): {siblings}",
+        "data": {
+          "power_entity": "Power sensor (W)",
+          "battery_entity": "Battery sensor (%)"
+        }
+      },
+      "device_advanced": {
+        "title": "Device — thresholds & behaviour",
+        "description": "Only fields relevant for this device kind are shown.",
+        "data": {
+          "active_threshold": "Active above watts",
+          "idle_threshold": "Idle below watts",
+          "deadband_lower": "Deadband lower (W, optional)",
+          "deadband_upper": "Deadband upper (W, optional)",
+          "stable_off_seconds": "Switch off only after stable-idle for seconds",
+          "unknown_behavior": "When power is unknown",
+          "never_cut_when_active": "Never switch off while active",
+          "manual_on_cooldown_seconds": "Protect manual-on for seconds",
+          "wake_signal_only": "Use as wake signal only",
+          "tablet_low": "Tablet: start charging at battery %",
+          "tablet_high": "Tablet: stop charging at battery %",
+          "diffuser_on_minutes": "Diffuser: on phase (minutes)",
+          "diffuser_off_minutes": "Diffuser: off phase (minutes)",
+          "allowed_contexts": "Allowed day contexts (policy SC)"
+        }
+      }
+    },
+    "selector": {
+      "unknown_behavior": {
+        "options": {
+          "assume_active": "treat as active (protect)",
+          "assume_idle": "treat as idle"
+        }
       }
     }
   }
