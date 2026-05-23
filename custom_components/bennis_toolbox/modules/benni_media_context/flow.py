@@ -52,6 +52,7 @@ from .const import (
     DEFAULT_DEBOUNCE,
     DEFAULT_QUIET_DUCK,
     DEFAULT_WINDOW_OFFSET,
+    DEVICE_CARDS,
     MODULE_ID,
     NAME,
 )
@@ -153,6 +154,33 @@ def _merged(entry: ConfigEntry) -> dict[str, Any]:
     return merged
 
 
+def _opt_entity_marker(key: str, default: Any):
+    """Build an Optional marker that omits None/"" defaults — HA's
+    EntitySelector rejects None as a value."""
+    if default in (None, "", []):
+        return vol.Optional(key)
+    return vol.Optional(key, default=default)
+
+
+def _device_card_schema(card: str, defaults: dict[str, Any]) -> vol.Schema:
+    """Render the per-device card as a small voluptuous schema.
+
+    Only the keys belonging to *this* device's card are present — the
+    OptionsFlow merges them on save so unrelated keys keep their values
+    (the "Skip" semantics the user asked for fall out naturally: closing
+    the dialog without visiting a card writes nothing).
+    """
+    fields: dict[Any, Any] = {}
+    for key in DEVICE_CARDS[card]:
+        fields[_opt_entity_marker(key, defaults.get(key))] = _ENTITY
+    return vol.Schema(fields)
+
+
+# Keys that the per-device cards manage. Used to wipe stale options
+# entries when the user clears a slot on save.
+_ALL_DEVICE_KEYS: set[str] = {k for keys in DEVICE_CARDS.values() for k in keys}
+
+
 class OptionsFlowHelper:
     """Two-step options menu.
 
@@ -174,8 +202,76 @@ class OptionsFlowHelper:
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         return self.flow.async_show_menu(
-            step_id="init", menu_options=["sources", "tuning"],
+            step_id="init",
+            menu_options=[
+                "tv", "appletv", "ps5", "switch", "pc", "denon", "homepods",
+                "sources", "tuning",
+            ],
         )
+
+    # ---- Per-device cards --------------------------------------------------
+
+    async def _save_card(self, card: str, user_input: dict[str, Any]) -> FlowResult:
+        """Merge a per-card submit into entry.options.
+
+        Only the keys declared for this card are touched. Keys the user
+        cleared get removed from options so the coordinator's merge can
+        fall back to entry.data. Other devices' keys stay untouched.
+        """
+        new_opts = dict(self.entry.options)
+        card_keys = set(DEVICE_CARDS[card])
+        cleaned = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+        for k in card_keys:
+            if k in cleaned:
+                new_opts[k] = cleaned[k]
+            else:
+                # User cleared the slot in this card → drop from options
+                # so any legacy data-side value resurfaces. If the slot
+                # wasn't in options before, this is a no-op.
+                new_opts.pop(k, None)
+        new_opts.pop(CONF_MODULE_ID, None)
+        return self.flow.async_create_entry(title="", data=new_opts)
+
+    async def _show_card(self, card: str) -> FlowResult:
+        return self.flow.async_show_form(
+            step_id=card,
+            data_schema=_device_card_schema(card, _merged(self.entry)),
+        )
+
+    async def async_step_tv(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("tv")
+        return await self._save_card("tv", user_input)
+
+    async def async_step_appletv(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("appletv")
+        return await self._save_card("appletv", user_input)
+
+    async def async_step_ps5(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("ps5")
+        return await self._save_card("ps5", user_input)
+
+    async def async_step_switch(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("switch")
+        return await self._save_card("switch", user_input)
+
+    async def async_step_pc(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("pc")
+        return await self._save_card("pc", user_input)
+
+    async def async_step_denon(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("denon")
+        return await self._save_card("denon", user_input)
+
+    async def async_step_homepods(self, user_input=None) -> FlowResult:
+        if user_input is None:
+            return await self._show_card("homepods")
+        return await self._save_card("homepods", user_input)
 
     async def async_step_sources(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:

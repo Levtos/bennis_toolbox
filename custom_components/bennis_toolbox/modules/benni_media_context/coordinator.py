@@ -44,6 +44,15 @@ from .const import (
     CONF_TV_SOURCE,
     CONF_WINDOW_OFFSET,
     CONF_WINDOW_STATE,
+    CONF_TV_PLAYER, CONF_TV_ACTIVE_NEW, CONF_TV_POWER,
+    CONF_APPLETV_PLAYER,
+    CONF_PS5_PLAYER, CONF_PS5_ACTIVE, CONF_PS5_POWER,
+    CONF_PS5_TITLE_ENTITY, CONF_PS5_NETWORK,
+    CONF_SWITCH_ACTIVE, CONF_SWITCH_POWER, CONF_SWITCH_PING,
+    CONF_PC_ACTIVE_NEW, CONF_PC_POWER,
+    CONF_DENON_PLAYER, CONF_DENON_ACTIVE_NEW, CONF_DENON_POWER,
+    CONF_HOMEPODS_PLAYER,
+    DEVICE_CARDS, LEGACY_FALLBACKS,
     CTX_STREAMING,
     DEFAULT_APPLETV_APP_MAP,
     DEFAULT_BASE_VOL_DENON,
@@ -122,6 +131,17 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             return v
         return [v]
 
+    def _entity_with_fallback(self, new_key: str) -> Optional[str]:
+        """Resolve an entity slot using the new CONF model, falling back
+        to the matching legacy key for unmigrated config entries."""
+        eid = self._entity(new_key)
+        if eid:
+            return eid
+        legacy = LEGACY_FALLBACKS.get(new_key)
+        if legacy:
+            return self._entity(legacy)
+        return None
+
     def _app_map(self) -> dict[str, str]:
         # App map currently has no UX surface, but follow the same
         # merge pattern so a future options-step can override.
@@ -133,10 +153,18 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
     # -- lifecycle --
     async def async_setup(self) -> None:
         entities: list[str] = []
+        # Walk every device card so newly configured slots get tracked
+        # alongside the legacy keys.
+        for keys in DEVICE_CARDS.values():
+            for k in keys:
+                e = self._entity_with_fallback(k)
+                if e:
+                    entities.append(e)
+        # Context / classifier / window / door / call etc. still use
+        # their original keys.
         for key in (
-            CONF_TV_ACTIVE, CONF_TV_SOURCE, CONF_TV_POWER_FALLBACK, CONF_APPLETV,
-            CONF_PS5_STATUS, CONF_PS5_TITLE, CONF_SWITCH_DOCK, CONF_PC_ACTIVE,
-            CONF_DENON_ACTIVE, CONF_TITLE_CLASSIFIER_PS5, CONF_TITLE_CLASSIFIER_PC,
+            CONF_TV_SOURCE,
+            CONF_TITLE_CLASSIFIER_PS5, CONF_TITLE_CLASSIFIER_PC,
             CONF_TITLE_CLASSIFIER_HOMEPODS, CONF_TITLE_CLASSIFIER_MEDIA,
             CONF_DOOR, CONF_CALL_MONITOR, CONF_DAY_STATE,
             CONF_ACTIVITY_STATE, CONF_WINDOW_STATE,
@@ -144,8 +172,13 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             e = self._entity(key)
             if e:
                 entities.append(e)
-        for e in self._entities_list(CONF_HOMEPODS):
-            entities.append(e)
+        # Legacy multi-homepods list — only relevant if no
+        # CONF_HOMEPODS_PLAYER is configured.
+        if not self._entity(CONF_HOMEPODS_PLAYER):
+            for e in self._entities_list(CONF_HOMEPODS):
+                entities.append(e)
+        # Deduplicate
+        entities = list(dict.fromkeys(entities))
 
         if entities:
             self._unsub_state = async_track_state_change_event(
@@ -186,37 +219,187 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
                 return None
             return st.attributes.get(attr)
 
-        s.tv_active = _bool_state(_state(CONF_TV_ACTIVE))
-        s.tv_source = _state(CONF_TV_SOURCE)
-        tv_power_raw = _state(CONF_TV_POWER_FALLBACK)
-        s.tv_power = _bool_state(tv_power_raw) if tv_power_raw is not None else None
+        # ---- New per-device snapshot helpers ------------------------------
+        # `_resolve(new_key)` returns the entity for the new CONF model,
+        # falling back to the legacy key for unmigrated config entries.
+        def _resolve(new_key: str) -> Optional[str]:
+            return self._entity_with_fallback(new_key)
 
-        s.atv_state = _state(CONF_APPLETV)
-        s.atv_app_id = _attr(CONF_APPLETV, "app_id") or _attr(CONF_APPLETV, "app_name")
-        s.atv_title = _attr(CONF_APPLETV, "media_title")
+        def _state_of(eid: Optional[str]) -> Optional[str]:
+            if not eid:
+                return None
+            st = hass.states.get(eid)
+            if st is None or st.state in ("unavailable", "unknown"):
+                return None
+            return st.state
 
-        s.ps5_status = _state(CONF_PS5_STATUS)
-        s.ps5_title = _state(CONF_PS5_TITLE)
+        def _attr_of(eid: Optional[str], attr: str) -> Optional[Any]:
+            if not eid:
+                return None
+            st = hass.states.get(eid)
+            if st is None:
+                return None
+            return st.attributes.get(attr)
+
+        def _float_state(eid: Optional[str]) -> Optional[float]:
+            v = _state_of(eid)
+            if v is None:
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        diag: dict[str, dict] = {}
+
+        def _record(device: str, **kw) -> None:
+            diag.setdefault(device, {}).update({k: v for k, v in kw.items() if v is not None})
+
+        # ---- TV -----------------------------------------------------------
+        tv_player = _resolve(CONF_TV_PLAYER)
+        tv_active_e = _resolve(CONF_TV_ACTIVE_NEW)
+        tv_power_e = _resolve(CONF_TV_POWER)
+        tv_player_state = _state_of(tv_player)
+        tv_source_attr = _attr_of(tv_player, "source")
+        tv_active_bool = _bool_state(_state_of(tv_active_e))
+        tv_power_w = _float_state(tv_power_e)
+        # Fallbacks to the legacy explicit-source slot, kept for entries
+        # that aren't migrated to the player-driven model yet.
+        if tv_source_attr is None:
+            tv_source_attr = self._entity(CONF_TV_SOURCE) and _state_of(self._entity(CONF_TV_SOURCE))
+        s.tv_active = tv_active_bool or (tv_player_state in ("on", "playing", "paused"))
+        s.tv_source = tv_source_attr
+        s.tv_player_state = tv_player_state
+        s.tv_power_w = tv_power_w
+        legacy_tv_power_raw = _state(CONF_TV_POWER_FALLBACK)
+        s.tv_power = (
+            _bool_state(legacy_tv_power_raw) if legacy_tv_power_raw is not None
+            else (tv_power_w is not None and tv_power_w > 0)
+        )
+        _record("tv",
+                player_state=tv_player_state, active_state=tv_active_bool,
+                power_w=tv_power_w, source=tv_source_attr)
+
+        # ---- Apple TV -----------------------------------------------------
+        atv = _resolve(CONF_APPLETV_PLAYER)
+        s.atv_state = _state_of(atv)
+        s.atv_app_id = _attr_of(atv, "app_id") or _attr_of(atv, "app_name")
+        s.atv_title = _attr_of(atv, "media_title")
+        _record("appletv",
+                player_state=s.atv_state, app_name=_attr_of(atv, "app_name"),
+                media_title=s.atv_title,
+                content_type=_attr_of(atv, "media_content_type"))
+
+        # ---- PS5 ----------------------------------------------------------
+        ps5_player = _resolve(CONF_PS5_PLAYER)
+        ps5_active_e = _resolve(CONF_PS5_ACTIVE)
+        ps5_power_e = _resolve(CONF_PS5_POWER)
+        ps5_title_e = _resolve(CONF_PS5_TITLE_ENTITY)
+        ps5_network_e = _resolve(CONF_PS5_NETWORK)
+        ps5_player_state = _state_of(ps5_player)
+        ps5_active_bool = _bool_state(_state_of(ps5_active_e))
+        ps5_power_w = _float_state(ps5_power_e)
+        ps5_title_from_player = _attr_of(ps5_player, "media_title")
+        ps5_title_from_entity = _state_of(ps5_title_e)
+        ps5_title = ps5_title_from_player or ps5_title_from_entity
+        # ps5_status keeps the legacy semantic: "on"/"playing" gate the
+        # gaming branch. Prefer the active binary; fall back to player.
+        if ps5_active_bool:
+            s.ps5_status = "on"
+        elif ps5_player_state in ("on", "playing", "paused"):
+            s.ps5_status = ps5_player_state
+        else:
+            s.ps5_status = ps5_player_state  # may be None / "off" / "standby"
+        s.ps5_title = ps5_title
         if s.ps5_status in ("on", "playing") and not s.ps5_title:
             s.ps5_title = ""  # explicit empty = menu/default
+        s.ps5_player_state = ps5_player_state
+        s.ps5_power_w = ps5_power_w
+        s.ps5_network_state = _state_of(ps5_network_e)
+        _record("ps5",
+                player_state=ps5_player_state, active_state=ps5_active_bool,
+                power_w=ps5_power_w, media_title=ps5_title,
+                network_state=s.ps5_network_state)
 
-        s.switch_dock = _bool_state(_state(CONF_SWITCH_DOCK))
-        s.pc_active = _bool_state(_state(CONF_PC_ACTIVE))
-        s.denon_active = _bool_state(_state(CONF_DENON_ACTIVE))
-        # If the configured CONF_DENON_ACTIVE entity is a media_player
-        # (e.g. media_player.living_denon) it exposes a `source` attribute
-        # like "TV Audio"; that's the canonical signal that the AVR is
-        # routing audio for a downstream device. For binary_sensor /
-        # switch entities the attribute simply isn't present → None.
-        s.denon_source = _attr(CONF_DENON_ACTIVE, "source")
+        # ---- Switch -------------------------------------------------------
+        sw_active_e = _resolve(CONF_SWITCH_ACTIVE)
+        sw_power_e = _resolve(CONF_SWITCH_POWER)
+        sw_ping_e = _resolve(CONF_SWITCH_PING)
+        sw_active_bool = _bool_state(_state_of(sw_active_e))
+        sw_power_w = _float_state(sw_power_e)
+        sw_ping_raw = _state_of(sw_ping_e)
+        sw_ping_bool: Optional[bool] = (
+            _bool_state(sw_ping_raw) if sw_ping_raw is not None else None
+        )
+        s.switch_dock = sw_active_bool
+        s.switch_power_w = sw_power_w
+        s.switch_ping_on = sw_ping_bool
+        # Handheld candidate: ping reachable, but the dock plug is NOT
+        # drawing. Diagnostic-only — we don't promote it to a dominant
+        # context per the constraint.
+        s.switch_handheld_candidate = bool(
+            sw_ping_bool and not sw_active_bool and (sw_power_w is None or sw_power_w < 1.0)
+        )
+        _record("switch",
+                active_state=sw_active_bool, power_w=sw_power_w,
+                network_state=sw_ping_raw,
+                reasons=(["handheld_candidate"] if s.switch_handheld_candidate else None))
 
+        # ---- PC -----------------------------------------------------------
+        pc_active_e = _resolve(CONF_PC_ACTIVE_NEW)
+        pc_power_e = _resolve(CONF_PC_POWER)
+        s.pc_active = _bool_state(_state_of(pc_active_e))
+        s.pc_power_w = _float_state(pc_power_e)
+        _record("pc",
+                active_state=s.pc_active, power_w=s.pc_power_w)
+
+        # ---- Denon --------------------------------------------------------
+        denon_player = _resolve(CONF_DENON_PLAYER)
+        denon_active_e = _resolve(CONF_DENON_ACTIVE_NEW)
+        denon_power_e = _resolve(CONF_DENON_POWER)
+        denon_player_state = _state_of(denon_player)
+        denon_active_bool = _bool_state(_state_of(denon_active_e))
+        denon_power_w = _float_state(denon_power_e)
+        # Denon active = explicit binary OR the player itself says it's on.
+        s.denon_active = denon_active_bool or (
+            denon_player_state in ("on", "playing", "paused")
+        )
+        s.denon_source = _attr_of(denon_player, "source") or _attr_of(denon_active_e, "source")
+        s.denon_player_state = denon_player_state
+        s.denon_power_w = denon_power_w
+        _record("denon",
+                player_state=denon_player_state, active_state=denon_active_bool,
+                power_w=denon_power_w, source=s.denon_source)
+
+        # ---- HomePods -----------------------------------------------------
+        # New model: a single media_player entity (often a group). Keep
+        # backwards compat with the legacy multi-entity list.
         hp_playing = False
-        for ent in self._entities_list(CONF_HOMEPODS):
-            st = hass.states.get(ent)
-            if st and st.state == "playing":
-                hp_playing = True
-                break
+        hp_volume: Optional[float] = None
+        hp_player_state: Optional[str] = None
+        homepods_single = self._entity(CONF_HOMEPODS_PLAYER)
+        if homepods_single:
+            st = hass.states.get(homepods_single)
+            if st is not None:
+                hp_player_state = st.state
+                if st.state == "playing":
+                    hp_playing = True
+                try:
+                    hp_volume = float(st.attributes.get("volume_level"))
+                except (TypeError, ValueError):
+                    hp_volume = None
+        else:
+            for ent in self._entities_list(CONF_HOMEPODS):
+                st = hass.states.get(ent)
+                if st and st.state == "playing":
+                    hp_playing = True
+                    hp_player_state = st.state
+                    break
         s.homepods_playing = hp_playing
+        s.homepods_volume_level = hp_volume
+        _record("homepods",
+                player_state=hp_player_state, volume_level=hp_volume)
+        s.device_diagnostics = diag
 
         s.classifier_ps5 = _maybe_int(_state(CONF_TITLE_CLASSIFIER_PS5))
         s.classifier_pc = _maybe_int(_state(CONF_TITLE_CLASSIFIER_PC))

@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.3.6 - 2026-05-22
+
+### Geändert
+
+- Benni Media Context: Source-/Device-Modell auf media_player-Attribute
+  umgestellt. Statt für jeden Detailwert (source, app, title) eine
+  eigene Entity zu pflegen, liefert ein einziger media_player pro
+  Gerät seinen `source`/`app_name`/`media_title`/`media_content_type`/
+  `volume_level`. Die Active-/Power-/Ping-Slots sind nur noch
+  optionale Plausibilitätssignale.
+- Benni Media Context: Options-Flow erhält pro Gerät eine Karte —
+  TV, Apple TV, PS5, Switch, PC, Denon, HomePods. Jede Karte zeigt
+  nur die Slots dieses Geräts; Speichern berührt ausschließlich
+  diese Keys. „Skip" ist implizit: Karte nicht öffnen oder leer
+  abschicken → bestehende Werte bleiben unangetastet. Geleerte
+  Slots werden aus options gestrichen, damit Legacy-Werte aus
+  entry.data wieder durchgreifen.
+- Coordinator: Resolver `_entity_with_fallback(new_key)` versucht
+  erst die neue CONF-Adresse, fällt sonst auf den Legacy-Key
+  zurück. Damit funktionieren existierende Config-Entries ohne
+  Migration weiter (Backwards Compatibility ohne Touch von
+  entry.data / unique_id).
+- Denon-Audio-Path: kombiniert jetzt explizit `denon_player_entity`
+  state + `source`-Attribut mit der `denon_active_entity`-Binary
+  und dem Power-Sensor.
+- Switch handheld_candidate: ping_on + dock_active=False +
+  power_w<1.0 wird als Snapshot-Flag erfasst und als
+  Diagnose-Reason im Switch-Device-Diagnostic-Dict gemeldet — kein
+  dominanter Kontext, nur Hinweis.
+
+### Hinzugefügt
+
+- Snapshot trägt `device_diagnostics` mit pro Gerät:
+  `player_state`, `active_state`, `power_w`, `network_state`,
+  `source`, `app_name`, `media_title`, `content_type`, `volume_level`,
+  `reasons`. Diese werden vom Coordinator gefüllt und stehen
+  Entitäten als Attribut zur Verfügung.
+- Neue CONF-Keys pro Gerät:
+  `<device>_player_entity`, `<device>_active_entity`,
+  `<device>_power_entity`, `<device>_network_entity` /
+  `<device>_ping_entity`, `<device>_title_entity` (PS5).
+- Translations (de/en) für alle Device-Karten.
+
+### Tests
+
+- `test_device_cards.py`: parametrisierte Tests pro Karte, die das
+  Schema auf genau die Device-Keys einschränken; Submit einer Karte
+  überschreibt keine anderen Geräte oder Tuning-Optionen; leerer
+  Submit löscht nichts; Slot-Clear droppt den Key, damit Legacy-Werte
+  durchgreifen.
+- Bestehender Options-Menü-Test um die sieben neuen Geräte-Steps
+  erweitert.
+- benni_media_context: 59 Tests (+10 neu).
+- Full test suite at release preparation: `472 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine unique_id-Änderungen.
+- Keine CONF-Key-Renames — alle alten Keys (`tv_active`, `appletv`,
+  `ps5_status`, `ps5_title`, `switch_dock`, `pc_active`,
+  `denon_active`, `homepods`) bleiben gültige Fallbacks für nicht
+  migrierte Entries.
+- enable_control / Subwoofer-Policy / Volume-Targets unverändert.
+
 ## 0.3.5.7 - 2026-05-22
 
 ### Geändert

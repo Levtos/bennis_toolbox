@@ -38,13 +38,33 @@ class Snapshot:
     ps5_title: Optional[str] = None
     # Switch
     switch_dock: bool = False
+    # `switch_dock` is the plug-based "docked & active" signal. ping_on +
+    # dock_off marks a likely handheld session; coordinator computes this
+    # so logic stays HA-free.
+    switch_ping_on: Optional[bool] = None
+    switch_power_w: Optional[float] = None
+    switch_handheld_candidate: bool = False
     # PC
     pc_active: bool = False
+    pc_power_w: Optional[float] = None
     # Denon
     denon_active: bool = False
     denon_source: Optional[str] = None  # raw `source` attr of the Denon media_player (e.g. "TV Audio")
+    denon_player_state: Optional[str] = None  # e.g. "on", "playing", "off"
+    denon_power_w: Optional[float] = None
     # HomePods
     homepods_playing: bool = False
+    homepods_volume_level: Optional[float] = None
+    # Per-device diagnostic raw inputs (player_state + power_w + …);
+    # the coordinator populates these so the entity attributes can
+    # surface a stable per-device view without re-reading hass.states.
+    device_diagnostics: dict = field(default_factory=dict)
+    # TV / PS5 / homepods enrichments via media_player attributes.
+    tv_player_state: Optional[str] = None
+    tv_power_w: Optional[float] = None
+    ps5_player_state: Optional[str] = None
+    ps5_power_w: Optional[float] = None
+    ps5_network_state: Optional[str] = None
     # Title Classifier enums
     classifier_ps5: int = 0
     classifier_pc: int = 0

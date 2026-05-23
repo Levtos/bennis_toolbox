@@ -68,7 +68,70 @@
           "remove_device": "Gerät entfernen",
           "calendar": "Kalender",
           "special_rules": "Spezialregeln",
-          "tuning": "Lautstärke & Debounce"
+          "tuning": "Lautstärke & Debounce",
+          "tv": "TV",
+          "appletv": "Apple TV",
+          "ps5": "PlayStation 5",
+          "switch": "Nintendo Switch",
+          "pc": "PC",
+          "denon": "Denon AVR",
+          "homepods": "HomePods"
+        }
+      },
+      "tv": {
+        "title": "TV",
+        "description": "Optionale Quell-Entities für den TV. Leer lassen = nicht verdrahtet.",
+        "data": {
+          "tv_player_entity": "media_player (liefert source / app / title)",
+          "tv_active_entity": "Active-Binary (z. B. Plug Active Atomic)",
+          "tv_power_entity": "Leistungssensor (W)"
+        }
+      },
+      "appletv": {
+        "title": "Apple TV",
+        "data": {
+          "appletv_player_entity": "media_player (liefert app / title)"
+        }
+      },
+      "ps5": {
+        "title": "PlayStation 5",
+        "data": {
+          "ps5_player_entity": "media_player (liefert title / state)",
+          "ps5_active_entity": "Active-Binary",
+          "ps5_power_entity": "Leistungssensor (W)",
+          "ps5_title_entity": "Externer Title-Sensor (z. B. PSN Now Playing)",
+          "ps5_network_entity": "Netzwerk-/Ping-Signal"
+        }
+      },
+      "switch": {
+        "title": "Nintendo Switch",
+        "description": "Dock-Plug + Ping. Ping aktiv + Dock-Power niedrig = handheld_candidate (rein diagnostisch).",
+        "data": {
+          "switch_active_entity": "Dock Active-Binary",
+          "switch_power_entity": "Dock Leistungssensor (W)",
+          "switch_ping_entity": "Ping-/Netzwerk-Signal"
+        }
+      },
+      "pc": {
+        "title": "PC",
+        "data": {
+          "pc_active_entity": "Active-Binary",
+          "pc_power_entity": "Leistungssensor (W)"
+        }
+      },
+      "denon": {
+        "title": "Denon AVR",
+        "description": "Player liefert source (z. B. \"TV Audio\") und damit denon_audio_path.",
+        "data": {
+          "denon_player_entity": "media_player (liefert source)",
+          "denon_active_entity": "Active-Binary",
+          "denon_power_entity": "Leistungssensor (W)"
+        }
+      },
+      "homepods": {
+        "title": "HomePods",
+        "data": {
+          "homepods_player_entity": "media_player (Gruppe oder Einzelgerät)"
         }
       },
       "tuning": {

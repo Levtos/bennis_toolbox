@@ -94,6 +94,86 @@ CONF_ACTIVITY_STATE = "activity_state"
 CONF_WINDOW_STATE = "window_state"
 CONF_APPLETV_APP_MAP = "appletv_app_map"
 
+# ---------------------------------------------------------------------------
+# New per-device CONF model (0.3.6+). Each device gets a thin set of
+# optional entity slots; player_state + media-player attributes carry the
+# rich signal, the *_active / *_power / *_ping entities only add
+# plausibility / fallback signals.
+#
+# Legacy CONF keys above stay valid — coordinator reads new-then-legacy
+# so existing config entries keep working without migration.
+# ---------------------------------------------------------------------------
+
+# TV
+CONF_TV_PLAYER = "tv_player_entity"
+CONF_TV_ACTIVE_NEW = "tv_active_entity"
+CONF_TV_POWER = "tv_power_entity"
+
+# Apple TV
+CONF_APPLETV_PLAYER = "appletv_player_entity"
+
+# PS5
+CONF_PS5_PLAYER = "ps5_player_entity"
+CONF_PS5_ACTIVE = "ps5_active_entity"
+CONF_PS5_POWER = "ps5_power_entity"
+CONF_PS5_TITLE_ENTITY = "ps5_title_entity"
+CONF_PS5_NETWORK = "ps5_network_entity"
+
+# Switch
+CONF_SWITCH_ACTIVE = "switch_active_entity"
+CONF_SWITCH_POWER = "switch_power_entity"
+CONF_SWITCH_PING = "switch_ping_entity"
+
+# PC
+CONF_PC_ACTIVE_NEW = "pc_active_entity"
+CONF_PC_POWER = "pc_power_entity"
+
+# Denon
+CONF_DENON_PLAYER = "denon_player_entity"
+CONF_DENON_ACTIVE_NEW = "denon_active_entity"
+CONF_DENON_POWER = "denon_power_entity"
+
+# HomePods
+CONF_HOMEPODS_PLAYER = "homepods_player_entity"
+
+
+# Devices grouped for the per-device options-flow cards. Each card
+# resolves to the listed CONF keys when rendering / saving.
+DEVICE_CARDS: dict[str, tuple[str, ...]] = {
+    "tv": (CONF_TV_PLAYER, CONF_TV_ACTIVE_NEW, CONF_TV_POWER),
+    "appletv": (CONF_APPLETV_PLAYER,),
+    "ps5": (CONF_PS5_PLAYER, CONF_PS5_ACTIVE, CONF_PS5_POWER,
+            CONF_PS5_TITLE_ENTITY, CONF_PS5_NETWORK),
+    "switch": (CONF_SWITCH_ACTIVE, CONF_SWITCH_POWER, CONF_SWITCH_PING),
+    "pc": (CONF_PC_ACTIVE_NEW, CONF_PC_POWER),
+    "denon": (CONF_DENON_PLAYER, CONF_DENON_ACTIVE_NEW, CONF_DENON_POWER),
+    "homepods": (CONF_HOMEPODS_PLAYER,),
+}
+
+
+# Map each new key to the legacy key it supersedes (or None for purely new
+# slots). Coordinator reads new-then-legacy for backward compat.
+LEGACY_FALLBACKS: dict[str, str | None] = {
+    CONF_TV_PLAYER: None,            # new: media_player slot
+    CONF_TV_ACTIVE_NEW: CONF_TV_ACTIVE,
+    CONF_TV_POWER: CONF_TV_POWER_FALLBACK,
+    CONF_APPLETV_PLAYER: CONF_APPLETV,
+    CONF_PS5_PLAYER: None,
+    CONF_PS5_ACTIVE: CONF_PS5_STATUS,
+    CONF_PS5_POWER: None,
+    CONF_PS5_TITLE_ENTITY: CONF_PS5_TITLE,
+    CONF_PS5_NETWORK: None,
+    CONF_SWITCH_ACTIVE: CONF_SWITCH_DOCK,
+    CONF_SWITCH_POWER: None,
+    CONF_SWITCH_PING: None,
+    CONF_PC_ACTIVE_NEW: CONF_PC_ACTIVE,
+    CONF_PC_POWER: None,
+    CONF_DENON_PLAYER: None,
+    CONF_DENON_ACTIVE_NEW: CONF_DENON_ACTIVE,
+    CONF_DENON_POWER: None,
+    CONF_HOMEPODS_PLAYER: CONF_HOMEPODS,
+}
+
 # Options
 CONF_DEBOUNCE = "debounce_seconds"
 CONF_QUIET_DUCK = "quiet_ducking_level"

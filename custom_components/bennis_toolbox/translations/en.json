@@ -67,7 +67,70 @@
           "remove_device": "Remove device",
           "calendar": "Calendars",
           "special_rules": "Special rules",
-          "tuning": "Volumes & debounce"
+          "tuning": "Volumes & debounce",
+          "tv": "TV",
+          "appletv": "Apple TV",
+          "ps5": "PlayStation 5",
+          "switch": "Nintendo Switch",
+          "pc": "PC",
+          "denon": "Denon AVR",
+          "homepods": "HomePods"
+        }
+      },
+      "tv": {
+        "title": "TV",
+        "description": "Optional source entities for the TV. Leave empty if not wired.",
+        "data": {
+          "tv_player_entity": "media_player (provides source / app / title)",
+          "tv_active_entity": "Active binary (e.g. plug active atomic)",
+          "tv_power_entity": "Power sensor (W)"
+        }
+      },
+      "appletv": {
+        "title": "Apple TV",
+        "data": {
+          "appletv_player_entity": "media_player (app / title)"
+        }
+      },
+      "ps5": {
+        "title": "PlayStation 5",
+        "data": {
+          "ps5_player_entity": "media_player (title / state)",
+          "ps5_active_entity": "Active binary",
+          "ps5_power_entity": "Power sensor (W)",
+          "ps5_title_entity": "External title sensor (e.g. PSN now playing)",
+          "ps5_network_entity": "Network / ping signal"
+        }
+      },
+      "switch": {
+        "title": "Nintendo Switch",
+        "description": "Dock plug + ping. ping_on + dock_off = handheld_candidate (diagnostic only).",
+        "data": {
+          "switch_active_entity": "Dock active binary",
+          "switch_power_entity": "Dock power sensor (W)",
+          "switch_ping_entity": "Ping / network signal"
+        }
+      },
+      "pc": {
+        "title": "PC",
+        "data": {
+          "pc_active_entity": "Active binary",
+          "pc_power_entity": "Power sensor (W)"
+        }
+      },
+      "denon": {
+        "title": "Denon AVR",
+        "description": "Player provides source (e.g. \"TV Audio\") which drives denon_audio_path.",
+        "data": {
+          "denon_player_entity": "media_player (provides source)",
+          "denon_active_entity": "Active binary",
+          "denon_power_entity": "Power sensor (W)"
+        }
+      },
+      "homepods": {
+        "title": "HomePods",
+        "data": {
+          "homepods_player_entity": "media_player (group or single)"
         }
       },
       "tuning": {

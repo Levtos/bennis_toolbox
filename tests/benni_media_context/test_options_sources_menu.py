@@ -71,7 +71,12 @@ async def test_options_init_shows_menu_with_sources_and_tuning():
     )
     result = await helper.async_step_init()
     assert result["type"] == "menu"
-    assert set(helper.flow.last_menu["menu_options"]) == {"sources", "tuning"}
+    opts = set(helper.flow.last_menu["menu_options"])
+    # Per-device cards plus the legacy aggregate `sources` and the
+    # tuning step. Existing entries opening the menu still see both
+    # the aggregate and the new card layout.
+    assert {"sources", "tuning"} <= opts
+    assert {"tv", "appletv", "ps5", "switch", "pc", "denon", "homepods"} <= opts
 
 
 # ---------------------------------------------------------------------------
