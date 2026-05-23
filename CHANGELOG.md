@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.3.6.1 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Coordinator-Setup brach mit
+  `TypeError: cannot use 'list' as a dict key (unhashable type: 'list')`
+  ab, sobald ein bestehender Eintrag einen list-förmigen Wert
+  enthielt (z. B. die Legacy-`homepods`-Mehrfachauswahl). Der
+  Tracker hat den list-Wert in seine Sammelliste aufgenommen und
+  beim Dedupe mit `dict.fromkeys()` gecrashed. Neue Helper
+  `_flatten_entities()` und `_first_entity()` akzeptieren jetzt
+  None / String / list / tuple / set, flachen eine Ebene tief und
+  liefern eine geordnete Stringliste. `_entity()` collapsed
+  list-Legacy-Werte auf den ersten gültigen String, `_entities_list()`
+  und das Setup-Dedupe nutzen den Flattener.
+- Title Classifier Panel: Sidebar-Registrierung loggt nach Reload
+  keinen „Overwriting panel"-Warning mehr. Static-Path-
+  Duplikat-Registrierung wird sauber abgefangen; ein vorhandener
+  Panel-Eintrag wird vor der Re-Registrierung über
+  `frontend.async_remove_panel` entfernt. Gleicher Fix für das
+  Wake-Planner-Panel.
+
+### Tests
+
+- Neuer `test_entity_flattening.py` (11): None/String/List/Tuple/Set
+  Inputs, nested-list-Flattening, Whitespace-Trim, Drop von
+  None/Empty/Duplikaten, Single-Entity-Collapse aus list-Legacy-
+  Werten, Regression auf das exakte Crash-Szenario.
+- benni_media_context: 70 Tests (+11).
+- Full test suite at release preparation: `483 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine unique_id-Änderungen.
+- Keine CONF-Key-Änderungen.
+- Bestehende Entries mit Legacy-list-Werten laden jetzt ohne
+  Migration; die Werte werden für Single-Slot-Lesezugriffe auf
+  den ersten gültigen Eintrag kollabiert.
+
 ## 0.3.6 - 2026-05-22
 
 ### Geändert

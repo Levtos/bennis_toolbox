@@ -7,6 +7,7 @@ Static-Path und Sidebar-Panel werden unter dem Toolbox-Präfix registriert:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from homeassistant.components import frontend
@@ -15,20 +16,38 @@ from homeassistant.core import HomeAssistant
 from ...const import panel_url_path
 from .const import MODULE_ID
 
+_LOGGER = logging.getLogger(__name__)
+
 _URL_PATH = panel_url_path(MODULE_ID)  # bennis_toolbox_wake_planner
 _STATIC_PREFIX = f"/{_URL_PATH}/frontend"
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
-    """Static path + Sidebar-Panel idempotent registrieren."""
-    if _URL_PATH in hass.data.get("frontend_panels", {}):
-        return
+    """Static path + Sidebar-Panel idempotent registrieren.
+
+    Reloads of the integration leave the panel + static path
+    registered. Re-registering either is what triggered the noisy
+    "Overwriting panel …" warning. We swallow the duplicate-static-
+    path error and remove a stale panel before re-registering so the
+    title/icon stay in sync with the current code.
+    """
     frontend_dir = Path(__file__).parent / "frontend"
     if not frontend_dir.exists():
         return
-    await hass.http.async_register_static_paths([
-        frontend.StaticPathConfig(_STATIC_PREFIX, str(frontend_dir), cache_headers=False)
-    ])
+    try:
+        await hass.http.async_register_static_paths([
+            frontend.StaticPathConfig(_STATIC_PREFIX, str(frontend_dir), cache_headers=False)
+        ])
+    except (RuntimeError, ValueError) as err:
+        _LOGGER.debug(
+            "wake_planner static path already registered, skipping: %s", err
+        )
+    panels = hass.data.get("frontend_panels") or {}
+    if _URL_PATH in panels:
+        try:
+            frontend.async_remove_panel(hass, _URL_PATH)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("wake_planner panel already absent during cleanup")
     frontend.async_register_built_in_panel(
         hass,
         component_name="custom",

@@ -68,6 +68,53 @@ from .logic import Decision, Snapshot, decide
 _LOGGER = logging.getLogger(__name__)
 
 
+def _flatten_entities(value: Any) -> list[str]:
+    """Normalise any CONF value into a flat ordered list of entity_ids.
+
+    Accepts:
+    - None / "" → []
+    - str → [str]
+    - list / tuple / set → flattened one level (nested lists handled)
+    Drops empty strings, None, and any non-string after flattening.
+    Preserves insertion order via dict-key uniqueness.
+    """
+    if value in (None, "", [], (), set()):
+        return []
+    out: list[str] = []
+
+    def _walk(v):
+        if v in (None, ""):
+            return
+        if isinstance(v, str):
+            s = v.strip()
+            if s:
+                out.append(s)
+            return
+        if isinstance(v, (list, tuple, set, frozenset)):
+            for item in v:
+                _walk(item)
+            return
+        # Fallback for unexpected types — coerce to str, drop if empty.
+        try:
+            s = str(v).strip()
+        except Exception:
+            return
+        if s and s.lower() not in ("none", ""):
+            out.append(s)
+
+    _walk(value)
+    # Ordered dedupe.
+    return list(dict.fromkeys(out))
+
+
+def _first_entity(value: Any) -> Optional[str]:
+    """Return the first valid entity_id from a (potentially list-shaped)
+    CONF value, or None. Used for slots the new model treats as
+    single-entity but where a legacy entry might have stored a list."""
+    flat = _flatten_entities(value)
+    return flat[0] if flat else None
+
+
 def _bool_state(v: Optional[str]) -> bool:
     if v is None:
         return False
@@ -113,23 +160,25 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
     def _entity(self, key: str) -> Optional[str]:
-        # Source-entity edits from the OptionsFlow land in `entry.options`;
-        # the initial add-flow wrote them to `entry.data`. Merge so edits
-        # win but legacy entries keep working without migration.
+        """Return ONE entity_id for the given CONF key.
+
+        Tolerant of legacy storage shapes — older entries may have
+        persisted a list (e.g. `homepods`) even for slots that the new
+        model treats as a single media_player. We collapse to the first
+        valid string and ignore None/empty noise so callers can pass
+        the return value into `hass.states.get(...)` or a hash set
+        without crashing.
+        """
         v = self.entry.options.get(key)
         if v in (None, ""):
             v = self.entry.data.get(key)
-        return v or None
+        return _first_entity(v)
 
     def _entities_list(self, key: str) -> list[str]:
         v = self.entry.options.get(key)
         if not v:
             v = self.entry.data.get(key)
-        if not v:
-            return []
-        if isinstance(v, list):
-            return v
-        return [v]
+        return _flatten_entities(v)
 
     def _entity_with_fallback(self, new_key: str) -> Optional[str]:
         """Resolve an entity slot using the new CONF model, falling back
@@ -177,8 +226,11 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         if not self._entity(CONF_HOMEPODS_PLAYER):
             for e in self._entities_list(CONF_HOMEPODS):
                 entities.append(e)
-        # Deduplicate
-        entities = list(dict.fromkeys(entities))
+        # Robust dedupe: legacy entries may have stored a list under a
+        # nominally-single key, or a slot that resolved to None slipped
+        # in. `_flatten_entities` accepts any shape and returns a clean
+        # ordered list of strings.
+        entities = _flatten_entities(entities)
 
         if entities:
             self._unsub_state = async_track_state_change_event(
