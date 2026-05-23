@@ -214,3 +214,14 @@ class _SubwooferAllowed(_BaseBinary):
     @property
     def is_on(self) -> bool:
         return self.coordinator.data.subwoofer_allowed
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        d = self.coordinator.data
+        snap_src = getattr(self.coordinator, "_last_snapshot", None)
+        attrs["denon_active"] = bool(snap_src.denon_active) if snap_src else None
+        attrs["denon_source"] = snap_src.denon_source if snap_src else None
+        attrs["denon_audio_path"] = d.denon_audio_path
+        attrs["subwoofer_block_reason"] = d.subwoofer_block_reason
+        return attrs

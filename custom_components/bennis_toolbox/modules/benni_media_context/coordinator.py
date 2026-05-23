@@ -97,6 +97,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         self._manual_nudge: Optional[str] = None
 
         self.data = Decision()
+        self._last_snapshot: Optional[Snapshot] = None
 
     # -- options helpers --
     def _opt(self, key: str, default: Any) -> Any:
@@ -202,6 +203,12 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         s.switch_dock = _bool_state(_state(CONF_SWITCH_DOCK))
         s.pc_active = _bool_state(_state(CONF_PC_ACTIVE))
         s.denon_active = _bool_state(_state(CONF_DENON_ACTIVE))
+        # If the configured CONF_DENON_ACTIVE entity is a media_player
+        # (e.g. media_player.living_denon) it exposes a `source` attribute
+        # like "TV Audio"; that's the canonical signal that the AVR is
+        # routing audio for a downstream device. For binary_sensor /
+        # switch entities the attribute simply isn't present → None.
+        s.denon_source = _attr(CONF_DENON_ACTIVE, "source")
 
         hp_playing = False
         for ent in self._entities_list(CONF_HOMEPODS):
@@ -292,6 +299,10 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
 
         self._last_stable = new
         self._pending_decision = None
+        # Stash the snapshot so entity attributes (denon_active /
+        # denon_source on subwoofer_allowed) can surface raw inputs
+        # without having to re-read hass.states.
+        self._last_snapshot = snap
         self.async_set_updated_data(new)
 
     # -- service hooks --

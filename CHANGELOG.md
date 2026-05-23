@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.3.5.7 - 2026-05-22
+
+### Geändert
+
+- Benni Media Context: `subwoofer_allowed` berücksichtigt jetzt den
+  Denon-Audio-Pfad. PC-Gaming über Denon/TV-Audio lässt den Subwoofer
+  zu, auch wenn ein Fenster offen ist — vorher schaltete schon das
+  offene Fenster den Sub allein aus.
+- Subwoofer-Policy mit klarer Blocker-Reihenfolge und Diagnose:
+  1. Quiet Mode → off, reason `quiet_mode`
+  2. keine Entertainment-Aktivität → off, reason `no_entertainment`
+  3. Headset aktiv (z. B. `gaming_headset` Classifier) → off, reason
+     `headset_active`
+  4. Fenster offen UND kein Denon-Pfad → off, reason
+     `window_open_no_denon_path`
+  5. sonst → on
+- `gaming_grind` blockiert den Subwoofer NICHT — das gab es vorher
+  schon nicht und wird via Regression-Test fixiert, damit ein
+  zukünftiger Blocker nur bewusst eingeführt werden kann.
+
+### Hinzugefügt
+
+- Snapshot trägt `denon_source` (`source`-Attribut der Denon
+  `media_player`-Entity, z. B. „TV Audio"). Wenn die konfigurierte
+  Denon-Entity ein `media_player` ist, reicht ein gesetzter
+  Source-Wert allein, um den Denon-Audio-Pfad als aktiv zu erkennen
+  — die `denon_active`-Binary ist nicht mehr Pflicht.
+- Decision trägt `denon_audio_path` und `subwoofer_block_reason` als
+  Diagnose-Felder.
+- `binary_sensor.benni_media_context_subwoofer_allowed` zeigt die
+  Diagnose als Attribute: `denon_active`, `denon_source`,
+  `denon_audio_path`, `subwoofer_block_reason`.
+
+### Tests
+
+- Neuer `test_subwoofer_policy.py` mit 11 Tests: PC-Gaming
+  Denon-off/on, Source-only-Erkennung, „off"-Source zählt nicht,
+  Fenster auf mit/ohne Denon, Quiet/Headset-Blocks, Idle-Block,
+  Denon-only Streaming, `gaming_grind` Regression.
+- benni_media_context: +11 Tests.
+- Full test suite at release preparation: `462 passed, 2 warnings`.
+
 ## 0.3.5.6 - 2026-05-22
 
 ### Behoben

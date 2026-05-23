@@ -42,6 +42,7 @@ class Snapshot:
     pc_active: bool = False
     # Denon
     denon_active: bool = False
+    denon_source: Optional[str] = None  # raw `source` attr of the Denon media_player (e.g. "TV Audio")
     # HomePods
     homepods_playing: bool = False
     # Title Classifier enums
@@ -74,6 +75,10 @@ class Decision:
     volume_target_homepods: float = 0.0
     volume_target_denon: float = 0.0
     subwoofer_allowed: bool = True
+    # Diagnostics for the subwoofer decision so the entity attributes can
+    # surface why subwoofer_allowed went on/off.
+    subwoofer_block_reason: Optional[str] = None
+    denon_audio_path: bool = False
     active_reasons: list = field(default_factory=list)
 
     def to_dict(self):
@@ -174,6 +179,61 @@ def detect_tv(snap: Snapshot) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Volume targets
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Subwoofer policy
+#
+# The subwoofer lives downstream of the Denon AVR. Whenever the Denon
+# audio path is active (PC gaming via TV Audio, music streaming via
+# Denon, ATV via Denon, …) we want the sub to be available even if a
+# window is open — the room is already in "audio listening" mode and
+# the window penalty for the volume targets is the correct knob there.
+# Explicit blockers still win: quiet mode, headset, and a window-open
+# scenario where there is NO Denon path at all (then the sub has no
+# legitimate route and should stay off).
+# ---------------------------------------------------------------------------
+
+
+def _denon_audio_path(snap: "Snapshot", device: str) -> bool:
+    """The user's audio is going through the Denon right now.
+
+    True if any of:
+    - the configured `denon_active` binary is on,
+    - or the chosen primary device is the Denon itself,
+    - or the Denon media_player reports a non-empty source attribute
+      (e.g. "TV Audio") — which is the canonical Einhornzentrale
+      signal that the AVR is routing for a downstream device.
+    """
+    if snap.denon_active:
+        return True
+    if device == DEV_DENON:
+        return True
+    if snap.denon_source and snap.denon_source.strip().lower() not in ("", "off", "standby"):
+        return True
+    return False
+
+
+def evaluate_subwoofer(snap: "Snapshot", decision: "Decision") -> tuple[bool, Optional[str]]:
+    """Return ``(allowed, block_reason)`` for the subwoofer.
+
+    Order of precedence:
+    1. quiet mode → off
+    2. no entertainment activity → off
+    3. headset_active (e.g. gaming_headset) → off (sub via speakers
+       would defeat the point)
+    4. window_open WITHOUT denon path → off (no audio route)
+    5. otherwise → on
+    """
+    if decision.quiet_mode_active:
+        return False, "quiet_mode"
+    if not decision.entertainment_active:
+        return False, "no_entertainment"
+    if decision.headset_active:
+        return False, "headset_active"
+    if snap.window_open and not decision.denon_audio_path:
+        return False, "window_open_no_denon_path"
+    return True, None
+
+
 def compute_volumes(
     snap: Snapshot,
     base_homepods: float,
@@ -233,7 +293,10 @@ def decide(
         )
         d.volume_target_homepods = hp
         d.volume_target_denon = dn
-        d.subwoofer_allowed = False
+        d.denon_audio_path = _denon_audio_path(snap, d.device)
+        allowed, block_reason = evaluate_subwoofer(snap, d)
+        d.subwoofer_allowed = allowed
+        d.subwoofer_block_reason = block_reason
         d.active_reasons = reasons
         return d
 
@@ -297,6 +360,9 @@ def decide(
     )
     d.volume_target_homepods = hp
     d.volume_target_denon = dn
-    d.subwoofer_allowed = not snap.window_open and d.entertainment_active
+    d.denon_audio_path = _denon_audio_path(snap, d.device)
+    allowed, block_reason = evaluate_subwoofer(snap, d)
+    d.subwoofer_allowed = allowed
+    d.subwoofer_block_reason = block_reason
     d.active_reasons = reasons
     return d
