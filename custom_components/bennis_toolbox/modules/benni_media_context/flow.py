@@ -162,17 +162,77 @@ def _opt_entity_marker(key: str, default: Any):
     return vol.Optional(key, default=default)
 
 
+# ---------------------------------------------------------------------------
+# Per-field EntitySelector domain mapping for the device cards.
+#
+# Each CONF key gets its own EntitySelector with a tight `domain` filter
+# so the picker only offers entities of the right kind (no more "all
+# entities" picker). The role suffix in the key name drives the mapping:
+# `*_player_entity` → media_player, `*_active_entity` → binary_sensor,
+# `*_power_entity` / `*_title_entity` → sensor, ping/network → both
+# binary_sensor and device_tracker.
+# ---------------------------------------------------------------------------
+
+
+def _entity_selector_for(key: str) -> selector.EntitySelector:
+    """Return an EntitySelector with the correct domain filter."""
+    if key.endswith("_player_entity"):
+        domains: Any = "media_player"
+    elif key.endswith("_active_entity"):
+        domains = "binary_sensor"
+    elif key.endswith("_power_entity") or key.endswith("_title_entity"):
+        domains = "sensor"
+    elif key.endswith("_ping_entity") or key.endswith("_network_entity"):
+        domains = ["binary_sensor", "device_tracker"]
+    else:
+        # Context globals fall through to a sensible default — see
+        # `_context_globals_card_schema` for the per-context overrides.
+        domains = None
+    cfg = selector.EntitySelectorConfig(domain=domains) if domains else selector.EntitySelectorConfig()
+    return selector.EntitySelector(cfg)
+
+
 def _device_card_schema(card: str, defaults: dict[str, Any]) -> vol.Schema:
     """Render the per-device card as a small voluptuous schema.
 
-    Only the keys belonging to *this* device's card are present — the
-    OptionsFlow merges them on save so unrelated keys keep their values
-    (the "Skip" semantics the user asked for fall out naturally: closing
-    the dialog without visiting a card writes nothing).
+    Each field gets a domain-filtered selector so the user only picks
+    entities that make sense (media_player for the *_player_entity
+    slots, binary_sensor for *_active_entity, …). The card only shows
+    keys that belong to this device; the OptionsFlow merges them on
+    save so unrelated keys keep their values (the "Skip" semantics
+    from v0.3.6 fall out naturally: closing the dialog without
+    visiting a card writes nothing).
     """
     fields: dict[Any, Any] = {}
     for key in DEVICE_CARDS[card]:
-        fields[_opt_entity_marker(key, defaults.get(key))] = _ENTITY
+        fields[_opt_entity_marker(key, defaults.get(key))] = _entity_selector_for(key)
+    return vol.Schema(fields)
+
+
+# Context globals card — exposes day/activity/window/door/call slots
+# with the right domain filter, alongside the device cards.
+_CONTEXT_GLOBALS_KEYS: tuple[str, ...] = (
+    "day_state",
+    "activity_state",
+    "window_state",
+    "entry_door",
+    "call_monitor",
+)
+
+
+def _context_globals_card_schema(defaults: dict[str, Any]) -> vol.Schema:
+    """Schema for the new "Context / globale Quellen" card."""
+    fields: dict[Any, Any] = {}
+    sensor_domains = {"day_state": "sensor", "activity_state": "sensor"}
+    binary_domains = {
+        "window_state": "binary_sensor",
+        "entry_door": "binary_sensor",
+        "call_monitor": "binary_sensor",
+    }
+    for key in _CONTEXT_GLOBALS_KEYS:
+        domain = sensor_domains.get(key) or binary_domains.get(key)
+        sel = selector.EntitySelector(selector.EntitySelectorConfig(domain=domain))
+        fields[_opt_entity_marker(key, defaults.get(key))] = sel
     return vol.Schema(fields)
 
 
@@ -205,7 +265,7 @@ class OptionsFlowHelper:
             step_id="init",
             menu_options=[
                 "tv", "appletv", "ps5", "switch", "pc", "denon", "homepods",
-                "sources", "tuning",
+                "context", "sources", "tuning",
             ],
         )
 
@@ -272,6 +332,27 @@ class OptionsFlowHelper:
         if user_input is None:
             return await self._show_card("homepods")
         return await self._save_card("homepods", user_input)
+
+    async def async_step_context(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Context-globals card: day phase / activity / window / door / call.
+
+        Behaves like a device card — only the listed CONF keys are
+        touched on save. Domain-filtered selectors apply per field.
+        """
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="context",
+                data_schema=_context_globals_card_schema(_merged(self.entry)),
+            )
+        new_opts = dict(self.entry.options)
+        cleaned = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+        for k in _CONTEXT_GLOBALS_KEYS:
+            if k in cleaned:
+                new_opts[k] = cleaned[k]
+            else:
+                new_opts.pop(k, None)
+        new_opts.pop(CONF_MODULE_ID, None)
+        return self.flow.async_create_entry(title="", data=new_opts)
 
     async def async_step_sources(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:

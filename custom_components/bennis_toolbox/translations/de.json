@@ -74,64 +74,80 @@
           "ps5": "PlayStation 5",
           "switch": "Nintendo Switch",
           "pc": "PC",
-          "denon": "Denon AVR",
-          "homepods": "HomePods"
+          "denon": "Denon",
+          "homepods": "HomePods",
+          "context": "Context / Globale Quellen"
         }
       },
       "tv": {
         "title": "TV",
-        "description": "Optionale Quell-Entities für den TV. Leer lassen = nicht verdrahtet.",
+        "description": "TV-Player liefert source/app/title für Streaming- und TV-Erkennung. Active/Power sind nur Plausibilität.",
         "data": {
-          "tv_player_entity": "media_player (liefert source / app / title)",
-          "tv_active_entity": "Active-Binary (z. B. Plug Active Atomic)",
-          "tv_power_entity": "Leistungssensor (W)"
+          "tv_player_entity": "TV Player (media_player)",
+          "tv_active_entity": "TV aktiv (binary_sensor)",
+          "tv_power_entity": "TV Leistung (sensor)"
         }
       },
       "appletv": {
         "title": "Apple TV",
+        "description": "Apple-TV-Media-Player für Streaming-App- und Title-Erkennung.",
         "data": {
-          "appletv_player_entity": "media_player (liefert app / title)"
+          "appletv_player_entity": "Apple TV Player (media_player)"
         }
       },
       "ps5": {
         "title": "PlayStation 5",
+        "description": "PS5-Player liefert title/state. PSN-Titel-Sensor optional als Fallback. Power nur Plausibilität.",
         "data": {
-          "ps5_player_entity": "media_player (liefert title / state)",
-          "ps5_active_entity": "Active-Binary",
-          "ps5_power_entity": "Leistungssensor (W)",
-          "ps5_title_entity": "Externer Title-Sensor (z. B. PSN Now Playing)",
-          "ps5_network_entity": "Netzwerk-/Ping-Signal"
+          "ps5_player_entity": "PS5 Player (media_player)",
+          "ps5_active_entity": "PS5 aktiv (binary_sensor)",
+          "ps5_power_entity": "PS5 Leistung (sensor)",
+          "ps5_title_entity": "PS5 Titel / Spiel (sensor)",
+          "ps5_network_entity": "PS5 Netzwerk / Ping (binary_sensor oder device_tracker)"
         }
       },
       "switch": {
         "title": "Nintendo Switch",
-        "description": "Dock-Plug + Ping. Ping aktiv + Dock-Power niedrig = handheld_candidate (rein diagnostisch).",
+        "description": "Dock-Power und optional Ping für Handheld-Vermutung. Ping an + Dock-Power niedrig = handheld_candidate (rein diagnostisch).",
         "data": {
-          "switch_active_entity": "Dock Active-Binary",
-          "switch_power_entity": "Dock Leistungssensor (W)",
-          "switch_ping_entity": "Ping-/Netzwerk-Signal"
+          "switch_active_entity": "Switch Dock aktiv (binary_sensor)",
+          "switch_power_entity": "Switch Dock Leistung (sensor)",
+          "switch_ping_entity": "Switch Netzwerk / Ping (binary_sensor oder device_tracker)"
         }
       },
       "pc": {
         "title": "PC",
+        "description": "PC-Aktivität und Leistung für Gaming und Private-Time-Erkennung.",
         "data": {
-          "pc_active_entity": "Active-Binary",
-          "pc_power_entity": "Leistungssensor (W)"
+          "pc_active_entity": "PC aktiv (binary_sensor)",
+          "pc_power_entity": "PC Leistung (sensor)"
         }
       },
       "denon": {
-        "title": "Denon AVR",
-        "description": "Player liefert source (z. B. \"TV Audio\") und damit denon_audio_path.",
+        "title": "Denon",
+        "description": "AVR-Player liefert source (z. B. \"TV Audio\") — Grundlage für denon_audio_path. Active/Power nur Plausibilität.",
         "data": {
-          "denon_player_entity": "media_player (liefert source)",
-          "denon_active_entity": "Active-Binary",
-          "denon_power_entity": "Leistungssensor (W)"
+          "denon_player_entity": "Denon Player (media_player)",
+          "denon_active_entity": "Denon aktiv (binary_sensor)",
+          "denon_power_entity": "Denon Leistung (sensor)"
         }
       },
       "homepods": {
         "title": "HomePods",
+        "description": "Gruppe oder bevorzugter Player für Musik/Radio.",
         "data": {
-          "homepods_player_entity": "media_player (Gruppe oder Einzelgerät)"
+          "homepods_player_entity": "HomePods Player / Gruppe (media_player)"
+        }
+      },
+      "context": {
+        "title": "Context / Globale Quellen",
+        "description": "Quellen, die kontextübergreifend gelten — Tagesphase, Aktivität, Fenster offen, Tür, Anruf-Monitor.",
+        "data": {
+          "day_state": "Tagesphase (sensor)",
+          "activity_state": "Aktivität (sensor)",
+          "window_state": "Fenster offen (binary_sensor)",
+          "entry_door": "Eingangstür (binary_sensor)",
+          "call_monitor": "Telefon/Anruf aktiv (binary_sensor)"
         }
       },
       "tuning": {

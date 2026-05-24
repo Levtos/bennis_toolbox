@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.3.6.2 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Die neuen Geräte-Karten im Options-Menü hatten
+  leere Labels — im UI sah man nur Chevron-Zeilen ohne Text. Die
+  Karten-Titel und Menü-Labels (TV / Apple TV / PlayStation 5 /
+  Nintendo Switch / PC / Denon / HomePods / Context / Legacy:
+  Auslöser & Quellen / Lautstärke & Debounce) liegen jetzt in der
+  Umbrella-`de.json`/`en.json` statt nur in den Modul-Translations.
+- Benni Media Context: Die Entity-Dropdowns in den Karten zeigten
+  alle Entities. Jedes Feld bekommt jetzt einen Domain-Filter
+  passend zur fachlichen Rolle: `*_player_entity` → `media_player`,
+  `*_active_entity` → `binary_sensor`, `*_power_entity` /
+  `*_title_entity` → `sensor`, `*_ping_entity` / `*_network_entity`
+  → `[binary_sensor, device_tracker]`. Context-Karte: `day_state` /
+  `activity_state` → `sensor`, `window_state` / `entry_door` /
+  `call_monitor` → `binary_sensor`.
+- Benni Media Context: Wording in den Karten ist konsistent
+  rollennamenbasiert. Legacy-Keys (`tv_active`, `ps5_status`,
+  `switch_dock`, `homepods` etc.) tauchen NUR noch im
+  Legacy-Aggregate-Step („Auslöser & Quellen") auf, niemals in den
+  neuen Karten.
+
+### Hinzugefügt
+
+- Neue Options-Karte `context` für Globale Quellen (Tagesphase,
+  Aktivität, Fenster, Tür, Anruf) mit domänspezifischen Selektoren,
+  Skip/OK-Semantik analog zu den Geräte-Karten.
+
+### Tests
+
+- Neuer `test_options_ux_labels.py`: pin Translation-Labels für
+  jedes Menü-Item, jeden Step-Titel und jede Feldbeschriftung in
+  beiden Locales; keine Legacy-Namen in den neuen Karten;
+  Domain-Filter je Feld korrekt; Context-Karte rendert genau ihre
+  fünf Keys mit den richtigen Domains; Skip/OK-Verhalten bleibt
+  unverändert.
+- benni_media_context: 100 Tests (+30).
+- Full test suite at release preparation: `513 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine unique_id-Änderungen.
+- Keine CONF-Key-Änderungen, neue Karten speichern weiterhin nur
+  neue Keys; Legacy-Step bleibt unverändert verfügbar.
+
 ## 0.3.6.1 - 2026-05-22
 
 ### Behoben
