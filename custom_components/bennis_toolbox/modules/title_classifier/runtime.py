@@ -165,6 +165,12 @@ class WatcherRuntime:
            CANDIDATES`` so radio streams without a track-level artist
            still get a meaningful grouping key (the station name acts
            as a synthetic artist).
+
+        Values that look like Music-Assistant-internal IDs
+        (``syncgroup_xxxxxxxx``, UUIDs, all-lowercase-underscore tokens
+        with no spaces) are skipped at every step so a mis-configured
+        ``artist_attribute = active_queue`` doesn't poison the panel
+        with opaque grouping keys.
         """
         configured = self.entry.data.get(CONF_ARTIST_ATTRIBUTE)
         attempts: list[str] = []
@@ -175,12 +181,12 @@ class WatcherRuntime:
                 attempts.append(attr)
         for attr in attempts:
             value = clean_value(state.attributes.get(attr))
-            if value:
+            if value and not _looks_like_internal_id(value):
                 return value
         if watcher_type == "media":
             for attr in RADIO_STATION_ATTRIBUTE_CANDIDATES:
                 value = clean_value(state.attributes.get(attr))
-                if value:
+                if value and not _looks_like_internal_id(value):
                     return value
         return None
 
@@ -233,6 +239,60 @@ def clean_value(value: Any) -> str | None:
     if value.lower() in IGNORED_RAW_VALUES:
         return None
     return value
+
+
+# Substrings that mark a value as a Music-Assistant / queue internal
+# identifier. Always treated as non-artist regardless of length.
+_INTERNAL_ID_PREFIXES: tuple[str, ...] = (
+    "syncgroup_", "syncgroup-",
+    "mass_", "mass-",
+    "ma_queue_", "queue_",
+    "player_id_",
+    "uuid:", "urn:",
+)
+
+_INTERNAL_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_\-]{5,}$")
+_UUID_LIKE_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?"
+    r"[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
+)
+
+
+def _looks_like_internal_id(value: str) -> bool:
+    """Heuristic: does this string look like an internal queue/group ID
+    rather than a human-readable artist?
+
+    Filters
+    - explicit MA prefixes (``syncgroup_…``, ``mass_…``, …),
+    - UUIDs (with or without dashes),
+    - opaque tokens: all lowercase + digits + underscore/hyphen, no
+      spaces, no slashes, length >= 6.
+
+    Human-readable artists almost always contain spaces, mixed case,
+    punctuation, or non-ASCII characters — so this is conservative
+    enough to skip the bad values without rejecting real names like
+    ``Daft Punk`` or ``WDR 4``.
+    """
+    if not value:
+        return True
+    s = value.strip()
+    lowered = s.lower()
+    for prefix in _INTERNAL_ID_PREFIXES:
+        if lowered.startswith(prefix):
+            return True
+    if _UUID_LIKE_PATTERN.fullmatch(s):
+        return True
+    # Opaque-token shape: contains no whitespace, no slash/dot, no
+    # uppercase letters; matches the lowercase+digits+_- pattern.
+    if (
+        " " not in s
+        and "/" not in s
+        and "." not in s
+        and s == lowered
+        and _INTERNAL_ID_PATTERN.fullmatch(lowered)
+    ):
+        return True
+    return False
 
 
 def split_media_key(key: str) -> tuple[str, str]:

@@ -212,3 +212,85 @@ def test_unknown_station_name_does_not_pollute_key():
     })
     # Cleaned away → no artist → bare title.
     assert rt.key_from_state(state) == "Mystery Track"
+
+
+# ---------------------------------------------------------------------------
+# 5) Internal-ID heuristic — protect against a mis-configured
+#    `artist_attribute` (the Einhornzentrale case where the user picked
+#    `active_queue` and every panel entry got prefixed with
+#    `syncgroup_edfgeqne - …`).
+# ---------------------------------------------------------------------------
+
+
+def test_looks_like_internal_id_recognises_mass_syncgroup():
+    f = R._looks_like_internal_id
+    assert f("syncgroup_edfgeqne") is True
+    assert f("syncgroup-edfgeqne") is True
+    assert f("mass_player_abc") is True
+    assert f("ma_queue_42") is True
+    assert f("queue_xyz") is True
+
+
+def test_looks_like_internal_id_recognises_uuids():
+    f = R._looks_like_internal_id
+    assert f("960eb9c7-0601-11e8-ae97-52543be04c81") is True
+    assert f("960eb9c7060111e8ae9752543be04c81") is True
+
+
+def test_looks_like_internal_id_recognises_opaque_tokens():
+    f = R._looks_like_internal_id
+    assert f("edfgeqne") is True               # all lowercase, no spaces
+    assert f("abc_def_ghi") is True
+    assert f("hash_abcd1234ef") is True
+
+
+def test_looks_like_internal_id_lets_real_artists_through():
+    f = R._looks_like_internal_id
+    # Spaces → human name
+    assert f("Becky Hill feat. Shift K3Y") is False
+    assert f("Daft Punk") is False
+    assert f("Hiroaki Mizuma/ Kölner Rundfunkorchester") is False
+    assert f("WDR 4") is False
+    assert f("1LIVE") is False                  # mixed case + digit
+    assert f("Jack FM - Berlin") is False       # spaces
+    assert f("Pro7") is False                   # mixed case
+    assert f("ARD") is False                    # all caps (short)
+
+
+def test_mis_configured_active_queue_falls_through_to_media_artist():
+    """The exact Einhornzentrale failure mode: the user picked
+    `active_queue` as artist_attribute at setup time, so for every
+    song the runtime produced `syncgroup_edfgeqne - <title>`. With
+    the heuristic, the opaque internal ID is rejected and the
+    runtime falls back to the real `media_artist` value."""
+    rt = _make_runtime(_Entry(artist_attribute="active_queue"))
+    state = _State("playing", {
+        "media_title": "Better Off Without You",
+        "media_artist": "Becky Hill feat. Shift K3Y",
+        "active_queue": "syncgroup_edfgeqne",
+    })
+    assert rt.key_from_state(state) == (
+        "Becky Hill feat. Shift K3Y - Better Off Without You"
+    )
+
+
+def test_mis_configured_attribute_with_no_fallback_returns_bare_title():
+    """If the bad attribute is the ONLY signal, we drop to bare title
+    instead of poisoning the panel with the opaque ID."""
+    rt = _make_runtime(_Entry(artist_attribute="active_queue"))
+    state = _State("playing", {
+        "media_title": "Some Track",
+        "active_queue": "syncgroup_edfgeqne",
+    })
+    assert rt.key_from_state(state) == "Some Track"
+
+
+def test_internal_id_in_radio_station_name_is_also_rejected():
+    """Defensive: even the radio-station fallback shouldn't accept an
+    opaque ID. Better a bare title than a confusing grouping key."""
+    rt = _make_runtime(_Entry())
+    state = _State("playing", {
+        "media_title": "Some Track",
+        "radio_station_name": "syncgroup_edfgeqne",
+    })
+    assert rt.key_from_state(state) == "Some Track"

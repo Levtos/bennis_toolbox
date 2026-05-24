@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.3.6.7 - 2026-05-22
+
+### Behoben
+
+- Title Classifier: Im Einhornzentrale-Setup war das `artist_attribute`
+  beim Watcher-Anlegen auf `active_queue` gesetzt worden (Music
+  Assistant exposed dort eine interne Queue-ID wie
+  `syncgroup_edfgeqne`). Dadurch landeten **alle** Musik-Einträge im
+  Panel als `syncgroup_edfgeqne - <Titel>` — die in 0.3.6.6
+  eingeführte Fallback-Kette griff nicht, weil das konfigurierte
+  Attribut immer Vorrang hat.
+- Fix: Neue Heuristik `_looks_like_internal_id(value)` erkennt
+  Music-Assistant-/Queue-IDs (`syncgroup_…`, `mass_…`,
+  `ma_queue_…`, `queue_…`, `player_id_…`, `uuid:…`, `urn:…`),
+  UUIDs (mit/ohne Bindestriche) und allgemein opaque Tokens
+  (rein lowercase + Ziffern + Underscore/Hyphen, keine
+  Whitespace/Slash/Punkt, Länge ≥ 6). Solche Werte werden auf
+  jeder Stufe der Artist-Resolver-Kette übersprungen — auch wenn
+  sie aus dem **konfigurierten** Attribut kommen. Echte Künstler
+  („Becky Hill feat. Shift K3Y", „Daft Punk", „1LIVE", „WDR 4",
+  „Jack FM - Berlin", „Pro7") passieren weiterhin.
+
+### Tests
+
+- `test_artist_resolution.py` (+7): Heuristik erkennt
+  `syncgroup_*`, `mass_*`, UUIDs, generische lowercase-Tokens;
+  echte Künstlernamen werden nicht abgelehnt; mis-configured
+  `active_queue` fällt automatisch auf `media_artist` zurück
+  („Better Off Without You" gruppiert jetzt unter „Becky Hill
+  feat. Shift K3Y"); ohne valide Fallback-Quelle bleibt der
+  Bare-Title statt einer Opaque-ID; auch der Radio-Station-
+  Fallback lehnt opaque IDs ab.
+- title_classifier: 51 Tests (+7).
+- Full test suite at release preparation: `560 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen, keine CONF-Key-Renames.
+- Storage-Format unverändert; alte Einträge mit
+  `syncgroup_*`-Prefix bleiben sichtbar (lassen sich im Panel per
+  „Aufräumen" / `delete_entry`-Service entfernen). Neue
+  State-Changes der Source-Entity erzeugen Einträge mit dem
+  korrekten Artist.
+
 ## 0.3.6.6 - 2026-05-22
 
 ### Geändert
