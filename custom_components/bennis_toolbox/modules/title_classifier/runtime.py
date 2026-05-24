@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ARTIST_ATTRIBUTE_CANDIDATES,
     CONF_ARTIST_ATTRIBUTE,
     CONF_AUTO_HIDE_HOURS,
     CONF_RETENTION_DAYS,
@@ -24,6 +25,7 @@ from .const import (
     IGNORED_RAW_VALUES,
     MEDIA_FEATURE_MARKERS,
     MEDIA_RICH_TITLE_MARKERS,
+    RADIO_STATION_ATTRIBUTE_CANDIDATES,
     TITLE_ATTRIBUTE_CANDIDATES,
 )
 from .storage import MapperStore
@@ -146,11 +148,41 @@ class WatcherRuntime:
             title = clean_value(state.state)
         if title is None:
             return None
-        artist_attr = self.entry.data.get(CONF_ARTIST_ATTRIBUTE) or DEFAULT_ARTIST_ATTRIBUTE
-        artist = clean_value(state.attributes.get(artist_attr))
+        artist = self._resolve_artist(state, watcher_type)
         if watcher_type == "media" and artist:
             return f"{artist} - {title}"
         return title
+
+    def _resolve_artist(self, state: State, watcher_type: str) -> str | None:
+        """Pull an artist string from the source state's attributes.
+
+        Lookup order:
+        1. The user-configured ``CONF_ARTIST_ATTRIBUTE`` (if set).
+        2. The generic ``ARTIST_ATTRIBUTE_CANDIDATES`` chain — picks up
+           ``media_artist`` (classic media_player), ``artist`` (Music
+           Assistant), and the album-artist variants.
+        3. For ``media`` watchers only: ``RADIO_STATION_ATTRIBUTE_
+           CANDIDATES`` so radio streams without a track-level artist
+           still get a meaningful grouping key (the station name acts
+           as a synthetic artist).
+        """
+        configured = self.entry.data.get(CONF_ARTIST_ATTRIBUTE)
+        attempts: list[str] = []
+        if configured:
+            attempts.append(configured)
+        for attr in ARTIST_ATTRIBUTE_CANDIDATES:
+            if attr not in attempts:
+                attempts.append(attr)
+        for attr in attempts:
+            value = clean_value(state.attributes.get(attr))
+            if value:
+                return value
+        if watcher_type == "media":
+            for attr in RADIO_STATION_ATTRIBUTE_CANDIDATES:
+                value = clean_value(state.attributes.get(attr))
+                if value:
+                    return value
+        return None
 
     def _title_from_attributes(self, state: State, watcher_type: str) -> str | None:
         values = [

@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.3.6.6 - 2026-05-22
+
+### Geändert
+
+- Title Classifier: Artist-Auflösung deutlich robuster. Bisher wurde
+  ausschließlich `media_artist` als Attribut gelesen — Music
+  Assistant exposed den Wert aber unter `artist`. Resultat: Musik-
+  Einträge im Panel ohne Künstler. Neuer Lookup-Pfad:
+  1. konfiguriertes `CONF_ARTIST_ATTRIBUTE` (falls gesetzt),
+  2. `ARTIST_ATTRIBUTE_CANDIDATES` (`media_artist`, `artist`,
+     `media_album_artist`, `album_artist`) — der erste nicht-leere
+     Wert gewinnt.
+- Title Classifier (nur `media`-Watcher): Fällt der Track-Artist
+  weg — typisch für Radio-Streams — wird ein „Synthetic-Artist" aus
+  dem Sendernamen abgeleitet (`radio_station_name`, `media_station`,
+  `station`, `channel`, `media_channel`). Dadurch landen Einträge
+  wie „WDR 2 POP. Die Abendshow mit Marcus Barsch" unter „WDR 2
+  Bergisches Land" und „1LIVE Fiehe" unter „1LIVE", statt
+  zwischen den unklassifizierten Titeln zu verschwinden.
+- `game`- und `activity`-Watcher nutzen den Radio-Fallback bewusst
+  nicht — der gilt nur für Musik-Watcher.
+
+### Tests
+
+- Neuer `test_artist_resolution.py` (13): Music-Assistant-`artist`-
+  Attribut funktioniert; klassisches `media_artist` weiterhin
+  unterstützt; konfiguriertes Attribut hat Vorrang;
+  `album_artist`-Fallback; Radio-Sender als Synthetic-Artist für
+  Musik; bei vorhandenem Track-Artist gewinnt der über die Station;
+  Alias-Attribute (`media_station`); leere/`unknown`-Werte werden
+  gereinigt; `game`/`activity` ignorieren Radio-Fallback;
+  Einhornzentrale-Repros (1LIVE Fiehe, WDR 2 POP, Time after time,
+  Rondeau, Save My Love).
+- title_classifier: 44 Tests (+13).
+- Full test suite at release preparation: `553 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen, keine CONF-Key-Renames.
+- Bestehende Watcher mit explizitem `artist_attribute` verhalten
+  sich unverändert.
+- Storage-Format unverändert; bestehende Einträge bleiben gültig.
+
 ## 0.3.6.5 - 2026-05-22
 
 ### Behoben

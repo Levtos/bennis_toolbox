@@ -18,6 +18,30 @@ CONF_AUTO_HIDE_HOURS = "auto_hide_hours"
 
 WATCHER_TYPES = ("game", "media", "activity")
 DEFAULT_ARTIST_ATTRIBUTE = "media_artist"
+
+# Resolved in order when looking for a track-level artist. Music Assistant
+# exposes the attribute simply as ``artist``; classic media_player
+# integrations use ``media_artist``. The configured attribute (see
+# ``CONF_ARTIST_ATTRIBUTE``) is always tried first; this list is the
+# generic fallback chain.
+ARTIST_ATTRIBUTE_CANDIDATES: tuple[str, ...] = (
+    "media_artist",
+    "artist",
+    "media_album_artist",
+    "album_artist",
+)
+
+# When no track-level artist is reported (typical for radio streams),
+# the runtime falls back to a "synthetic artist" derived from the
+# station/source attribute so panel grouping still works ("WDR 2 POP
+# Die Abendshow…" lands under WDR 2 instead of under "— Kein Künstler —").
+RADIO_STATION_ATTRIBUTE_CANDIDATES: tuple[str, ...] = (
+    "radio_station_name",
+    "media_station",
+    "station",
+    "channel",
+    "media_channel",
+)
 DEFAULT_ENUM = 0
 MIN_ENUM = 0
 MAX_ENUM = 9
