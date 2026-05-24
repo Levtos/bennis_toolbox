@@ -119,7 +119,25 @@ def _options_schema(opts: dict[str, Any]) -> vol.Schema:
 # ---------------------------------------------------------------------------
 
 
+# Minimal welcome schema for the initial add — no source pickers,
+# no legacy fields. After creation, sources are picked per-device
+# from the options menu under "Configure".
+_WELCOME_SCHEMA = vol.Schema({})
+
+
 class ConfigFlowHelper:
+    """Initial add-flow.
+
+    Until 0.3.6.2 the first screen dumped the entire legacy source
+    schema (`tv_active`, `ps5_status`, `switch_dock`, …) into the
+    user's face — a confusing way to start, and inconsistent with
+    the new per-device cards that appear under "Configure". This
+    flow now creates an empty entry immediately so the user can
+    head straight to the device cards. Legacy values can still be
+    edited through the legacy "Auslöser & Quellen" step that
+    remains in the options menu.
+    """
+
     def __init__(self, hass: HomeAssistant, flow) -> None:
         self.hass = hass
         self.flow = flow
@@ -128,14 +146,18 @@ class ConfigFlowHelper:
         await self.flow.async_set_unique_id(f"{MODULE_ID}_singleton")
         self.flow._abort_if_unique_id_configured()
         return self.flow.async_show_form(
-            step_id="module_step", data_schema=_sources_schema(),
+            step_id="module_step", data_schema=_WELCOME_SCHEMA,
         )
 
     async def async_step_module_step(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is None:
             return self.flow.async_show_form(
-                step_id="module_step", data_schema=_sources_schema(),
+                step_id="module_step", data_schema=_WELCOME_SCHEMA,
             )
+        # The welcome form has no fields; any keys that arrive here
+        # (e.g. from older add-flow callers that still pass legacy
+        # values) are preserved on entry.data for the legacy-
+        # compatible read path in the coordinator.
         data: dict[str, Any] = {CONF_MODULE_ID: MODULE_ID}
         data.update({k: v for k, v in user_input.items() if v not in (None, "", [])})
         return self.flow.async_create_entry(title=NAME, data=data)

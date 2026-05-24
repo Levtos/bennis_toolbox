@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.3.6.3 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Beim Anlegen einer neuen Instanz erschien noch
+  die alte Legacy-Erstkonfigurationsmaske mit Feldern wie `tv_active`,
+  `tv_source`, `tv_power_fallback`, `appletv`, `ps5_status`,
+  `switch_dock`. Erst nach leerem Bestätigen kam man in den neuen
+  Options-Flow mit den Geräte-Karten. Der ConfigFlow zeigt jetzt ein
+  leeres Welcome-Formular — der Nutzer klickt Submit und landet
+  direkt auf dem neuen Options-Menü mit den Geräte-Karten.
+- Benni Media Context: `denon_source` konnte fälschlich beim Lesen
+  durch den Legacy-Fallback (`denon_active` mit einer Power-Binary
+  ohne `source`-Attribut) als Quelle gemeldet werden. Wenn
+  `denon_player_entity` konfiguriert ist, liest der Coordinator
+  jetzt ausschließlich das `source`-Attribut dieses
+  `media_player` — der Legacy-Slot kann den Wert nicht mehr
+  überschreiben. Ohne neuen Player bleibt der bisherige Fallback
+  auf das Source-Attribut des Legacy-Slots aktiv (deckt User ab, die
+  einen `media_player` in den alten `denon_active`-Slot gehängt
+  hatten).
+
+### Tests
+
+- `test_config_flow_minimal.py` (4): Welcome-Form ist leer; keine
+  Legacy-Felder leaken; Submit erzeugt sofort einen Entry mit nur
+  dem Modul-Identifier; Options-Menü zeigt weiterhin alle Karten.
+- `test_denon_source_resolution.py` (5): `denon_source` kommt aus
+  dem Player-Attribut; Fallback auf Legacy-Slot funktioniert ohne
+  neuen Player; Power-Binary ohne `source`-Attribut liefert `None`,
+  nie eine Entity-ID; neuer Player gewinnt über Legacy-Slot.
+- benni_media_context: 109 Tests (+9).
+- Full test suite at release preparation: `522 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine CONF-Key-Renames, keine `unique_id`-Änderungen.
+- Engine-Policy unverändert.
+- Legacy-Step „Auslöser & Quellen" bleibt für Backwards-Compat im
+  Options-Menü verfügbar.
+- Bestehende Entries mit Legacy-Daten in `entry.data` laden
+  unverändert.
+
 ## 0.3.6.2 - 2026-05-22
 
 ### Behoben

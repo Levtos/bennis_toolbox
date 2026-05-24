@@ -406,7 +406,19 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
                 active_state=s.pc_active, power_w=s.pc_power_w)
 
         # ---- Denon --------------------------------------------------------
-        denon_player = _resolve(CONF_DENON_PLAYER)
+        # Denon resolution: the new `denon_player_entity` is the
+        # authoritative source-attribute provider. We only fall back
+        # to reading a `source` attribute off the legacy active
+        # entity when no player entity is configured — otherwise a
+        # power-sensor wired into the legacy slot would shadow the
+        # real media_player source. The active binary still feeds
+        # `denon_active` regardless, since it's the canonical
+        # plug-power "AVR is on" signal.
+        # Resolve the player WITHOUT the legacy fallback: legacy
+        # entries that only configured the active binary must keep
+        # going through the active-binary path, never through the
+        # media_player attribute read.
+        denon_player = self._entity(CONF_DENON_PLAYER)
         denon_active_e = _resolve(CONF_DENON_ACTIVE_NEW)
         denon_power_e = _resolve(CONF_DENON_POWER)
         denon_player_state = _state_of(denon_player)
@@ -416,7 +428,14 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         s.denon_active = denon_active_bool or (
             denon_player_state in ("on", "playing", "paused")
         )
-        s.denon_source = _attr_of(denon_player, "source") or _attr_of(denon_active_e, "source")
+        # Source: prefer the media_player's `source` attribute. Only
+        # if no player is configured do we look at the legacy active
+        # slot's attributes (some users wire a media_player into the
+        # legacy denon_active key).
+        if denon_player:
+            s.denon_source = _attr_of(denon_player, "source")
+        else:
+            s.denon_source = _attr_of(denon_active_e, "source")
         s.denon_player_state = denon_player_state
         s.denon_power_w = denon_power_w
         _record("denon",
