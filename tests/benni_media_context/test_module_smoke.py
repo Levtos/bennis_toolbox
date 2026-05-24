@@ -179,11 +179,29 @@ def _install_ha_stubs() -> None:
     class _NumberSelectorMode:
         BOX = "box"
 
+    class _StubTextSelectorConfig:
+        def __init__(self, type=None, **_kw):
+            self.type = type
+
+    class _StubTextSelector:
+        def __init__(self, cfg=None):
+            self.cfg = cfg
+
+        def __call__(self, value):
+            # voluptuous validators must be callable; plain pass-through.
+            return value
+
+    class _TextSelectorType:
+        TEXT = "text"
+
     ha_sel.EntitySelector = _StubEntitySelector
     ha_sel.EntitySelectorConfig = _StubEntitySelectorConfig
     ha_sel.NumberSelector = _StubNumberSelector
     ha_sel.NumberSelectorConfig = _StubNumberSelectorConfig
     ha_sel.NumberSelectorMode = _NumberSelectorMode
+    ha_sel.TextSelector = _StubTextSelector
+    ha_sel.TextSelectorConfig = _StubTextSelectorConfig
+    ha_sel.TextSelectorType = _TextSelectorType
 
     ha_cv = sys.modules.setdefault(
         "homeassistant.helpers.config_validation",

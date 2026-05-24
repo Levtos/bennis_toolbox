@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.3.6.8 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Im „Lautstärke & Debounce"-Step wurden
+  Dezimalwerte in der deutschen HA-Locale mit Komma angezeigt
+  (`0,15`, `-0,1`). Der Spec/Code-Konsens war jedoch
+  Punkt-separierte Werte (`0.15`, `-0.1`). Ursache: HAs
+  `NumberSelector` formatiert immer locale-spezifisch.
+- Fix: Die sechs Tuning-Felder
+  (`debounce_seconds`, `quiet_ducking_level`,
+  `base_volume_homepods`, `base_volume_denon`,
+  `track_boost_offset`, `window_volume_offset`) verwenden jetzt
+  einen `TextSelector` plus eine Coercion-Kette `_to_decimal()` →
+  `vol.Range`. Defaults werden über `_fmt_decimal()` mit Punkt
+  gerendert. Beim Submit nehmen wir sowohl `"0.15"` als auch
+  `"0,15"` an (für User, die im DE-Layout den Komma-Eintrag
+  gewohnt sind) — beides landet konsistent als Python-Float in
+  `entry.options`.
+
+### Tests
+
+- Neuer `test_tuning_decimal_separator.py` (13): Coercion akzeptiert
+  Dot/Comma-Strings, Numbers, Whitespace, leere Inputs; lehnt
+  Garbage ab; Defaults werden mit Punkt gerendert; alle 6
+  Tuning-Felder nutzen `TextSelector`, nicht `NumberSelector`;
+  Round-Trip von `"-0,1"` → `-0.1`; Range-Validierung nach der
+  Coercion; bestehende `0.15`-Submission funktioniert weiterhin.
+- benni_media_context: 140 Tests (+13).
+- Full test suite at release preparation: `573 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen, keine CONF-Key-Renames.
+- Storage-Format unverändert; gespeicherte Floats bleiben Floats.
+- Bestehende Setups sehen beim nächsten Öffnen des Tuning-Steps
+  die Werte als Punkt-Strings — Einreichen schreibt wieder Float.
+
 ## 0.3.6.7 - 2026-05-22
 
 ### Behoben

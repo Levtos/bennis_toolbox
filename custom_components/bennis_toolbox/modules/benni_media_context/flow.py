@@ -89,28 +89,82 @@ def _sources_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema(fields)
 
 
-def _number(min_: float, max_: float, step: float = 0.01) -> selector.NumberSelector:
-    return selector.NumberSelector(
-        selector.NumberSelectorConfig(
-            min=min_, max=max_, step=step, mode=selector.NumberSelectorMode.BOX
-        )
+# HA's NumberSelector renders values in the user's locale → a DE locale
+# user sees "0,15" / "-0,1" with a comma decimal separator, which is
+# unusual for tuning knobs and confusing when the spec writes the
+# values with a dot. We side-step the locale by using a plain text
+# input plus dot/comma-tolerant coercion. Both "0.15" and "0,15"
+# parse to the same float; we render defaults with a dot.
+
+
+def _to_decimal(value: Any) -> float:
+    """Parse a number or string-decimal into a Python float.
+
+    Accepts both '.' and ',' as decimal separator; strips whitespace;
+    treats empty input as 0.0. Raises on anything that doesn't look
+    like a number.
+    """
+    if value is None or value == "":
+        return 0.0
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    s = str(value).strip().replace(",", ".")
+    return float(s)
+
+
+def _decimal_text(min_: float, max_: float):
+    """voluptuous validator chain backing the tuning fields.
+
+    Renders a plain text input (no locale formatting) and coerces the
+    submitted value to a clamped float via `_to_decimal`. Order is
+    important: we coerce *before* the range check so a comma-decimal
+    string still validates as a number.
+    """
+    return vol.All(
+        selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+        ),
+        _to_decimal,
+        vol.Range(min=min_, max=max_),
     )
+
+
+def _fmt_decimal(value: Any, default: float) -> str:
+    """Render a stored decimal as a dot-separated string for the form
+    default. Falls back to `default` when the stored value is None /
+    empty / unparsable."""
+    try:
+        return f"{float(value)}"
+    except (TypeError, ValueError):
+        return f"{float(default)}"
 
 
 def _options_schema(opts: dict[str, Any]) -> vol.Schema:
     return vol.Schema({
-        vol.Optional(CONF_DEBOUNCE, default=opts.get(CONF_DEBOUNCE, DEFAULT_DEBOUNCE)):
-            _number(0, 60, 0.5),
-        vol.Optional(CONF_QUIET_DUCK, default=opts.get(CONF_QUIET_DUCK, DEFAULT_QUIET_DUCK)):
-            _number(0, 1, 0.01),
-        vol.Optional(CONF_BASE_VOL_HOMEPODS, default=opts.get(CONF_BASE_VOL_HOMEPODS, DEFAULT_BASE_VOL_HOMEPODS)):
-            _number(0, 1, 0.01),
-        vol.Optional(CONF_BASE_VOL_DENON, default=opts.get(CONF_BASE_VOL_DENON, DEFAULT_BASE_VOL_DENON)):
-            _number(0, 1, 0.01),
-        vol.Optional(CONF_BOOST_OFFSET, default=opts.get(CONF_BOOST_OFFSET, DEFAULT_BOOST_OFFSET)):
-            _number(-0.5, 0.5, 0.01),
-        vol.Optional(CONF_WINDOW_OFFSET, default=opts.get(CONF_WINDOW_OFFSET, DEFAULT_WINDOW_OFFSET)):
-            _number(-0.5, 0.5, 0.01),
+        vol.Optional(
+            CONF_DEBOUNCE,
+            default=_fmt_decimal(opts.get(CONF_DEBOUNCE), DEFAULT_DEBOUNCE),
+        ): _decimal_text(0, 60),
+        vol.Optional(
+            CONF_QUIET_DUCK,
+            default=_fmt_decimal(opts.get(CONF_QUIET_DUCK), DEFAULT_QUIET_DUCK),
+        ): _decimal_text(0, 1),
+        vol.Optional(
+            CONF_BASE_VOL_HOMEPODS,
+            default=_fmt_decimal(opts.get(CONF_BASE_VOL_HOMEPODS), DEFAULT_BASE_VOL_HOMEPODS),
+        ): _decimal_text(0, 1),
+        vol.Optional(
+            CONF_BASE_VOL_DENON,
+            default=_fmt_decimal(opts.get(CONF_BASE_VOL_DENON), DEFAULT_BASE_VOL_DENON),
+        ): _decimal_text(0, 1),
+        vol.Optional(
+            CONF_BOOST_OFFSET,
+            default=_fmt_decimal(opts.get(CONF_BOOST_OFFSET), DEFAULT_BOOST_OFFSET),
+        ): _decimal_text(-0.5, 0.5),
+        vol.Optional(
+            CONF_WINDOW_OFFSET,
+            default=_fmt_decimal(opts.get(CONF_WINDOW_OFFSET), DEFAULT_WINDOW_OFFSET),
+        ): _decimal_text(-0.5, 0.5),
     })
 
 
