@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.3.6.4 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: Der Legacy-Aggregat-Step „Auslöser & Quellen"
+  erschien noch im normalen Options-Menü und führte beim Öffnen zur
+  alten Maske mit `tv_active`, `tv_source`, `tv_power_fallback`,
+  `appletv`, `ps5_status`, `switch_dock` etc. Der Step ist jetzt
+  gegated: er erscheint **nur**, wenn der Entry tatsächlich
+  Legacy-CONF-Werte in `entry.data` oder `entry.options` enthält
+  (Migrationsfall). Frische Entries sehen die Karte gar nicht mehr.
+- Benni Media Context: Wenn der Step doch erscheint, ist er klar als
+  „Legacy-Quellen (Altbestand)" / „Legacy sources (existing setups)"
+  beschriftet — keine Verwechslungsgefahr mit der normalen
+  Konfiguration über die Geräte-Karten.
+
+### Hinzugefügt
+
+- Coordinator: neuer Resolver `_resolve_with_origin(new_key)` liefert
+  zusätzlich, ob die Entity über den neuen oder den Legacy-Key
+  aufgelöst wurde.
+- Snapshot `device_diagnostics` enthält jetzt pro Gerät:
+  `configured_player_entity`, `configured_active_entity`,
+  `configured_power_entity`, `configured_title_entity`,
+  `configured_ping_entity` / `configured_network_entity` (je nach
+  Karte), `resolution_source` (`"new_key"` oder `"legacy_fallback"`)
+  und `resolution_per_role` (Detail pro Rolle).
+- `sensor.benni_media_context_media_context` und
+  `sensor.benni_media_context_media_device` legen `device_diagnostics`
+  als Attribut frei — sichtbar in Lovelace und im Entity-Tab, ohne
+  dass eine extra Entity-Registry aufgemacht wird.
+
+### Tests
+
+- Neuer `test_legacy_gating_and_diagnostics.py` (9): Frische Entries
+  zeigen keinen `sources`-Step; Entries mit Legacy-Werten in `data`
+  oder `options` zeigen ihn; reine Neu-Key-Setups verbergen ihn;
+  Translation-Label enthält explizit „Legacy"/„Altbestand"; pro
+  Gerät `configured_*_entity` + `resolution_source` korrekt; neuer
+  Key gewinnt gegen Legacy-Fallback; Denon-`source` aus dem
+  Player-Attribut, niemals als Power-Sensor-Entity-ID.
+- Zwei bestehende Menü-Tests an die Gating-Semantik angepasst.
+- benni_media_context: 118 Tests (+9).
+- Full test suite at release preparation: `531 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen.
+- Keine CONF-Key-Renames.
+- Engine-Policy unverändert.
+- Legacy-Read-Fallback im Coordinator bleibt aktiv (alte
+  Installationen laufen weiter).
+- Keine Top-Level-Entity-Registry-Änderungen — die Diagnose liegt als
+  Attribut auf zwei bestehenden Sensoren.
+
 ## 0.3.6.3 - 2026-05-22
 
 ### Behoben

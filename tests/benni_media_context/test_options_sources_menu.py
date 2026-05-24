@@ -72,11 +72,11 @@ async def test_options_init_shows_menu_with_sources_and_tuning():
     result = await helper.async_step_init()
     assert result["type"] == "menu"
     opts = set(helper.flow.last_menu["menu_options"])
-    # Per-device cards plus the legacy aggregate `sources` and the
-    # tuning step. Existing entries opening the menu still see both
-    # the aggregate and the new card layout.
-    assert {"sources", "tuning"} <= opts
-    assert {"tv", "appletv", "ps5", "switch", "pc", "denon", "homepods"} <= opts
+    # Per-device cards plus the tuning step are always present. The
+    # legacy aggregate `sources` step is now gated to entries with
+    # legacy values — this entry has none, so it shouldn't appear.
+    assert {"tv", "appletv", "ps5", "switch", "pc", "denon", "homepods", "tuning"} <= opts
+    assert "sources" not in opts
 
 
 # ---------------------------------------------------------------------------

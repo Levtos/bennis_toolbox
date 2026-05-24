@@ -109,8 +109,10 @@ async def test_options_menu_still_lists_all_device_and_context_cards():
     )
     await helper.async_step_init()
     opts = set(helper.flow.last_menu["menu_options"])
+    # `sources` is gated to entries that already have legacy values
+    # — see test_config_flow_minimal for the gating contract.
     assert {"tv", "appletv", "ps5", "switch", "pc", "denon",
-            "homepods", "context", "sources", "tuning"} <= opts
+            "homepods", "context", "tuning"} <= opts
 
 
 # ---------------------------------------------------------------------------

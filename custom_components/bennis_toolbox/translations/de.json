@@ -57,7 +57,7 @@
       "init": {
         "title": "Modul-Optionen",
         "menu_options": {
-          "sources": "Auslöser & Quellen",
+          "sources": "Legacy-Quellen (Altbestand)",
           "profile": "Zielpositionen pro Modus",
           "runtime": "Laufzeit / Apply-Verhalten",
           "entities": "Quell-Entities",

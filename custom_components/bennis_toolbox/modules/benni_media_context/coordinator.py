@@ -191,6 +191,23 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             return self._entity(legacy)
         return None
 
+    def _resolve_with_origin(self, new_key: str) -> tuple[Optional[str], Optional[str]]:
+        """Like ``_entity_with_fallback`` but also returns whether the
+        entity came from the new key or the legacy fallback.
+
+        Returns ``(entity_id, origin)`` where origin is ``"new_key"``,
+        ``"legacy_fallback"`` or ``None`` when no entity is configured.
+        """
+        eid = self._entity(new_key)
+        if eid:
+            return eid, "new_key"
+        legacy = LEGACY_FALLBACKS.get(new_key)
+        if legacy:
+            leid = self._entity(legacy)
+            if leid:
+                return leid, "legacy_fallback"
+        return None, None
+
     def _app_map(self) -> dict[str, str]:
         # App map currently has no UX surface, but follow the same
         # merge pattern so a future options-step can override.
@@ -470,6 +487,52 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         s.homepods_volume_level = hp_volume
         _record("homepods",
                 player_state=hp_player_state, volume_level=hp_volume)
+        # ---- Per-device configuration/resolution diagnostics ------------
+        # For every device card, stamp the configured CONF_* values plus
+        # which key (new vs legacy) actually resolved. This is what the
+        # entity attribute view surfaces so users can see at a glance
+        # whether the runtime is reading from the new model or still
+        # falling back to a legacy slot.
+        _ROLE_SUFFIX = {
+            "_player_entity": "player",
+            "_active_entity": "active",
+            "_power_entity": "power",
+            "_title_entity": "title",
+            "_ping_entity": "ping",
+            "_network_entity": "network",
+        }
+
+        def _role_for(key: str) -> Optional[str]:
+            for suffix, role in _ROLE_SUFFIX.items():
+                if key.endswith(suffix):
+                    return role
+            return None
+
+        for card, keys in DEVICE_CARDS.items():
+            bucket = diag.setdefault(card, {})
+            sources: dict[str, str] = {}
+            for key in keys:
+                role = _role_for(key)
+                if not role:
+                    continue
+                eid, origin = self._resolve_with_origin(key)
+                bucket[f"configured_{role}_entity"] = eid
+                if origin:
+                    sources[role] = origin
+            if "player" in sources:
+                bucket["player_source"] = bucket.get("source")  # alias for clarity
+            # Single rolled-up "resolution_source": "new_key" if every
+            # configured slot resolved via the new key, "legacy_fallback"
+            # if any slot fell back, None if nothing is configured.
+            origins = set(sources.values())
+            if not origins:
+                bucket["resolution_source"] = None
+            elif origins == {"new_key"}:
+                bucket["resolution_source"] = "new_key"
+            else:
+                bucket["resolution_source"] = "legacy_fallback"
+            bucket["resolution_per_role"] = sources
+
         s.device_diagnostics = diag
 
         s.classifier_ps5 = _maybe_int(_state(CONF_TITLE_CLASSIFIER_PS5))

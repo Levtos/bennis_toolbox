@@ -56,7 +56,7 @@
       "init": {
         "title": "Module options",
         "menu_options": {
-          "sources": "Triggers & sources",
+          "sources": "Legacy sources (existing setups)",
           "profile": "Target positions per mode",
           "runtime": "Runtime / apply behaviour",
           "entities": "Source entities",

@@ -282,14 +282,43 @@ class OptionsFlowHelper:
         self.entry = entry
         self.flow = flow
 
+    # All CONF keys that the legacy aggregate `sources` step still
+    # exposes. Used to decide whether to offer that step in the menu.
+    _LEGACY_SOURCE_CONF_KEYS: tuple[str, ...] = (
+        CONF_TV_ACTIVE, CONF_TV_SOURCE, CONF_TV_POWER_FALLBACK, CONF_APPLETV,
+        CONF_PS5_STATUS, CONF_PS5_TITLE, CONF_SWITCH_DOCK, CONF_PC_ACTIVE,
+        CONF_DENON_ACTIVE, CONF_HOMEPODS,
+        CONF_TITLE_CLASSIFIER_PS5, CONF_TITLE_CLASSIFIER_PC,
+        CONF_TITLE_CLASSIFIER_HOMEPODS, CONF_TITLE_CLASSIFIER_MEDIA,
+        CONF_DOOR, CONF_CALL_MONITOR, CONF_DAY_STATE, CONF_ACTIVITY_STATE,
+        CONF_WINDOW_STATE,
+    )
+
+    def _has_legacy_values(self) -> bool:
+        """Return True if the entry still has anything stored under
+        a legacy CONF key in either ``data`` or ``options``."""
+        merged = _merged(self.entry)
+        for key in self._LEGACY_SOURCE_CONF_KEYS:
+            v = merged.get(key)
+            if v not in (None, "", [], ()):
+                return True
+        return False
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        return self.flow.async_show_menu(
-            step_id="init",
-            menu_options=[
-                "tv", "appletv", "ps5", "switch", "pc", "denon", "homepods",
-                "context", "sources", "tuning",
-            ],
-        )
+        # Per-device cards are the only normal configuration surface.
+        # The legacy aggregate "sources" step is now gated: it only
+        # appears for entries that already have legacy values stored
+        # (existing installs migrating from the old mass form). Fresh
+        # entries don't see it at all, removing the foot-gun where
+        # opening "Auslöser & Quellen" would dump the old schema.
+        menu = [
+            "tv", "appletv", "ps5", "switch", "pc", "denon", "homepods",
+            "context",
+        ]
+        if self._has_legacy_values():
+            menu.append("sources")
+        menu.append("tuning")
+        return self.flow.async_show_menu(step_id="init", menu_options=menu)
 
     # ---- Per-device cards --------------------------------------------------
 

@@ -93,6 +93,17 @@ class _ContextSensor(_BaseSensor):
     def native_value(self):
         return self.coordinator.data.context
 
+    @property
+    def extra_state_attributes(self):
+        # The two top-of-the-list sensors are the natural place for the
+        # per-device diagnostics dict — surface it so users (and Lovelace)
+        # can see configured_player_entity / resolution_source / etc.
+        attrs = super().extra_state_attributes
+        attrs["device_diagnostics"] = getattr(
+            self.coordinator.data, "device_diagnostics", {}
+        )
+        return attrs
+
 
 class _SubcontextSensor(_BaseSensor):
     _key = "media_subcontext"
@@ -111,6 +122,14 @@ class _DeviceSensor(_BaseSensor):
     @property
     def native_value(self):
         return self.coordinator.data.device
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        attrs["device_diagnostics"] = getattr(
+            self.coordinator.data, "device_diagnostics", {}
+        )
+        return attrs
 
 
 class _GamingSourceSensor(_BaseSensor):
