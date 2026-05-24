@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.3.6.5 - 2026-05-22
+
+### Behoben
+
+- Benni Media Context: `device_diagnostics` blieb auf den
+  `media_context`- und `media_device`-Sensoren dauerhaft `{}`,
+  obwohl der Coordinator die Diagnose pro Geräte-Karte korrekt
+  aufbaute. Ursache: das Feld lebte ausschließlich auf der
+  `Snapshot`-Dataclass, die der Coordinator nicht publiziert. Die
+  Entities lesen `coordinator.data.device_diagnostics` — aber
+  `coordinator.data` ist eine `Decision`, und die Decision-Dataclass
+  hatte das Feld bisher nicht. `getattr(..., "device_diagnostics",
+  {})` lieferte deshalb immer den leeren Default.
+- Fix: `Decision.device_diagnostics` als eigenes Feld; `decide()`
+  kopiert `snap.device_diagnostics` in beide Rückgabe-Pfade
+  (Quiet-Early-Return und Hauptpfad). Coordinator-Debounce-Interims
+  übernehmen die frischen Diagnostics ebenfalls, damit die Attribute
+  nicht stale werden, während der Context zwischen Stable-States
+  hin- und herwechselt.
+- Engine-Policy unverändert: `device_diagnostics` ist reines
+  Beiwerk und beeinflusst weder `context` noch `device` noch
+  `gaming_source`/`gaming_platform`.
+
+### Tests
+
+- Neuer `test_device_diagnostics_propagation.py` (9): pin
+  Decision-Feld-Existenz; `decide()` kopiert Snapshot-Diag in beide
+  Pfade; konfigurierte Cards füllen Diag auch wenn Gerät off ist;
+  PC-Active-Repro liefert `pc`-Bucket mit `configured_*_entity` +
+  `active_state` + `power_w` + `resolution_source=new_key`;
+  Legacy-only-Setup markiert `legacy_fallback`; neuer Key gewinnt
+  über Legacy in Runtime und Diag; beide Sensoren exposen das
+  gleiche Diag-Dict.
+- benni_media_context: 127 Tests (+9).
+- Full test suite at release preparation: `540 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen.
+- Keine CONF-Key-Renames.
+- Engine-Policy unverändert; `context`/`device`/`gaming_source`/
+  `gaming_platform`/Subwoofer-Policy/Volume-Targets unverändert.
+- Legacy-Read-Fallback bleibt aktiv für nicht migrierte Entries.
+
 ## 0.3.6.4 - 2026-05-22
 
 ### Behoben

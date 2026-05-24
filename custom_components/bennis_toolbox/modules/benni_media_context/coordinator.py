@@ -593,6 +593,10 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             interim.active_reasons = self._last_stable.active_reasons + [
                 f"debouncing->{new.context}/{new.subcontext}"
             ]
+            # During debounce we still want the freshest per-device
+            # diagnostics surfaced — the entity attributes shouldn't go
+            # stale just because the context is in transition.
+            interim.device_diagnostics = dict(new.device_diagnostics or {})
             self.async_set_updated_data(interim)
             self.hass.loop.call_later(
                 debounce + 0.1,
@@ -607,6 +611,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             interim.active_reasons = self._last_stable.active_reasons + [
                 f"debouncing->{new.context}/{new.subcontext}"
             ]
+            interim.device_diagnostics = dict(new.device_diagnostics or {})
             self.async_set_updated_data(interim)
 
     def _commit(self, new: Decision, snap: Snapshot) -> None:

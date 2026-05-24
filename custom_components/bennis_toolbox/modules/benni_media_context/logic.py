@@ -100,6 +100,13 @@ class Decision:
     subwoofer_block_reason: Optional[str] = None
     denon_audio_path: bool = False
     active_reasons: list = field(default_factory=list)
+    # Per-device diagnostics carried forward from the snapshot so the
+    # entity attribute view shows configured_*_entity / resolution_source
+    # / player_state / power_w per device. Populated by `decide()` from
+    # the snapshot — keeping the field on the Decision means the
+    # coordinator's `async_set_updated_data(decision)` reaches the
+    # entities with the diag intact.
+    device_diagnostics: dict = field(default_factory=dict)
 
     def to_dict(self):
         return asdict(self)
@@ -318,6 +325,7 @@ def decide(
         d.subwoofer_allowed = allowed
         d.subwoofer_block_reason = block_reason
         d.active_reasons = reasons
+        d.device_diagnostics = dict(snap.device_diagnostics or {})
         return d
 
     # Manual nudge highest non-quiet priority
@@ -385,4 +393,5 @@ def decide(
     d.subwoofer_allowed = allowed
     d.subwoofer_block_reason = block_reason
     d.active_reasons = reasons
+    d.device_diagnostics = dict(snap.device_diagnostics or {})
     return d
