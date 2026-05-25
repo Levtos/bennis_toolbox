@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.3.6.9 - 2026-05-22
+
+### Hinzugefügt
+
+- Wake Planner: Neuer Binary Sensor pro Person
+  `binary_sensor.wake_planner_<slug>_holiday_active`. Liefert den
+  Feiertag/Frei-Tag-Boolean, den `benni_context.holiday_sensor`
+  konsumiert, statt YAML-seitig den `decision.reason`-String zu
+  parsen.
+- Semantik:
+  - `on`, wenn `decision.holiday_name` gesetzt ist **oder**
+    `decision.matched_rule_id == "profile_holiday"`.
+  - `off` für reguläre Werktage und Cold-Start (keine Decision).
+- Attribute: `holiday_name`, `reason`, `decided_by`,
+  `matched_rule_id`, `next_wake`, `wake_state`, `person_id`.
+- Entity-Konvention:
+  - `suggested_object_id = "wake_planner_<slug>_holiday_active"`
+  - `unique_id = "bennis_toolbox_wake_planner_<entry_id>_<slug>_holiday_active"`
+- Umbrella-Translations: DE „Feiertag aktiv" / EN „Holiday active".
+
+### Tests
+
+- Neuer `test_holiday_active.py` (11): Wahrheitstabelle für
+  `holiday_name`, `matched_rule_id`, Werktag, fehlende Decision,
+  leerer holiday_name; Attribute werden korrekt durchgereicht;
+  Cold-Start ohne Decision liefert `{}`; `next_wake=None`
+  handled; `suggested_object_id` + `unique_id` Pattern;
+  Plattform-Dispatcher liefert pro Person beide Binary-Sensoren.
+- wake_planner: 84 Tests (+11).
+- Full test suite at release preparation: `584 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen an bestehenden Wake-Planner-Entities.
+- Keine Engine-Policy-Änderungen.
+- Keine CONF-Key-Renames.
+- Bestehende Setups: Beim Reload erscheint der neue Binary
+  Sensor automatisch pro Person.
+
 ## 0.3.6.8 - 2026-05-22
 
 ### Behoben

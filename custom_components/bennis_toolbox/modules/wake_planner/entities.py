@@ -65,6 +65,15 @@ BINARY_DESCRIPTION = BinarySensorEntityDescription(
     device_class=BinarySensorDeviceClass.RUNNING,
 )
 
+# The holiday-active binary mirrors the wake-planner decision's
+# "today is a holiday / day-off" flag so downstream consumers
+# (benni_context.holiday_sensor) get a single clean boolean instead
+# of having to parse the textual `decision.reason`.
+HOLIDAY_ACTIVE_DESCRIPTION = BinarySensorEntityDescription(
+    key="holiday_active",
+    translation_key="holiday_active",
+)
+
 
 def _device_info(entry: ConfigEntry, person: PersonConfig) -> dict[str, Any]:
     return {
@@ -88,10 +97,11 @@ async def async_get_entities(
             for desc in SENSOR_DESCRIPTIONS
         ]
     if platform == Platform.BINARY_SENSOR:
-        return [
-            WakeNeededBinarySensor(coordinator, entry, person)
-            for person in coordinator.persons
-        ]
+        entities: list = []
+        for person in coordinator.persons:
+            entities.append(WakeNeededBinarySensor(coordinator, entry, person))
+            entities.append(HolidayActiveBinarySensor(coordinator, entry, person))
+        return entities
     return []
 
 
@@ -186,3 +196,63 @@ class WakeNeededBinarySensor(CoordinatorEntity[WakePlannerCoordinator], BinarySe
     def extra_state_attributes(self) -> dict[str, Any]:
         decision = self.coordinator.data.get(self.person.slug) if self.coordinator.data else None
         return decision.as_dict() if decision else {}
+
+
+class HolidayActiveBinarySensor(CoordinatorEntity[WakePlannerCoordinator], BinarySensorEntity):
+    """Boolean projection of the wake-planner decision for downstream
+    consumers (e.g. ``benni_context.holiday_sensor``).
+
+    ON if the current decision was driven by a holiday/profile-holiday
+    rule — either ``decision.holiday_name`` is non-empty or
+    ``decision.matched_rule_id == "profile_holiday"``. OFF otherwise
+    (including weekday plans and missing-decision cold-start cases).
+    """
+
+    entity_description = HOLIDAY_ACTIVE_DESCRIPTION
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: WakePlannerCoordinator,
+        entry: ConfigEntry,
+        person: PersonConfig,
+    ) -> None:
+        super().__init__(coordinator)
+        self.person = person
+        self._attr_unique_id = unique_id(
+            MODULE_ID, entry.entry_id, person.slug, "holiday_active",
+        )
+        self._attr_translation_key = HOLIDAY_ACTIVE_DESCRIPTION.translation_key
+        self._attr_device_info = _device_info(entry, person)
+        self._attr_suggested_object_id = (
+            f"{MODULE_ID}_{person.slug}_holiday_active"
+        )
+
+    @property
+    def is_on(self) -> bool:
+        decision = self.coordinator.data.get(self.person.slug) if self.coordinator.data else None
+        if not decision:
+            return False
+        if decision.holiday_name:
+            return True
+        if decision.matched_rule_id == "profile_holiday":
+            return True
+        return False
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        decision = self.coordinator.data.get(self.person.slug) if self.coordinator.data else None
+        if not decision:
+            return {}
+        attrs: dict[str, Any] = {
+            "holiday_name": decision.holiday_name,
+            "reason": decision.reason,
+            "decided_by": decision.decided_by,
+            "matched_rule_id": decision.matched_rule_id,
+            "next_wake": (
+                decision.next_wake.isoformat() if decision.next_wake else None
+            ),
+            "wake_state": decision.state.value if decision.state else None,
+            "person_id": self.person.slug,
+        }
+        return attrs

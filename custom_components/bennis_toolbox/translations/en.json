@@ -251,7 +251,8 @@
   },
   "entity": {
     "binary_sensor": {
-      "wake_needed": { "name": "Wake needed" }
+      "wake_needed": { "name": "Wake needed" },
+      "holiday_active": { "name": "Holiday active" }
     },
     "sensor": {
       "wake_state": {
