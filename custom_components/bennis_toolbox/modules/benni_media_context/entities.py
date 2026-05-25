@@ -214,20 +214,6 @@ class _VolumePolicySensor(_BaseSensor):
         return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
-class _VolumeApplyAllowed(_BaseBinary):
-    _key = "volume_apply_allowed"
-    _attr_name = "Volume Apply Allowed"
-
-    @property
-    def is_on(self) -> bool:
-        vd = getattr(self.coordinator.data, "volume", None)
-        return bool(vd and vd.apply_allowed)
-
-    @property
-    def extra_state_attributes(self):
-        return _orchestrator_attrs(*_orch_pair(self.coordinator))
-
-
 # -------------------------------------------------------------- binary_sensor
 
 
@@ -410,6 +396,20 @@ class _HomePodsResumeAllowed(_BaseBinary):
     def is_on(self) -> bool:
         od = self.coordinator.data.orchestrator
         return bool(od and od.resume_allowed)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
+
+
+class _VolumeApplyAllowed(_BaseBinary):
+    _key = "volume_apply_allowed"
+    _attr_name = "Volume Apply Allowed"
+
+    @property
+    def is_on(self) -> bool:
+        vd = getattr(self.coordinator.data, "volume", None)
+        return bool(vd and vd.apply_allowed)
 
     @property
     def extra_state_attributes(self):
