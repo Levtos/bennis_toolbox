@@ -22,6 +22,10 @@ INTEGRATION_DIR = CC / "bennis_toolbox"
 MODULES_DIR = INTEGRATION_DIR / "modules"
 
 EXPECTED_MODULE_IDS: set[str] = {
+    # benni_core_* — neues Fundament (drei Herzen + Device Layer).
+    # Siehe memory/toolbox_rebuild_plan.md.
+    "benni_core_day_state",
+    # Alt-Module bleiben bis zur Migration auf das neue Fundament.
     "benni_context",
     "benni_media_context",
     "notification_router",
