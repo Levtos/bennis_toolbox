@@ -28,6 +28,19 @@ MODULE_DIR = Path(
 ) / "custom_components" / "bennis_toolbox" / "modules" / "benni_media_context"
 
 
+def _load_orchestrator_stub():
+    """Load the orchestrator module under the `bmc_orchestrator` alias so
+    the test-time exec of coordinator.py can resolve its import."""
+    if "bmc_orchestrator" in sys.modules:
+        return
+    src = (MODULE_DIR / "orchestrator.py").read_text(encoding="utf-8")
+    src = src.replace("from .const import", "from bmc_const import")
+    src = src.replace("from .logic import", "from bmc_logic import")
+    mod = types.ModuleType("bmc_orchestrator")
+    sys.modules["bmc_orchestrator"] = mod
+    exec(compile(src, str(MODULE_DIR / "orchestrator.py"), "exec"), mod.__dict__)
+
+
 def _load_coordinator():
     """Load coordinator.py with minimal HA stubs so the helpers can run.
 
@@ -107,9 +120,11 @@ def _load_coordinator():
     src = src.replace("from ...const import", "from bmc_toolbox_stub.const import")
     src = src.replace("from .const import", "from bmc_const import")
     src = src.replace("from .logic import", "from bmc_logic import")
+    src = src.replace("from .orchestrator import", "from bmc_orchestrator import")
     # Ensure prerequisites are in sys.modules — they're set up by
     # test_module_smoke during collection. Import lazily here:
     import tests.benni_media_context.test_module_smoke  # noqa: F401
+    _load_orchestrator_stub()
     mod = types.ModuleType("bmc_coord_for_flatten")
     sys.modules["bmc_coord_for_flatten"] = mod
     exec(compile(src, str(MODULE_DIR / "coordinator.py"), "exec"), mod.__dict__)

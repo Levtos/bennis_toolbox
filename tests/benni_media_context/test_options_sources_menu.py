@@ -32,9 +32,13 @@ class _FakeOptionsFlow:
         self.last_menu: dict | None = None
         self.created_entry: dict | None = None
 
-    def async_show_form(self, step_id, data_schema=None, **_kw):
-        self.last_form = {"step_id": step_id, "data_schema": data_schema}
-        return {"type": "form", "step_id": step_id}
+    def async_show_form(self, step_id, data_schema=None, errors=None, **_kw):
+        self.last_form = {
+            "step_id": step_id,
+            "data_schema": data_schema,
+            "errors": dict(errors) if errors else None,
+        }
+        return {"type": "form", "step_id": step_id, "errors": errors}
 
     def async_show_menu(self, step_id, menu_options=None):
         self.last_menu = {"step_id": step_id, "menu_options": list(menu_options or [])}
@@ -42,6 +46,7 @@ class _FakeOptionsFlow:
 
     def async_create_entry(self, title, data, options=None):
         self.created_entry = {
+            "type": "create_entry",
             "title": title, "data": dict(data),
             "options": dict(options or {}),
         }

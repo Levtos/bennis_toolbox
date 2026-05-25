@@ -106,17 +106,15 @@ _TUNING_KEYS = (
 
 
 def _selector_in_schema(schema, key):
-    """Return the first validator in a vol.All chain that has a `cfg`
-    attribute (i.e. one of the selector stubs). The chain layout is
-    `vol.All(TextSelector, _to_decimal, vol.Range)`, so the selector
-    is the first sub-validator."""
+    """Return the bare Selector instance for the field.
+
+    Since the 0.3.7 refactor, the schema value is the TextSelector
+    directly — no `vol.All` wrapping — so HA's voluptuous_serialize can
+    render the form reliably across HA versions. Coercion + range
+    validation happen in the step handler, not in the schema.
+    """
     for marker, validator in schema.schema.items():
         if str(getattr(marker, "schema", marker)) == key:
-            # validator is a vol.All; pull the first wrapped item.
-            validators = getattr(validator, "validators", ())
-            for v in validators:
-                if hasattr(v, "cfg"):
-                    return v
             return validator
     raise AssertionError(f"key {key!r} not in schema")
 
@@ -174,22 +172,15 @@ async def test_tuning_schema_defaults_render_with_dot():
 @_run
 async def test_tuning_step_accepts_comma_decimal_input():
     """German-locale user types '-0,1' into the window-offset field.
-    The voluptuous chain must coerce to -0.1, validate the range, and
-    persist a Python float."""
+    The step handler must coerce to -0.1 and persist a Python float."""
     helper = flow_module.OptionsFlowHelper(
         hass=object(), entry=_entry(), flow=_FakeOptionsFlow(),
     )
-    await helper.async_step_tuning()  # render
-    schema = helper.flow.last_form["data_schema"]
-    # Manually run the validator chain for the field — that's what HA
-    # does on submit.
-    for marker, validator in schema.schema.items():
-        if str(getattr(marker, "schema", marker)) == "window_volume_offset":
-            out = validator("-0,1")
-            assert out == pytest.approx(-0.1)
-            break
-    else:
-        raise AssertionError("window_volume_offset missing")
+    result = await helper.async_step_tuning({
+        "window_volume_offset": "-0,1",
+    })
+    assert result["type"] == "create_entry"
+    assert result["data"]["window_volume_offset"] == pytest.approx(-0.1)
 
 
 @_run
@@ -197,28 +188,73 @@ async def test_tuning_step_still_accepts_dot_decimal_input():
     helper = flow_module.OptionsFlowHelper(
         hass=object(), entry=_entry(), flow=_FakeOptionsFlow(),
     )
-    await helper.async_step_tuning()
-    schema = helper.flow.last_form["data_schema"]
-    for marker, validator in schema.schema.items():
-        if str(getattr(marker, "schema", marker)) == "quiet_ducking_level":
-            assert validator("0.15") == pytest.approx(0.15)
-            break
-    else:
-        raise AssertionError("quiet_ducking_level missing")
+    result = await helper.async_step_tuning({
+        "quiet_ducking_level": "0.15",
+    })
+    assert result["type"] == "create_entry"
+    assert result["data"]["quiet_ducking_level"] == pytest.approx(0.15)
 
 
 @_run
 async def test_tuning_step_enforces_range_after_coercion():
+    """Out-of-range submission must re-show the form with an
+    `out_of_range` error code instead of crashing or persisting."""
+    helper = flow_module.OptionsFlowHelper(
+        hass=object(), entry=_entry(), flow=_FakeOptionsFlow(),
+    )
+    result = await helper.async_step_tuning({
+        "quiet_ducking_level": "2.5",  # out of [0, 1] range
+    })
+    # No entry created — form re-rendered with errors.
+    assert helper.flow.created_entry is None
+    last = helper.flow.last_form
+    assert last["step_id"] == "tuning"
+    assert last["errors"] == {"quiet_ducking_level": "out_of_range"}
+
+
+@_run
+async def test_tuning_step_rejects_garbage_with_invalid_number_error():
+    helper = flow_module.OptionsFlowHelper(
+        hass=object(), entry=_entry(), flow=_FakeOptionsFlow(),
+    )
+    result = await helper.async_step_tuning({
+        "debounce_seconds": "abc",
+    })
+    assert helper.flow.created_entry is None
+    assert helper.flow.last_form["errors"] == {"debounce_seconds": "invalid_number"}
+
+
+@_run
+async def test_tuning_step_blank_input_keeps_stored_value():
+    """An empty submission keeps the stored options untouched."""
+    entry = _entry(options={"debounce_seconds": 7.5})
+    helper = flow_module.OptionsFlowHelper(
+        hass=object(), entry=entry, flow=_FakeOptionsFlow(),
+    )
+    result = await helper.async_step_tuning({"debounce_seconds": ""})
+    assert result["type"] == "create_entry"
+    # The cleaned dict was empty → original stored value survives.
+    assert result["data"]["debounce_seconds"] == 7.5
+
+
+@_run
+async def test_tuning_step_schema_uses_bare_text_selector_for_render():
+    """Regression for the 0.3.7 fix: the value in the schema dict must
+    be a TextSelector instance directly, *not* a vol.All chain. HA's
+    voluptuous_serialize can't reliably render a Selector that is
+    wrapped inside vol.All across all HA versions — that wrap was the
+    root cause of the "Lautstärke & Debounce" render error."""
+    import voluptuous as vol
+    import homeassistant.helpers.selector as sel
     helper = flow_module.OptionsFlowHelper(
         hass=object(), entry=_entry(), flow=_FakeOptionsFlow(),
     )
     await helper.async_step_tuning()
     schema = helper.flow.last_form["data_schema"]
-    import voluptuous as vol
     for marker, validator in schema.schema.items():
-        if str(getattr(marker, "schema", marker)) == "quiet_ducking_level":
-            with pytest.raises(vol.Invalid):
-                validator("2.5")  # out of [0, 1] range
-            break
-    else:
-        raise AssertionError("quiet_ducking_level missing")
+        assert not isinstance(validator, vol.All), (
+            f"{marker} must use a bare Selector, not vol.All"
+        )
+        assert isinstance(validator, sel.TextSelector), (
+            f"{marker} must be a TextSelector, got {type(validator).__name__}"
+        )

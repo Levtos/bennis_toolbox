@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.3.7 - 2026-05-25
+
+### Hinzugefügt
+
+- Benni Media Context: HomePods-vs-Entertainment Audio-Orchestrator als
+  reine Entscheidungslogik. Erweitert das Modul um stabile HA-Entities,
+  ohne selbst Services aufzurufen — YAML reagiert nur noch auf das
+  berechnete Ergebnis.
+- Neue Outputs:
+  - `binary_sensor.benni_media_context_homepods_should_pause`
+  - `binary_sensor.benni_media_context_homepods_resume_allowed`
+  - `sensor.benni_media_context_homepods_action`
+    (Werte `none`, `pause_homepods`, `resume_homepods`, `start_radio`)
+  - `sensor.benni_media_context_audio_owner`
+    (Werte `none`, `homepods`, `tv_denon`, `gaming_stack`,
+    `private_stack`)
+- Jede Orchestrator-Entity trägt das gleiche Debug-Attribut-Set:
+  `reason`, `blocked_reason`, `media_context`, `media_subcontext`,
+  `media_device`, `gaming_source`, `gaming_platform`,
+  `entertainment_active`, `tv_state`, `appletv_state`, `ps5_state`,
+  `switch_state`, `pc_gaming_active`, `denon_state`,
+  `denon_audio_path`, `homepods_state`, `manual_playback_active`,
+  `planned_radio_active`, `bio_sleep`, `auto_paused_homepods`,
+  `resume_candidate`, `winning_stack`, sowie die Signal-Aufschlüsselung
+  (`private_signal_active`, `gaming_signal_active`,
+  `streaming_signal_active`, `tv_signal_active`, `ps5_gaming_active`,
+  `switch_gaming_active`).
+- Neue, optionale Konfigurationsquellen (kein UI-Eintrag — über
+  `entry.data`/`options`): `bio_state_entity` (sleep/sleeping blockiert
+  Resume), `manual_playback_entity` (manuell laufende Musik),
+  `planned_radio_entity` (geplantes Radio).
+
+### Fachregeln
+
+- Priorität: `private_time` > `gaming` > `streaming`/`tv` > `homepods`
+  > `idle`.
+- PS5 und Switch (gedockt) sind immer Entertainment-Stack.
+- PC-Gaming zählt nur bei validem Title-Classifier-Wert
+  (`classifier_pc != 0`); ein bloß eingeschalteter PC pausiert HomePods
+  nicht.
+- Apple-TV-Streaming-Apps gewinnen gegen HomePods; Apple-TV-System-Apps
+  (Home/Settings) zählen nicht als Streaming.
+- HomePods werden nach Ende des Entertainment-Stacks nur fortgesetzt,
+  wenn sie zuvor automatisch pausiert wurden. Manueller Stop blockiert
+  Resume bis zum nächsten Start.
+- `bio_sleep` (Bio-State `sleep`/`sleeping`/`asleep`) blockiert sowohl
+  Resume als auch geplanten Radio-Start.
+- War vorher geplantes Radio aktiv, empfiehlt der Orchestrator nach
+  Entertainment-Ende `start_radio`; sonst (falls manuelle Musik lief)
+  `resume_homepods`.
+
+### Behoben
+
+- Benni Media Context: Das Options-Menü „Lautstärke & Debounce“
+  warf in HA einen Render-Fehler, weil die Tuning-Felder über
+  `vol.All(TextSelector, _to_decimal, vol.Range)` definiert waren —
+  HA's `voluptuous_serialize` extrahiert den Selector nicht
+  zuverlässig aus einer `vol.All`-Kette, je nach HA-Version. Schema
+  baut jetzt jedes Feld als bare `selector.TextSelector`. Coercion
+  (Dot/Komma-Dezimal) und Range-Check laufen im Step-Handler
+  `async_step_tuning`. Ungültige Eingaben zeigen das Formular erneut
+  mit per-Feld-Fehlercodes (`invalid_number`, `out_of_range`); leere
+  Felder lassen den gespeicherten Wert unverändert.
+
+### Tests
+
+- `benni_media_context`: 20 neue Tests in `test_orchestrator.py`
+  (Priorität, PS5/Switch/PC-Gaming-Regeln, Apple-TV-System-App-Filter,
+  Auto-Pause/Resume-Bookkeeping, Manual-Stop-Block, Bio-Sleep-Block,
+  Radio-vs-Manual-Wahl, Debug-Surface).
+- `test_tuning_decimal_separator.py`: Pinning auf den
+  Step-Handler-Validierungspfad — Komma-/Dot-Submit, Out-of-range
+  → `errors`-Rerender, Garbage → `invalid_number`, leeres Feld
+  behält Storage-Wert, Regression auf bare `TextSelector` im Schema.
+- Smoke-Test um die vier neuen Entity-Keys erweitert.
+- Full suite: `613 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine Migration nötig. Bestehende Sensor-/Binary-Sensor-Entities
+  bleiben unverändert. Die neuen Orchestrator-Outputs erscheinen
+  zusätzlich am bestehenden Device.
+
 ## 0.3.6.10 - 2026-05-25
 
 ### Geändert
