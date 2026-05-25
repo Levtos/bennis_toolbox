@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.8.2 - 2026-05-25
+
+### Behoben
+
+- **Benni Core Day State: Zeitzonen-Inkonsistenz in `phase_starts` und
+  abgeleiteten Anker-Attributen.** `sun.sun.next_noon` liefert UTC-ISO,
+  was im Coordinator als UTC-aware datetime geparst und unverändert an
+  die Logik übergeben wurde. Daraus abgeleitete Anker (`midday_start`,
+  `evening_start`, `late_evening_start`) behielten UTC, während die aus
+  `now` abgeleiteten Anker (`morning_fix`, `night_fix`) in lokaler TZ
+  (CEST) blieben. Im Attribut `phase_starts` (HH:MM:SS-Strings ohne
+  Offset) führte das zu Mischformaten — `forenoon` zeigte z.B. `08:28`
+  statt `10:28`. Phase-Resolution selbst war nie betroffen, da
+  Vergleiche zwischen TZ-aware datetimes intern UTC nutzen.
+- Fix: `_resolve_solar_noon` konvertiert Solar Noon jetzt nach
+  `now.tzinfo`, bevor er an die Logik weitergegeben wird.
+
+### Tests
+
+- Neuer Regression-Test
+  `test_solar_noon_utc_input_is_converted_to_now_timezone`: stellt
+  sicher, dass UTC-Inputs konsistent in `now`'s TZ konvertiert werden
+  und `phase_starts` Lokalzeit-Strings liefert.
+- Full suite: **691 passed** (+1, von 690).
+
 ## 0.3.8.1 - 2026-05-25
 
 ### Behoben
