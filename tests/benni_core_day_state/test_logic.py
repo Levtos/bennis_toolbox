@@ -287,6 +287,28 @@ def test_solar_noon_fallback_inactive_when_input_provided():
     assert r.solar_noon_at == noon
 
 
+def test_solar_noon_utc_input_is_converted_to_now_timezone():
+    """Regression: sun.sun.next_noon kommt als UTC. Wenn der Input in einer
+    anderen TZ kommt als now, müssen alle daraus abgeleiteten Anker in
+    now's TZ landen — sonst zeigt `phase_starts` Mischformate (CEST für
+    morning_fix, UTC für forenoon/afternoon/evening).
+    """
+    now = datetime(2026, 5, 25, 22, 0, tzinfo=TZ_SUMMER)
+    # Solar Noon kommt als UTC (so wie sun.sun.next_noon es liefert).
+    utc_noon = datetime(2026, 5, 25, 11, 28, tzinfo=timezone.utc)
+    r = L.compute_day_state(now, utc_noon)
+
+    # Alle abgeleiteten Anker müssen in CEST (now.tzinfo) sein.
+    assert r.solar_noon_at.utcoffset() == TZ_SUMMER.utcoffset(None)
+    assert r.midday_start_at.utcoffset() == TZ_SUMMER.utcoffset(None)
+    assert r.evening_start_at.utcoffset() == TZ_SUMMER.utcoffset(None)
+    assert r.late_evening_start_at.utcoffset() == TZ_SUMMER.utcoffset(None)
+
+    # phase_starts in Lokalzeit, nicht UTC.
+    # solar_noon 11:28 UTC = 13:28 CEST → afternoon startet 13:28.
+    assert r.phase_starts["afternoon"] == "13:28:00"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Vollständigkeits-Test: alle 8 Phasen erreichbar
 # ─────────────────────────────────────────────────────────────────────────────

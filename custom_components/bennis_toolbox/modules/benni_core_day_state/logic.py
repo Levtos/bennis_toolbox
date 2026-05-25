@@ -177,9 +177,18 @@ def late_night_start_for(
 def _resolve_solar_noon(
     now: datetime, solar_noon: datetime | None
 ) -> tuple[datetime, bool]:
-    """Solar Noon oder Fallback. Gibt (timestamp, fallback_active) zurück."""
+    """Solar Noon oder Fallback. Gibt (timestamp, fallback_active) zurück.
+
+    Konvertiert Solar Noon nach `now.tzinfo`, damit alle daraus abgeleiteten
+    Anker (midday_start, evening_start, late_evening_start) in derselben
+    Zeitzone wie morning_fix/night_fix landen. Sonst zeigt der Sensor
+    Mischformate in `phase_starts` an (z.B. CEST für morning_fix, UTC für
+    forenoon — weil `sun.sun.next_noon` als UTC-Timestamp parsed wird).
+    """
     if solar_noon is None:
         return _combine(now.date(), SOLAR_NOON_FALLBACK, now.tzinfo), True
+    if now.tzinfo is not None and solar_noon.tzinfo is not None:
+        solar_noon = solar_noon.astimezone(now.tzinfo)
     return solar_noon, False
 
 
