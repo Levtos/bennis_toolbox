@@ -41,6 +41,17 @@ def _load_orchestrator_stub():
     exec(compile(src, str(MODULE_DIR / "orchestrator.py"), "exec"), mod.__dict__)
 
 
+def _load_volume_orchestrator_stub():
+    """Same trick as _load_orchestrator_stub but for the volume sibling."""
+    if "bmc_volume_orchestrator" in sys.modules:
+        return
+    src = (MODULE_DIR / "volume_orchestrator.py").read_text(encoding="utf-8")
+    src = src.replace("from .const import", "from bmc_const import")
+    mod = types.ModuleType("bmc_volume_orchestrator")
+    sys.modules["bmc_volume_orchestrator"] = mod
+    exec(compile(src, str(MODULE_DIR / "volume_orchestrator.py"), "exec"), mod.__dict__)
+
+
 def _load_coordinator():
     """Load coordinator.py with minimal HA stubs so the helpers can run.
 
@@ -121,10 +132,15 @@ def _load_coordinator():
     src = src.replace("from .const import", "from bmc_const import")
     src = src.replace("from .logic import", "from bmc_logic import")
     src = src.replace("from .orchestrator import", "from bmc_orchestrator import")
+    src = src.replace(
+        "from .volume_orchestrator import",
+        "from bmc_volume_orchestrator import",
+    )
     # Ensure prerequisites are in sys.modules — they're set up by
     # test_module_smoke during collection. Import lazily here:
     import tests.benni_media_context.test_module_smoke  # noqa: F401
     _load_orchestrator_stub()
+    _load_volume_orchestrator_stub()
     mod = types.ModuleType("bmc_coord_for_flatten")
     sys.modules["bmc_coord_for_flatten"] = mod
     exec(compile(src, str(MODULE_DIR / "coordinator.py"), "exec"), mod.__dict__)

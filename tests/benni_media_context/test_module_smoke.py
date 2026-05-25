@@ -68,11 +68,13 @@ def test_entities_expose_expected_sensor_and_binary_sensor_keys():
         "gaming_source", "gaming_platform",
         "volume_target_homepods", "volume_target_denon",
         "homepods_action", "audio_owner",
+        "volume_policy",
     }
     expected_binary_keys = {
         "headset_active", "entertainment_active",
         "quiet_mode_active", "subwoofer_allowed",
         "homepods_should_pause", "homepods_resume_allowed",
+        "volume_apply_allowed",
     }
 
     # Sensor classes are listed in the SENSOR branch of async_get_entities;

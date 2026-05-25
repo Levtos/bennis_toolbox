@@ -256,6 +256,106 @@ CONF_BIO_STATE = "bio_state_entity"
 CONF_MANUAL_PLAYBACK = "manual_playback_entity"
 CONF_PLANNED_RADIO = "planned_radio_entity"
 
+# Orchestrator-specific inputs that don't map onto an existing device card.
+# All optional — missing entities downgrade behaviour gracefully (the
+# orchestrators fall back to the legacy heuristics that don't need
+# them).
+CONF_PC_GAMING_ACTIVE = "pc_gaming_active_entity"
+CONF_MEDIA_STOP_LATCH = "media_stop_latch_entity"
+CONF_OPENING_ANY_OPEN = "opening_any_open_entity"
+CONF_QUIET_MODE_ENTITY = "quiet_mode_entity"
+
+# ---------------------------------------------------------------------------
+# Volume orchestrator settings
+#
+# Each setting is an optional config-entry option. The volume
+# orchestrator reads them via the coordinator's `_opt()` helper so a
+# missing key transparently falls back to the listed default. The
+# names mirror the spec exactly — the options-flow card uses these
+# keys 1:1.
+# ---------------------------------------------------------------------------
+CONF_VOL_HOMEPODS_BASE = "volume_homepods_media_base"
+CONF_VOL_DENON_BASE = "volume_denon_media_base"
+CONF_VOL_DUCKED_TARGET = "volume_ducked_target"
+CONF_VOL_HOMEPODS_MAX = "volume_homepods_max"
+CONF_VOL_DENON_MAX = "volume_denon_max"
+CONF_VOL_ACTIVE_MIN = "volume_active_min"
+CONF_VOL_NIGHT_OFFSET = "volume_night_offset"
+CONF_VOL_EDGE_DAY_OFFSET = "volume_edge_day_offset"
+CONF_VOL_OPENING_OFFSET = "volume_opening_offset"
+
+DEFAULT_VOL_HOMEPODS_BASE = 0.35
+DEFAULT_VOL_DENON_BASE = 0.40
+DEFAULT_VOL_DUCKED_TARGET = 0.15
+DEFAULT_VOL_HOMEPODS_MAX = 0.65
+DEFAULT_VOL_DENON_MAX = 0.70
+DEFAULT_VOL_ACTIVE_MIN = 0.05
+DEFAULT_VOL_NIGHT_OFFSET = -0.10
+DEFAULT_VOL_EDGE_DAY_OFFSET = -0.05
+DEFAULT_VOL_OPENING_OFFSET = -0.05
+
+# Volume policy state machine values
+VOL_POLICY_IDLE = "idle"
+VOL_POLICY_MEDIA = "media"
+VOL_POLICY_DUCKED = "ducked"
+VOL_POLICY_MUTED = "muted"
+VOL_POLICY_BLOCKED = "blocked"
+
+# Day-state values the volume orchestrator reasons about. The
+# `day_state_entity` may emit other values too — those are treated as
+# "no offset" (the default-zero branch).
+DAY_NIGHT = "night"
+DAY_LATE_NIGHT = "late_night"
+DAY_EARLY_NIGHT = "early_night"
+DAY_EARLY_MORNING = "early_morning"
+DAY_LATE_EVENING = "late_evening"
+
+DAY_NIGHT_VALUES = (DAY_NIGHT, DAY_LATE_NIGHT, DAY_EARLY_NIGHT)
+DAY_EDGE_VALUES = (DAY_EARLY_MORNING, DAY_LATE_EVENING)
+
+# ---------------------------------------------------------------------------
+# Orchestrator input registry
+#
+# Single source of truth for "which entities the orchestrators look at".
+# Each entry is (canonical_name, primary_conf_key, legacy_fallback_or_None).
+#
+# The coordinator uses this list to resolve a `configured_entities`
+# dict (canonical → entity_id-or-None) and a parallel
+# `missing_orchestrator_inputs` / `missing_volume_inputs` list for the
+# debug surface. The registry intentionally mixes existing
+# device-card CONF keys with orchestrator-only keys — the contract is
+# "every input the orchestrator reads is in this list".
+# ---------------------------------------------------------------------------
+ORCH_INPUTS: tuple[tuple[str, str, str | None], ...] = (
+    ("homepods_player_entity", CONF_HOMEPODS_PLAYER, CONF_HOMEPODS),
+    ("denon_player_entity", CONF_DENON_PLAYER, None),
+    ("tv_player_entity", CONF_TV_PLAYER, None),
+    ("appletv_player_entity", CONF_APPLETV_PLAYER, CONF_APPLETV),
+    ("ps5_player_entity", CONF_PS5_PLAYER, None),
+    ("switch_status_entity", CONF_SWITCH_ACTIVE, CONF_SWITCH_DOCK),
+    ("pc_gaming_active_entity", CONF_PC_GAMING_ACTIVE, None),
+    ("manual_playback_active_entity", CONF_MANUAL_PLAYBACK, None),
+    ("planned_radio_active_entity", CONF_PLANNED_RADIO, None),
+    ("media_stop_latch_entity", CONF_MEDIA_STOP_LATCH, None),
+    ("bio_state_entity", CONF_BIO_STATE, None),
+    ("day_state_entity", CONF_DAY_STATE, None),
+    ("opening_any_open_entity", CONF_OPENING_ANY_OPEN, None),
+    ("quiet_mode_entity", CONF_QUIET_MODE_ENTITY, None),
+)
+
+# Names that must be configured for the audio orchestrator to do
+# meaningful work. Everything else is "nice to have" — when missing,
+# the orchestrator falls back to legacy heuristics. The HomePod player
+# is the one critical input: without it, pause/resume have no target.
+ORCH_REQUIRED_INPUTS: frozenset[str] = frozenset({"homepods_player_entity"})
+
+# Inputs the volume orchestrator needs at least one of in order to
+# produce a non-blocked policy. With neither homepods nor denon
+# configured, policy=blocked.
+VOL_PRIMARY_INPUTS: frozenset[str] = frozenset({
+    "homepods_player_entity", "denon_player_entity",
+})
+
 # ---- Services ----
 SERVICE_FORCE_RECALCULATE = "force_recalculate"
 SERVICE_SET_MANUAL_NUDGE = "set_manual_nudge"
