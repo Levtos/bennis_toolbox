@@ -112,21 +112,62 @@ def _to_decimal(value: Any) -> float:
     return float(s)
 
 
-def _decimal_text(min_: float, max_: float):
-    """voluptuous validator chain backing the tuning fields.
+def _text_selector() -> selector.TextSelector:
+    """Build the plain-text input used for every tuning field.
 
-    Renders a plain text input (no locale formatting) and coerces the
-    submitted value to a clamped float via `_to_decimal`. Order is
-    important: we coerce *before* the range check so a comma-decimal
-    string still validates as a number.
+    Why not `vol.All(TextSelector, _to_decimal, vol.Range)`? HA renders
+    config-flow schemas via `voluptuous_serialize`, which does not
+    reliably pick a Selector out of an `vol.All` chain across all HA
+    versions (Einhornzentrale's box hit a render error on "Lautstärke
+    & Debounce" because of exactly that wrap). The Selector must be
+    the bare value; coercion + range validation happen in the step
+    handler after submit.
     """
-    return vol.All(
-        selector.TextSelector(
-            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
-        ),
-        _to_decimal,
-        vol.Range(min=min_, max=max_),
+    return selector.TextSelector(
+        selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
     )
+
+
+# Range bounds per tuning field. Used both by the field-level UI
+# (via the tooltip range hint) and by `_validate_tuning_input` to
+# reject out-of-range submissions cleanly.
+_TUNING_RANGES: dict[str, tuple[float, float]] = {
+    CONF_DEBOUNCE: (0.0, 60.0),
+    CONF_QUIET_DUCK: (0.0, 1.0),
+    CONF_BASE_VOL_HOMEPODS: (0.0, 1.0),
+    CONF_BASE_VOL_DENON: (0.0, 1.0),
+    CONF_BOOST_OFFSET: (-0.5, 0.5),
+    CONF_WINDOW_OFFSET: (-0.5, 0.5),
+}
+
+
+def _validate_tuning_input(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Parse + range-check a tuning submission.
+
+    Returns ``(cleaned, errors)``. ``cleaned`` only contains keys that
+    parsed successfully; ``errors`` maps the failing key to a
+    translation-friendly error code ("invalid_number" or
+    "out_of_range").
+    """
+    cleaned: dict[str, float] = {}
+    errors: dict[str, str] = {}
+    for key, (lo, hi) in _TUNING_RANGES.items():
+        raw = user_input.get(key)
+        if raw is None or raw == "":
+            # Optional field left blank → keep stored value (drop key).
+            continue
+        try:
+            value = _to_decimal(raw)
+        except (TypeError, ValueError):
+            errors[key] = "invalid_number"
+            continue
+        if value < lo or value > hi:
+            errors[key] = "out_of_range"
+            continue
+        cleaned[key] = value
+    return cleaned, errors
 
 
 def _fmt_decimal(value: Any, default: float) -> str:
@@ -139,33 +180,30 @@ def _fmt_decimal(value: Any, default: float) -> str:
         return f"{float(default)}"
 
 
+_TUNING_DEFAULTS: dict[str, float] = {
+    CONF_DEBOUNCE: DEFAULT_DEBOUNCE,
+    CONF_QUIET_DUCK: DEFAULT_QUIET_DUCK,
+    CONF_BASE_VOL_HOMEPODS: DEFAULT_BASE_VOL_HOMEPODS,
+    CONF_BASE_VOL_DENON: DEFAULT_BASE_VOL_DENON,
+    CONF_BOOST_OFFSET: DEFAULT_BOOST_OFFSET,
+    CONF_WINDOW_OFFSET: DEFAULT_WINDOW_OFFSET,
+}
+
+
 def _options_schema(opts: dict[str, Any]) -> vol.Schema:
-    return vol.Schema({
-        vol.Optional(
-            CONF_DEBOUNCE,
-            default=_fmt_decimal(opts.get(CONF_DEBOUNCE), DEFAULT_DEBOUNCE),
-        ): _decimal_text(0, 60),
-        vol.Optional(
-            CONF_QUIET_DUCK,
-            default=_fmt_decimal(opts.get(CONF_QUIET_DUCK), DEFAULT_QUIET_DUCK),
-        ): _decimal_text(0, 1),
-        vol.Optional(
-            CONF_BASE_VOL_HOMEPODS,
-            default=_fmt_decimal(opts.get(CONF_BASE_VOL_HOMEPODS), DEFAULT_BASE_VOL_HOMEPODS),
-        ): _decimal_text(0, 1),
-        vol.Optional(
-            CONF_BASE_VOL_DENON,
-            default=_fmt_decimal(opts.get(CONF_BASE_VOL_DENON), DEFAULT_BASE_VOL_DENON),
-        ): _decimal_text(0, 1),
-        vol.Optional(
-            CONF_BOOST_OFFSET,
-            default=_fmt_decimal(opts.get(CONF_BOOST_OFFSET), DEFAULT_BOOST_OFFSET),
-        ): _decimal_text(-0.5, 0.5),
-        vol.Optional(
-            CONF_WINDOW_OFFSET,
-            default=_fmt_decimal(opts.get(CONF_WINDOW_OFFSET), DEFAULT_WINDOW_OFFSET),
-        ): _decimal_text(-0.5, 0.5),
-    })
+    """Build the tuning schema with bare TextSelectors.
+
+    Each field is a plain `selector.TextSelector` — no `vol.All`
+    wrapping, because some HA versions fail to render selectors that
+    are nested inside `vol.All`. Coercion + range checks live in
+    `_validate_tuning_input` and run in the step handler.
+    """
+    fields: dict[Any, Any] = {}
+    for key, default in _TUNING_DEFAULTS.items():
+        fields[
+            vol.Optional(key, default=_fmt_decimal(opts.get(key), default))
+        ] = _text_selector()
+    return vol.Schema(fields)
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +517,18 @@ class OptionsFlowHelper:
 
     async def async_step_tuning(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:
-            new_opts = {**self.entry.options, **user_input}
+            cleaned, errors = _validate_tuning_input(user_input)
+            if errors:
+                # Re-render with the values the user typed (so they
+                # don't have to retype everything) plus the per-field
+                # error codes the frontend can translate.
+                merged_for_render = {**_merged(self.entry), **user_input}
+                return self.flow.async_show_form(
+                    step_id="tuning",
+                    data_schema=_options_schema(merged_for_render),
+                    errors=errors,
+                )
+            new_opts = {**self.entry.options, **cleaned}
             new_opts.pop(CONF_MODULE_ID, None)
             return self.flow.async_create_entry(title="", data=new_opts)
         return self.flow.async_show_form(

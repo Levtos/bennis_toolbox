@@ -222,6 +222,40 @@ TV_SOURCE_MAP = {
     "RTL": SUB_TV_RTL,
 }
 
+# ---------------------------------------------------------------------------
+# Audio orchestrator
+#
+# The orchestrator decides whether the HomePods may keep playing, must be
+# paused (because a higher-priority media stack is taking over), or may be
+# resumed after the entertainment stack ended. It only computes — it does
+# not call HA services. YAML automations react to the output sensors.
+#
+# Priority of the audio owner mirrors the media-context priority from the
+# lastenheft: private_time > gaming > streaming/tv > homepods > idle.
+# ---------------------------------------------------------------------------
+
+AUDIO_OWNER_NONE = "none"
+AUDIO_OWNER_HOMEPODS = "homepods"
+AUDIO_OWNER_TV_DENON = "tv_denon"
+AUDIO_OWNER_GAMING = "gaming_stack"
+AUDIO_OWNER_PRIVATE = "private_stack"
+
+ACTION_NONE = "none"
+ACTION_PAUSE = "pause_homepods"
+ACTION_RESUME = "resume_homepods"
+ACTION_START_RADIO = "start_radio"
+
+RESUME_MODE_MANUAL = "manual"
+RESUME_MODE_RADIO = "radio"
+
+# Bio sleep state values (read from benni_context bio sensor)
+BIO_SLEEP_VALUES = ("sleep", "sleeping", "asleep")
+
+# CONF keys for the orchestrator inputs
+CONF_BIO_STATE = "bio_state_entity"
+CONF_MANUAL_PLAYBACK = "manual_playback_entity"
+CONF_PLANNED_RADIO = "planned_radio_entity"
+
 # ---- Services ----
 SERVICE_FORCE_RECALCULATE = "force_recalculate"
 SERVICE_SET_MANUAL_NUDGE = "set_manual_nudge"

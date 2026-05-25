@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.sensor import SensorEntity
@@ -13,8 +13,13 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ...const import DOMAIN, unique_id
-from .const import MODULE_ID
+from .const import (
+    ACTION_NONE,
+    AUDIO_OWNER_NONE,
+    MODULE_ID,
+)
 from .coordinator import BenniMediaCoordinator, coordinator_from_hass
+from .orchestrator import OrchestratorDecision
 
 
 def _device_info(entry: ConfigEntry) -> dict[str, Any]:
@@ -41,6 +46,8 @@ async def async_get_entities(
             _GamingPlatformSensor(coord, entry),
             _VolHomePodsSensor(coord, entry),
             _VolDenonSensor(coord, entry),
+            _HomePodsActionSensor(coord, entry),
+            _AudioOwnerSensor(coord, entry),
         ]
     if platform == Platform.BINARY_SENSOR:
         return [
@@ -48,6 +55,8 @@ async def async_get_entities(
             _EntertainmentActive(coord, entry),
             _QuietModeActive(coord, entry),
             _SubwooferAllowed(coord, entry),
+            _HomePodsShouldPause(coord, entry),
+            _HomePodsResumeAllowed(coord, entry),
         ]
     return []
 
@@ -244,3 +253,112 @@ class _SubwooferAllowed(_BaseBinary):
         attrs["denon_audio_path"] = d.denon_audio_path
         attrs["subwoofer_block_reason"] = d.subwoofer_block_reason
         return attrs
+
+
+# --------------------------------------------------- audio orchestrator
+#
+# All four entities below read from the same `OrchestratorDecision` payload
+# attached to `coordinator.data.orchestrator`. The attribute set is
+# identical across the four entities so the HA Devtools Template view can
+# inspect every signal — winning stack, blockers, per-device states — from
+# whichever entity the user happens to look at first.
+
+
+def _orchestrator_attrs(od: Optional[OrchestratorDecision]) -> dict[str, Any]:
+    """Build the full attribute set for the orchestrator entities."""
+    if od is None:
+        # Pre-first-commit state: surface stable defaults so HA template
+        # automations don't see `None` flicker on startup.
+        od = OrchestratorDecision()
+    return {
+        "reason": od.reason,
+        "blocked_reason": od.blocked_reason,
+        "media_context": od.media_context,
+        "media_subcontext": od.media_subcontext,
+        "media_device": od.media_device,
+        "gaming_source": od.gaming_source,
+        "gaming_platform": od.gaming_platform,
+        "entertainment_active": od.entertainment_active,
+        "tv_state": od.tv_state,
+        "appletv_state": od.appletv_state,
+        "ps5_state": od.ps5_state,
+        "switch_state": od.switch_state,
+        "pc_gaming_active": od.pc_gaming_active,
+        "denon_state": od.denon_state,
+        "denon_audio_path": od.denon_audio_path,
+        "homepods_state": od.homepods_state,
+        "manual_playback_active": od.manual_playback_active,
+        "planned_radio_active": od.planned_radio_active,
+        "bio_sleep": od.bio_sleep,
+        "auto_paused_homepods": od.auto_paused_homepods,
+        "resume_candidate": od.resume_candidate,
+        # Detailed debug — which signals were active when the
+        # orchestrator picked the winner.
+        "audio_owner": od.audio_owner,
+        "winning_stack": od.winning_stack,
+        "private_signal_active": od.private_signal_active,
+        "gaming_signal_active": od.gaming_signal_active,
+        "streaming_signal_active": od.streaming_signal_active,
+        "tv_signal_active": od.tv_signal_active,
+        "ps5_gaming_active": od.ps5_gaming_active,
+        "switch_gaming_active": od.switch_gaming_active,
+        "should_pause": od.should_pause,
+        "resume_allowed": od.resume_allowed,
+        "action": od.action,
+    }
+
+
+class _HomePodsShouldPause(_BaseBinary):
+    _key = "homepods_should_pause"
+    _attr_name = "HomePods Should Pause"
+
+    @property
+    def is_on(self) -> bool:
+        od = self.coordinator.data.orchestrator
+        return bool(od and od.should_pause)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+
+
+class _HomePodsResumeAllowed(_BaseBinary):
+    _key = "homepods_resume_allowed"
+    _attr_name = "HomePods Resume Allowed"
+
+    @property
+    def is_on(self) -> bool:
+        od = self.coordinator.data.orchestrator
+        return bool(od and od.resume_allowed)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+
+
+class _HomePodsActionSensor(_BaseSensor):
+    _key = "homepods_action"
+    _attr_name = "HomePods Action"
+
+    @property
+    def native_value(self):
+        od = self.coordinator.data.orchestrator
+        return od.action if od else ACTION_NONE
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+
+
+class _AudioOwnerSensor(_BaseSensor):
+    _key = "audio_owner"
+    _attr_name = "Audio Owner"
+
+    @property
+    def native_value(self):
+        od = self.coordinator.data.orchestrator
+        return od.audio_owner if od else AUDIO_OWNER_NONE
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(self.coordinator.data.orchestrator)

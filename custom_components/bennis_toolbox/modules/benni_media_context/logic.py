@@ -55,6 +55,10 @@ class Snapshot:
     # HomePods
     homepods_playing: bool = False
     homepods_volume_level: Optional[float] = None
+    # Raw HomePod player state (e.g. "playing"/"paused"/"idle"/"off");
+    # surfaced separately so the orchestrator can distinguish "currently
+    # playing" from "paused" and reason about auto-pause transitions.
+    homepods_state: Optional[str] = None
     # Per-device diagnostic raw inputs (player_state + power_w + …);
     # the coordinator populates these so the entity attributes can
     # surface a stable per-device view without re-reading hass.states.
@@ -79,6 +83,12 @@ class Snapshot:
     window_open: bool = False
     # Manual nudge override (subcontext)
     manual_nudge: Optional[str] = None
+    # Audio orchestrator inputs (carried so decide() can pass them down
+    # to the orchestrator without growing its signature). All optional —
+    # absent values default to "not active / not sleeping".
+    bio_sleep: bool = False
+    manual_playback_active: bool = False
+    planned_radio_active: bool = False
 
 
 @dataclass
@@ -107,9 +117,20 @@ class Decision:
     # coordinator's `async_set_updated_data(decision)` reaches the
     # entities with the diag intact.
     device_diagnostics: dict = field(default_factory=dict)
+    # Audio orchestrator output (None until the coordinator computes it
+    # after _commit). Kept off-band from `asdict()` callers; the
+    # coordinator must re-attach the live object after rebuilding a
+    # Decision from a dict (see `_commit`).
+    orchestrator: Optional["object"] = None
 
     def to_dict(self):
-        return asdict(self)
+        # Exclude the live orchestrator object — it is a separate
+        # dataclass and the coordinator carries it across ticks
+        # explicitly. Dropping it here keeps `Decision(**to_dict())`
+        # round-trips usable for the debounce interim copy.
+        d = asdict(self)
+        d.pop("orchestrator", None)
+        return d
 
 
 # ---------------------------------------------------------------------------

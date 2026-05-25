@@ -18,8 +18,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from ...const import DATA_ENTRIES, DOMAIN
 from .const import (
+    BIO_SLEEP_VALUES,
     CONF_ACTIVITY_STATE,
     CONF_APPLETV,
+    CONF_BIO_STATE,
+    CONF_MANUAL_PLAYBACK,
+    CONF_PLANNED_RADIO,
     CONF_APPLETV_APP_MAP,
     CONF_BASE_VOL_DENON,
     CONF_BASE_VOL_HOMEPODS,
@@ -64,6 +68,11 @@ from .const import (
     MODULE_ID,
 )
 from .logic import Decision, Snapshot, decide
+from .orchestrator import (
+    OrchestratorDecision,
+    OrchestratorState,
+    decide_audio_orchestrator,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -151,6 +160,9 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         self._pending_decision: Optional[Decision] = None
         self._pending_since: float = 0.0
         self._manual_nudge: Optional[str] = None
+        # Audio orchestrator persistent state. Updated only on _commit so
+        # debounce-driven recomputes don't double-consume transitions.
+        self._orch_state: OrchestratorState = OrchestratorState()
 
         self.data = Decision()
         self._last_snapshot: Optional[Snapshot] = None
@@ -227,13 +239,15 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
                 if e:
                     entities.append(e)
         # Context / classifier / window / door / call etc. still use
-        # their original keys.
+        # their original keys. The orchestrator inputs
+        # (bio/manual_playback/planned_radio) ride along here.
         for key in (
             CONF_TV_SOURCE,
             CONF_TITLE_CLASSIFIER_PS5, CONF_TITLE_CLASSIFIER_PC,
             CONF_TITLE_CLASSIFIER_HOMEPODS, CONF_TITLE_CLASSIFIER_MEDIA,
             CONF_DOOR, CONF_CALL_MONITOR, CONF_DAY_STATE,
             CONF_ACTIVITY_STATE, CONF_WINDOW_STATE,
+            CONF_BIO_STATE, CONF_MANUAL_PLAYBACK, CONF_PLANNED_RADIO,
         ):
             e = self._entity(key)
             if e:
@@ -485,6 +499,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
                     break
         s.homepods_playing = hp_playing
         s.homepods_volume_level = hp_volume
+        s.homepods_state = hp_player_state
         _record("homepods",
                 player_state=hp_player_state, volume_level=hp_volume)
         # ---- Per-device configuration/resolution diagnostics ------------
@@ -547,6 +562,15 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         s.window_open = _bool_state(_state(CONF_WINDOW_STATE))
 
         s.manual_nudge = self._manual_nudge
+
+        # ---- Orchestrator inputs ----------------------------------------
+        bio_raw = _state(CONF_BIO_STATE)
+        s.bio_sleep = (
+            bio_raw is not None and str(bio_raw).lower() in BIO_SLEEP_VALUES
+        )
+        s.manual_playback_active = _bool_state(_state(CONF_MANUAL_PLAYBACK))
+        s.planned_radio_active = _bool_state(_state(CONF_PLANNED_RADIO))
+
         return s
 
     # -- recalculate --
@@ -586,7 +610,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         ):
             self._pending_decision = new
             self._pending_since = now
-            interim = Decision(**{**self._last_stable.to_dict()})
+            interim = Decision(**self._last_stable.to_dict())
             interim.volume_target_homepods = new.volume_target_homepods
             interim.volume_target_denon = new.volume_target_denon
             interim.subwoofer_allowed = new.subwoofer_allowed
@@ -597,6 +621,10 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             # diagnostics surfaced — the entity attributes shouldn't go
             # stale just because the context is in transition.
             interim.device_diagnostics = dict(new.device_diagnostics or {})
+            # Keep the last stable orchestrator output visible during
+            # debounce so the audio_owner / homepods_action sensors
+            # don't flap.
+            interim.orchestrator = self._last_stable.orchestrator
             self.async_set_updated_data(interim)
             self.hass.loop.call_later(
                 debounce + 0.1,
@@ -607,17 +635,34 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         if now - self._pending_since >= debounce:
             self._commit(new, snap)
         else:
-            interim = Decision(**{**self._last_stable.to_dict()})
+            interim = Decision(**self._last_stable.to_dict())
             interim.active_reasons = self._last_stable.active_reasons + [
                 f"debouncing->{new.context}/{new.subcontext}"
             ]
             interim.device_diagnostics = dict(new.device_diagnostics or {})
+            interim.orchestrator = self._last_stable.orchestrator
             self.async_set_updated_data(interim)
 
     def _commit(self, new: Decision, snap: Snapshot) -> None:
         if self._last_stable.context not in (CTX_STREAMING,) and new.context == CTX_STREAMING:
             # entering streaming -> remember what we had before
             self._pre_atv_scenario = self._last_stable
+
+        # Compute the audio orchestrator decision against the freshly
+        # committed snap and the persistent orchestrator state. Only
+        # update _orch_state at commit time so debounce-driven
+        # recomputes don't double-consume transitions.
+        od, new_orch_state = decide_audio_orchestrator(
+            snap,
+            new,
+            bio_sleep=snap.bio_sleep,
+            manual_playback_active=snap.manual_playback_active,
+            planned_radio_active=snap.planned_radio_active,
+            homepods_state=snap.homepods_state,
+            state=self._orch_state,
+        )
+        self._orch_state = new_orch_state
+        new.orchestrator = od
 
         self._last_stable = new
         self._pending_decision = None
