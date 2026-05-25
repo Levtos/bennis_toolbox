@@ -87,8 +87,16 @@ class Snapshot:
     # to the orchestrator without growing its signature). All optional —
     # absent values default to "not active / not sleeping".
     bio_sleep: bool = False
+    bio_state: Optional[str] = None
     manual_playback_active: bool = False
     planned_radio_active: bool = False
+    # New configurable inputs (0.3.8). Each can be None to mean "not
+    # configured"; the orchestrators then fall back to legacy
+    # heuristics (e.g. classifier_pc for pc gaming).
+    pc_gaming_active: Optional[bool] = None
+    media_stop_latch: Optional[bool] = None
+    opening_any_open: Optional[bool] = None
+    quiet_mode_external: Optional[bool] = None
 
 
 @dataclass
@@ -122,6 +130,10 @@ class Decision:
     # coordinator must re-attach the live object after rebuilding a
     # Decision from a dict (see `_commit`).
     orchestrator: Optional["object"] = None
+    # Volume orchestrator output. Same treatment as `orchestrator` —
+    # live dataclass, dropped from `to_dict()` so round-trips through
+    # the debounce interim copy don't choke on a dict-from-asdict.
+    volume: Optional["object"] = None
 
     def to_dict(self):
         # Exclude the live orchestrator object — it is a separate
@@ -130,6 +142,7 @@ class Decision:
         # round-trips usable for the debounce interim copy.
         d = asdict(self)
         d.pop("orchestrator", None)
+        d.pop("volume", None)
         return d
 
 
@@ -137,6 +150,13 @@ class Decision:
 # Quiet mode
 # ---------------------------------------------------------------------------
 def evaluate_quiet(snap: Snapshot) -> tuple[bool, Optional[str]]:
+    # An explicit external quiet_mode signal (when configured) wins
+    # over the heuristics. `None` means "not configured" → fall back.
+    if snap.quiet_mode_external is True:
+        return True, "quiet_mode_external"
+    if snap.quiet_mode_external is False:
+        # Explicitly off → skip the heuristic ladder.
+        return False, None
     if snap.call_active:
         return True, "call_active"
     if snap.door_open:

@@ -25,6 +25,7 @@ from .const import (
     CONF_APPLETV,
     CONF_BASE_VOL_DENON,
     CONF_BASE_VOL_HOMEPODS,
+    CONF_BIO_STATE,
     CONF_BOOST_OFFSET,
     CONF_CALL_MONITOR,
     CONF_DAY_STATE,
@@ -32,10 +33,16 @@ from .const import (
     CONF_DENON_ACTIVE,
     CONF_DOOR,
     CONF_HOMEPODS,
+    CONF_MANUAL_PLAYBACK,
+    CONF_MEDIA_STOP_LATCH,
+    CONF_OPENING_ANY_OPEN,
     CONF_PC_ACTIVE,
+    CONF_PC_GAMING_ACTIVE,
+    CONF_PLANNED_RADIO,
     CONF_PS5_STATUS,
     CONF_PS5_TITLE,
     CONF_QUIET_DUCK,
+    CONF_QUIET_MODE_ENTITY,
     CONF_SWITCH_DOCK,
     CONF_TITLE_CLASSIFIER_HOMEPODS,
     CONF_TITLE_CLASSIFIER_MEDIA,
@@ -44,6 +51,15 @@ from .const import (
     CONF_TV_ACTIVE,
     CONF_TV_POWER_FALLBACK,
     CONF_TV_SOURCE,
+    CONF_VOL_ACTIVE_MIN,
+    CONF_VOL_DENON_BASE,
+    CONF_VOL_DENON_MAX,
+    CONF_VOL_DUCKED_TARGET,
+    CONF_VOL_EDGE_DAY_OFFSET,
+    CONF_VOL_HOMEPODS_BASE,
+    CONF_VOL_HOMEPODS_MAX,
+    CONF_VOL_NIGHT_OFFSET,
+    CONF_VOL_OPENING_OFFSET,
     CONF_WINDOW_OFFSET,
     CONF_WINDOW_STATE,
     DEFAULT_BASE_VOL_DENON,
@@ -51,6 +67,15 @@ from .const import (
     DEFAULT_BOOST_OFFSET,
     DEFAULT_DEBOUNCE,
     DEFAULT_QUIET_DUCK,
+    DEFAULT_VOL_ACTIVE_MIN,
+    DEFAULT_VOL_DENON_BASE,
+    DEFAULT_VOL_DENON_MAX,
+    DEFAULT_VOL_DUCKED_TARGET,
+    DEFAULT_VOL_EDGE_DAY_OFFSET,
+    DEFAULT_VOL_HOMEPODS_BASE,
+    DEFAULT_VOL_HOMEPODS_MAX,
+    DEFAULT_VOL_NIGHT_OFFSET,
+    DEFAULT_VOL_OPENING_OFFSET,
     DEFAULT_WINDOW_OFFSET,
     DEVICE_CARDS,
     MODULE_ID,
@@ -188,6 +213,89 @@ _TUNING_DEFAULTS: dict[str, float] = {
     CONF_BOOST_OFFSET: DEFAULT_BOOST_OFFSET,
     CONF_WINDOW_OFFSET: DEFAULT_WINDOW_OFFSET,
 }
+
+
+# Orchestrator-specific entity slots (the 0.3.8 contract). Each
+# binds an option key to the matching EntitySelector domain so the
+# picker stays narrow.
+_ORCHESTRATOR_ENTITY_DOMAINS: dict[str, str] = {
+    CONF_BIO_STATE: "sensor",
+    CONF_MANUAL_PLAYBACK: "binary_sensor",
+    CONF_PLANNED_RADIO: "binary_sensor",
+    CONF_PC_GAMING_ACTIVE: "binary_sensor",
+    CONF_MEDIA_STOP_LATCH: "binary_sensor",
+    CONF_OPENING_ANY_OPEN: "binary_sensor",
+    CONF_QUIET_MODE_ENTITY: "binary_sensor",
+}
+
+
+def _orchestrator_card_schema(defaults: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {}
+    for key, domain in _ORCHESTRATOR_ENTITY_DOMAINS.items():
+        sel = selector.EntitySelector(selector.EntitySelectorConfig(domain=domain))
+        fields[_opt_entity_marker(key, defaults.get(key))] = sel
+    return vol.Schema(fields)
+
+
+# Volume tuning card: the 9 dot-separated decimal fields. Reuses
+# the bare-TextSelector pattern from the 0.3.7 tuning fix to dodge
+# locale formatting.
+_VOLUME_DEFAULTS: dict[str, float] = {
+    CONF_VOL_HOMEPODS_BASE: DEFAULT_VOL_HOMEPODS_BASE,
+    CONF_VOL_DENON_BASE: DEFAULT_VOL_DENON_BASE,
+    CONF_VOL_DUCKED_TARGET: DEFAULT_VOL_DUCKED_TARGET,
+    CONF_VOL_HOMEPODS_MAX: DEFAULT_VOL_HOMEPODS_MAX,
+    CONF_VOL_DENON_MAX: DEFAULT_VOL_DENON_MAX,
+    CONF_VOL_ACTIVE_MIN: DEFAULT_VOL_ACTIVE_MIN,
+    CONF_VOL_NIGHT_OFFSET: DEFAULT_VOL_NIGHT_OFFSET,
+    CONF_VOL_EDGE_DAY_OFFSET: DEFAULT_VOL_EDGE_DAY_OFFSET,
+    CONF_VOL_OPENING_OFFSET: DEFAULT_VOL_OPENING_OFFSET,
+}
+
+# Range bounds for the volume tuning fields. Targets/duck stay in
+# [0, 1], offsets can swing negative.
+_VOLUME_RANGES: dict[str, tuple[float, float]] = {
+    CONF_VOL_HOMEPODS_BASE: (0.0, 1.0),
+    CONF_VOL_DENON_BASE: (0.0, 1.0),
+    CONF_VOL_DUCKED_TARGET: (0.0, 1.0),
+    CONF_VOL_HOMEPODS_MAX: (0.0, 1.0),
+    CONF_VOL_DENON_MAX: (0.0, 1.0),
+    CONF_VOL_ACTIVE_MIN: (0.0, 1.0),
+    CONF_VOL_NIGHT_OFFSET: (-0.5, 0.5),
+    CONF_VOL_EDGE_DAY_OFFSET: (-0.5, 0.5),
+    CONF_VOL_OPENING_OFFSET: (-0.5, 0.5),
+}
+
+
+def _volume_schema(opts: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {}
+    for key, default in _VOLUME_DEFAULTS.items():
+        fields[
+            vol.Optional(key, default=_fmt_decimal(opts.get(key), default))
+        ] = _text_selector()
+    return vol.Schema(fields)
+
+
+def _validate_volume_input(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Sibling of `_validate_tuning_input` for the volume card."""
+    cleaned: dict[str, float] = {}
+    errors: dict[str, str] = {}
+    for key, (lo, hi) in _VOLUME_RANGES.items():
+        raw = user_input.get(key)
+        if raw is None or raw == "":
+            continue
+        try:
+            value = _to_decimal(raw)
+        except (TypeError, ValueError):
+            errors[key] = "invalid_number"
+            continue
+        if value < lo or value > hi:
+            errors[key] = "out_of_range"
+            continue
+        cleaned[key] = value
+    return cleaned, errors
 
 
 def _options_schema(opts: dict[str, Any]) -> vol.Schema:
@@ -405,7 +513,7 @@ class OptionsFlowHelper:
         # opening "Auslöser & Quellen" would dump the old schema.
         menu = [
             "tv", "appletv", "ps5", "switch", "pc", "denon", "homepods",
-            "context",
+            "context", "orchestrator", "volume",
         ]
         if self._has_legacy_values():
             menu.append("sources")
@@ -494,6 +602,60 @@ class OptionsFlowHelper:
                 new_opts[k] = cleaned[k]
             else:
                 new_opts.pop(k, None)
+        new_opts.pop(CONF_MODULE_ID, None)
+        return self.flow.async_create_entry(title="", data=new_opts)
+
+    async def async_step_orchestrator(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> FlowResult:
+        """Orchestrator-specific entity slots (0.3.8).
+
+        Houses the entity pickers that don't belong on a device card:
+        bio_state, manual_playback, planned_radio, pc_gaming_active,
+        media_stop_latch, opening_any_open, quiet_mode. Same save
+        semantics as the device cards — empty fields drop the option
+        so legacy data-side values can resurface.
+        """
+        keys = tuple(_ORCHESTRATOR_ENTITY_DOMAINS.keys())
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="orchestrator",
+                data_schema=_orchestrator_card_schema(_merged(self.entry)),
+            )
+        new_opts = dict(self.entry.options)
+        cleaned = {k: v for k, v in user_input.items() if v not in (None, "", [])}
+        for k in keys:
+            if k in cleaned:
+                new_opts[k] = cleaned[k]
+            else:
+                new_opts.pop(k, None)
+        new_opts.pop(CONF_MODULE_ID, None)
+        return self.flow.async_create_entry(title="", data=new_opts)
+
+    async def async_step_volume(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> FlowResult:
+        """Volume orchestrator tuning card (0.3.8).
+
+        Holds the 9 dot-separated decimal fields the volume
+        orchestrator reads. Validation lives in the step handler
+        (same pattern as the legacy tuning fix) so bare TextSelectors
+        render reliably across HA versions.
+        """
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="volume",
+                data_schema=_volume_schema(_merged(self.entry)),
+            )
+        cleaned, errors = _validate_volume_input(user_input)
+        if errors:
+            merged_for_render = {**_merged(self.entry), **user_input}
+            return self.flow.async_show_form(
+                step_id="volume",
+                data_schema=_volume_schema(merged_for_render),
+                errors=errors,
+            )
+        new_opts = {**self.entry.options, **cleaned}
         new_opts.pop(CONF_MODULE_ID, None)
         return self.flow.async_create_entry(title="", data=new_opts)
 

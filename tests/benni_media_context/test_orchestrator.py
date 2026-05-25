@@ -303,3 +303,128 @@ def test_attributes_echo_external_inputs():
     assert od.manual_playback_active is True
     assert od.planned_radio_active is True
     assert od.bio_sleep is True
+
+
+# ---------------------------------------------------------------------------
+# 0.3.8 configured-entity surface
+# ---------------------------------------------------------------------------
+
+
+def _orch_with_inputs(snap, *, state=None, configured=None, missing_audio=None,
+                     missing_vol=None, bio_sleep=False, manual=False, radio=False,
+                     homepods_state=None):
+    state = state or O.OrchestratorState()
+    decision = _decide(snap)
+    return O.decide_audio_orchestrator(
+        snap, decision,
+        bio_sleep=bio_sleep,
+        manual_playback_active=manual,
+        planned_radio_active=radio,
+        homepods_state=homepods_state,
+        state=state,
+        configured_entities=configured or {},
+        missing_orchestrator_inputs=missing_audio or [],
+        missing_volume_inputs=missing_vol or [],
+    )
+
+
+def test_configured_entities_surface_echoes_through():
+    od, _ = _orch_with_inputs(
+        _snap(),
+        configured={
+            "homepods_player_entity": "media_player.homepods",
+            "denon_player_entity": "media_player.denon",
+        },
+        homepods_state="idle",
+    )
+    assert od.configured_entities == {
+        "homepods_player_entity": "media_player.homepods",
+        "denon_player_entity": "media_player.denon",
+    }
+    assert od.missing_orchestrator_inputs == []
+
+
+def test_missing_homepods_entity_blocks_action():
+    snap = _snap(homepods_playing=True, homepods_state="playing")
+    od, _ = _orch_with_inputs(
+        snap,
+        homepods_state="playing",
+        missing_audio=["homepods_player_entity"],
+        manual=True,
+    )
+    assert od.action == C.ACTION_NONE
+    assert od.blocked_reason == "homepods_entity_missing"
+    assert od.should_pause is False
+
+
+def test_pc_gaming_active_entity_overrides_classifier():
+    """External pc_gaming_active=True forces PC into the gaming stack
+    even without a classifier_pc value."""
+    snap = _snap(pc_active=True, classifier_pc=0, pc_gaming_active=True,
+                 homepods_playing=True, homepods_state="playing")
+    od, _ = _orch_with_inputs(
+        snap, homepods_state="playing", manual=True,
+        configured={"homepods_player_entity": "media_player.homepods"},
+    )
+    assert od.audio_owner == C.AUDIO_OWNER_GAMING
+    assert od.pc_gaming_active is True
+    assert od.should_pause is True
+
+
+def test_pc_gaming_active_entity_false_overrides_classifier_true():
+    """External pc_gaming_active=False blocks the classifier path."""
+    snap = _snap(pc_active=True, classifier_pc=2, pc_gaming_active=False,
+                 homepods_playing=True, homepods_state="playing")
+    od, _ = _orch_with_inputs(
+        snap, homepods_state="playing", manual=True,
+        configured={"homepods_player_entity": "media_player.homepods"},
+    )
+    # Classifier alone would have said gaming; external override wins.
+    assert od.pc_gaming_active is False
+
+
+def test_media_stop_latch_sets_manual_stop():
+    state = O.OrchestratorState(
+        auto_paused=True, pre_pause_mode=C.RESUME_MODE_MANUAL,
+    )
+    snap = _snap(media_stop_latch=True)
+    od, new_state = _orch_with_inputs(
+        snap, state=state, homepods_state="idle", manual=False,
+        configured={"homepods_player_entity": "media_player.homepods"},
+    )
+    assert new_state.manual_stop is True
+    assert od.action == C.ACTION_NONE
+    assert od.blocked_reason == "manual_stop"
+    assert od.media_stop_latch is True
+
+
+def test_quiet_mode_external_drives_private_owner():
+    """When the dedicated quiet_mode binary is on, private_stack wins."""
+    snap = _snap(quiet_mode_external=True,
+                 homepods_playing=True, homepods_state="playing")
+    od, _ = _orch_with_inputs(
+        snap, homepods_state="playing", manual=True,
+        configured={"homepods_player_entity": "media_player.homepods"},
+    )
+    assert od.audio_owner == C.AUDIO_OWNER_PRIVATE
+    assert od.should_pause is True
+
+
+def test_quiet_mode_external_false_overrides_internal_heuristics():
+    """External quiet_mode=False blocks the door/call/activity ladder."""
+    snap = _snap(quiet_mode_external=False, door_open=True,
+                 homepods_playing=True, homepods_state="playing")
+    od, _ = _orch_with_inputs(
+        snap, homepods_state="playing", manual=True,
+        configured={"homepods_player_entity": "media_player.homepods"},
+    )
+    # Door is open, but the external entity says NOT quiet → quiet_mode
+    # should not promote to private_stack.
+    assert od.audio_owner != C.AUDIO_OWNER_PRIVATE
+
+
+def test_bio_state_and_day_state_echoed_for_debug():
+    snap = _snap(bio_state="awake", day_state="late_evening")
+    od, _ = _orch_with_inputs(snap, homepods_state="idle")
+    assert od.bio_state == "awake"
+    assert od.day_state == "late_evening"

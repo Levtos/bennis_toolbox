@@ -110,6 +110,19 @@ class OrchestratorDecision:
     switch_gaming_active: bool = False
     winning_stack: str = AUDIO_OWNER_NONE
 
+    # Resolved orchestrator inputs (canonical_name → entity_id|None)
+    # and the names of orchestrator-required inputs the user hasn't
+    # wired up yet. Surfaced verbatim on the entity attributes.
+    configured_entities: dict = field(default_factory=dict)
+    missing_orchestrator_inputs: list = field(default_factory=list)
+    missing_volume_inputs: list = field(default_factory=list)
+    # Echoed external state (orchestrator-input mirrors) so the debug
+    # view has everything in one attribute dict.
+    media_stop_latch: bool = False
+    opening_any_open: bool = False
+    bio_state: Optional[str] = None
+    day_state: Optional[str] = None
+
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -135,8 +148,19 @@ def _switch_gaming(snap: Snapshot) -> bool:
 
 
 def _pc_gaming(snap: Snapshot) -> bool:
-    # PC counts as gaming only if the title classifier identified an
-    # actual game (grind/headset). Pure "PC is on" is not enough.
+    """PC counts as gaming only on a positive PC-gaming signal.
+
+    Precedence:
+      1. external `pc_gaming_active_entity` (when configured) — when
+         it explicitly says True/False, that wins.
+      2. legacy heuristic: pc_active AND title classifier flagged it
+         as a game (grind/headset). Pure "PC is powered" does not
+         pause HomePods.
+    """
+    if snap.pc_gaming_active is True:
+        return True
+    if snap.pc_gaming_active is False:
+        return False
     if not snap.pc_active:
         return False
     return bool(snap.classifier_pc and snap.classifier_pc != 0)
@@ -184,12 +208,25 @@ def decide_audio_orchestrator(
     planned_radio_active: bool,
     homepods_state: Optional[str],
     state: OrchestratorState,
+    configured_entities: Optional[dict] = None,
+    missing_orchestrator_inputs: Optional[list] = None,
+    missing_volume_inputs: Optional[list] = None,
 ) -> tuple[OrchestratorDecision, OrchestratorState]:
     """Compute the orchestrator decision and the next persistent state."""
     od = OrchestratorDecision()
     new_state = OrchestratorState(**asdict(state))
 
+    configured_entities = dict(configured_entities or {})
+    missing_orchestrator_inputs = list(missing_orchestrator_inputs or [])
+    missing_volume_inputs = list(missing_volume_inputs or [])
+
     homepods_playing = homepods_state == "playing"
+
+    # Without a configured HomePods entity the orchestrator has
+    # nothing to act on. Surface a blocked decision instead of
+    # guessing — YAML automations should see "no HomePods wired up"
+    # explicitly rather than silently treating the world as idle.
+    homepods_missing = "homepods_player_entity" in missing_orchestrator_inputs
 
     ps5_gaming = _ps5_gaming(snap)
     switch_gaming = _switch_gaming(snap)
@@ -251,6 +288,18 @@ def decide_audio_orchestrator(
         new_state.manual_stop = False
         new_state.pre_pause_mode = None
 
+    # External media_stop_latch overrides internal manual_stop
+    # bookkeeping when it is set. Off (False) explicitly clears the
+    # latch even if the internal heuristic would have set it; None
+    # (not configured) keeps the internal value untouched.
+    if snap.media_stop_latch is True:
+        new_state.manual_stop = True
+    elif snap.media_stop_latch is False and not state.last_homepods_playing:
+        # External latch dropped → re-enable resume eligibility, but
+        # only when no recent manual-stop event is being recorded
+        # (else we'd clobber a fresh internal transition).
+        new_state.manual_stop = False
+
     # ---- Action / reason ------------------------------------------------
     reason = "idle"
     blocked: Optional[str] = None
@@ -258,7 +307,13 @@ def decide_audio_orchestrator(
     should_pause = False
     resume_allowed = False
 
-    if other_stack_active and homepods_playing:
+    if homepods_missing:
+        # No HomePods configured → orchestrator has no actor. Surface
+        # blocked so YAML doesn't trigger pause/resume against a
+        # phantom entity.
+        blocked = "homepods_entity_missing"
+        reason = "homepods_entity_missing"
+    elif other_stack_active and homepods_playing:
         action = ACTION_PAUSE
         should_pause = True
         reason = f"{winning_label}_pause_homepods"
@@ -337,6 +392,14 @@ def decide_audio_orchestrator(
     od.tv_signal_active = tv_signal
     od.ps5_gaming_active = ps5_gaming
     od.switch_gaming_active = switch_gaming
+
+    od.configured_entities = dict(configured_entities)
+    od.missing_orchestrator_inputs = list(missing_orchestrator_inputs)
+    od.missing_volume_inputs = list(missing_volume_inputs)
+    od.media_stop_latch = bool(snap.media_stop_latch)
+    od.opening_any_open = bool(snap.opening_any_open)
+    od.bio_state = snap.bio_state
+    od.day_state = snap.day_state
 
     # ---- Bookkeeping for the next tick ---------------------------------
     new_state.last_homepods_playing = homepods_playing

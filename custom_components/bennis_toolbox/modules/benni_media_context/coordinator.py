@@ -23,7 +23,32 @@ from .const import (
     CONF_APPLETV,
     CONF_BIO_STATE,
     CONF_MANUAL_PLAYBACK,
+    CONF_MEDIA_STOP_LATCH,
+    CONF_OPENING_ANY_OPEN,
+    CONF_PC_GAMING_ACTIVE,
     CONF_PLANNED_RADIO,
+    CONF_QUIET_MODE_ENTITY,
+    CONF_VOL_ACTIVE_MIN,
+    CONF_VOL_DENON_BASE,
+    CONF_VOL_DENON_MAX,
+    CONF_VOL_DUCKED_TARGET,
+    CONF_VOL_EDGE_DAY_OFFSET,
+    CONF_VOL_HOMEPODS_BASE,
+    CONF_VOL_HOMEPODS_MAX,
+    CONF_VOL_NIGHT_OFFSET,
+    CONF_VOL_OPENING_OFFSET,
+    DEFAULT_VOL_ACTIVE_MIN,
+    DEFAULT_VOL_DENON_BASE,
+    DEFAULT_VOL_DENON_MAX,
+    DEFAULT_VOL_DUCKED_TARGET,
+    DEFAULT_VOL_EDGE_DAY_OFFSET,
+    DEFAULT_VOL_HOMEPODS_BASE,
+    DEFAULT_VOL_HOMEPODS_MAX,
+    DEFAULT_VOL_NIGHT_OFFSET,
+    DEFAULT_VOL_OPENING_OFFSET,
+    ORCH_INPUTS,
+    ORCH_REQUIRED_INPUTS,
+    VOL_PRIMARY_INPUTS,
     CONF_APPLETV_APP_MAP,
     CONF_BASE_VOL_DENON,
     CONF_BASE_VOL_HOMEPODS,
@@ -72,6 +97,11 @@ from .orchestrator import (
     OrchestratorDecision,
     OrchestratorState,
     decide_audio_orchestrator,
+)
+from .volume_orchestrator import (
+    VolumeDecision,
+    VolumeSettings,
+    decide_volume,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -240,7 +270,9 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
                     entities.append(e)
         # Context / classifier / window / door / call etc. still use
         # their original keys. The orchestrator inputs
-        # (bio/manual_playback/planned_radio) ride along here.
+        # (bio/manual_playback/planned_radio + the 0.3.8 additions:
+        # pc_gaming_active, media_stop_latch, opening_any_open,
+        # quiet_mode) ride along here.
         for key in (
             CONF_TV_SOURCE,
             CONF_TITLE_CLASSIFIER_PS5, CONF_TITLE_CLASSIFIER_PC,
@@ -248,6 +280,8 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             CONF_DOOR, CONF_CALL_MONITOR, CONF_DAY_STATE,
             CONF_ACTIVITY_STATE, CONF_WINDOW_STATE,
             CONF_BIO_STATE, CONF_MANUAL_PLAYBACK, CONF_PLANNED_RADIO,
+            CONF_PC_GAMING_ACTIVE, CONF_MEDIA_STOP_LATCH,
+            CONF_OPENING_ANY_OPEN, CONF_QUIET_MODE_ENTITY,
         ):
             e = self._entity(key)
             if e:
@@ -565,13 +599,90 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
 
         # ---- Orchestrator inputs ----------------------------------------
         bio_raw = _state(CONF_BIO_STATE)
+        s.bio_state = bio_raw
         s.bio_sleep = (
             bio_raw is not None and str(bio_raw).lower() in BIO_SLEEP_VALUES
         )
         s.manual_playback_active = _bool_state(_state(CONF_MANUAL_PLAYBACK))
         s.planned_radio_active = _bool_state(_state(CONF_PLANNED_RADIO))
 
+        # New 0.3.8 orchestrator-input slots. Tri-state semantics:
+        # `None` means "not configured" — orchestrators fall back to
+        # legacy heuristics. `True` / `False` come straight from the
+        # configured binary sensor.
+        def _opt_bool(key: str) -> Optional[bool]:
+            if not self._entity(key):
+                return None
+            raw = _state(key)
+            if raw is None:
+                return None
+            return _bool_state(raw)
+
+        s.pc_gaming_active = _opt_bool(CONF_PC_GAMING_ACTIVE)
+        s.media_stop_latch = _opt_bool(CONF_MEDIA_STOP_LATCH)
+        s.opening_any_open = _opt_bool(CONF_OPENING_ANY_OPEN)
+        s.quiet_mode_external = _opt_bool(CONF_QUIET_MODE_ENTITY)
+
         return s
+
+    # -- input-resolution helpers --
+    def _resolve_orchestrator_inputs(
+        self,
+    ) -> tuple[dict[str, Optional[str]], list[str], list[str]]:
+        """Resolve every orchestrator input declared in ``ORCH_INPUTS``.
+
+        Returns:
+            ``(configured_entities, missing_orchestrator_inputs,
+            missing_volume_inputs)``.
+
+        Resolution honours the existing legacy fallbacks (so an entry
+        that hasn't been migrated to the new CONF model still wires
+        the orchestrator inputs correctly via ``LEGACY_FALLBACKS``
+        / the registry's third tuple element). ``missing_*_inputs``
+        only lists the names that the respective orchestrator
+        actually needs in order to act — purely "nice to have"
+        inputs don't pollute the debug list.
+        """
+        resolved: dict[str, Optional[str]] = {}
+        for name, primary, legacy in ORCH_INPUTS:
+            eid = self._entity(primary)
+            if not eid and legacy:
+                eid = self._entity(legacy)
+            resolved[name] = eid
+
+        missing_audio = [
+            n for n in ORCH_REQUIRED_INPUTS if not resolved.get(n)
+        ]
+        # Volume orchestrator can run on either speaker, but blocked
+        # when both are missing — that's the contract surfaced via
+        # ``missing_volume_inputs``.
+        vol_missing = [n for n in VOL_PRIMARY_INPUTS if not resolved.get(n)]
+        # If at least one is configured, treat the other as "fine to
+        # be missing" — the volume orchestrator just routes audio to
+        # whichever exists. Only flag both-missing as a real gap.
+        if len(vol_missing) < len(VOL_PRIMARY_INPUTS):
+            vol_missing = []
+        return resolved, missing_audio, vol_missing
+
+    def _volume_settings(self) -> VolumeSettings:
+        """Hydrate the VolumeSettings dataclass from options/data."""
+        def _f(key: str, default: float) -> float:
+            try:
+                return float(self._opt(key, default))
+            except (TypeError, ValueError):
+                return default
+
+        return VolumeSettings(
+            homepods_base=_f(CONF_VOL_HOMEPODS_BASE, DEFAULT_VOL_HOMEPODS_BASE),
+            denon_base=_f(CONF_VOL_DENON_BASE, DEFAULT_VOL_DENON_BASE),
+            ducked_target=_f(CONF_VOL_DUCKED_TARGET, DEFAULT_VOL_DUCKED_TARGET),
+            homepods_max=_f(CONF_VOL_HOMEPODS_MAX, DEFAULT_VOL_HOMEPODS_MAX),
+            denon_max=_f(CONF_VOL_DENON_MAX, DEFAULT_VOL_DENON_MAX),
+            active_min=_f(CONF_VOL_ACTIVE_MIN, DEFAULT_VOL_ACTIVE_MIN),
+            night_offset=_f(CONF_VOL_NIGHT_OFFSET, DEFAULT_VOL_NIGHT_OFFSET),
+            edge_day_offset=_f(CONF_VOL_EDGE_DAY_OFFSET, DEFAULT_VOL_EDGE_DAY_OFFSET),
+            opening_offset=_f(CONF_VOL_OPENING_OFFSET, DEFAULT_VOL_OPENING_OFFSET),
+        )
 
     # -- recalculate --
     async def async_recalculate(self) -> None:
@@ -625,6 +736,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             # debounce so the audio_owner / homepods_action sensors
             # don't flap.
             interim.orchestrator = self._last_stable.orchestrator
+            interim.volume = self._last_stable.volume
             self.async_set_updated_data(interim)
             self.hass.loop.call_later(
                 debounce + 0.1,
@@ -641,6 +753,7 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             ]
             interim.device_diagnostics = dict(new.device_diagnostics or {})
             interim.orchestrator = self._last_stable.orchestrator
+            interim.volume = self._last_stable.volume
             self.async_set_updated_data(interim)
 
     def _commit(self, new: Decision, snap: Snapshot) -> None:
@@ -652,6 +765,9 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
         # committed snap and the persistent orchestrator state. Only
         # update _orch_state at commit time so debounce-driven
         # recomputes don't double-consume transitions.
+        configured_entities, missing_audio, missing_vol = (
+            self._resolve_orchestrator_inputs()
+        )
         od, new_orch_state = decide_audio_orchestrator(
             snap,
             new,
@@ -660,9 +776,27 @@ class BenniMediaCoordinator(DataUpdateCoordinator[Decision]):
             planned_radio_active=snap.planned_radio_active,
             homepods_state=snap.homepods_state,
             state=self._orch_state,
+            configured_entities=configured_entities,
+            missing_orchestrator_inputs=missing_audio,
+            missing_volume_inputs=missing_vol,
         )
         self._orch_state = new_orch_state
         new.orchestrator = od
+
+        # Volume orchestrator runs off the audio decision + raw
+        # snapshot signals. It doesn't carry state across ticks (yet).
+        vol = decide_volume(
+            audio_owner=od.audio_owner,
+            bio_sleep=snap.bio_sleep,
+            quiet_mode_active=new.quiet_mode_active,
+            bio_state=snap.bio_state,
+            day_state=snap.day_state,
+            opening_any_open=bool(snap.opening_any_open),
+            homepods_configured=bool(configured_entities.get("homepods_player_entity")),
+            denon_configured=bool(configured_entities.get("denon_player_entity")),
+            settings=self._volume_settings(),
+        )
+        new.volume = vol
 
         self._last_stable = new
         self._pending_decision = None

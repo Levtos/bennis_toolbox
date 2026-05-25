@@ -17,9 +17,11 @@ from .const import (
     ACTION_NONE,
     AUDIO_OWNER_NONE,
     MODULE_ID,
+    VOL_POLICY_IDLE,
 )
 from .coordinator import BenniMediaCoordinator, coordinator_from_hass
 from .orchestrator import OrchestratorDecision
+from .volume_orchestrator import VolumeDecision
 
 
 def _device_info(entry: ConfigEntry) -> dict[str, Any]:
@@ -48,6 +50,7 @@ async def async_get_entities(
             _VolDenonSensor(coord, entry),
             _HomePodsActionSensor(coord, entry),
             _AudioOwnerSensor(coord, entry),
+            _VolumePolicySensor(coord, entry),
         ]
     if platform == Platform.BINARY_SENSOR:
         return [
@@ -57,6 +60,7 @@ async def async_get_entities(
             _SubwooferAllowed(coord, entry),
             _HomePodsShouldPause(coord, entry),
             _HomePodsResumeAllowed(coord, entry),
+            _VolumeApplyAllowed(coord, entry),
         ]
     return []
 
@@ -160,23 +164,68 @@ class _GamingPlatformSensor(_BaseSensor):
 
 
 class _VolHomePodsSensor(_BaseSensor):
+    """Effective HomePods volume target — driven by the volume
+    orchestrator. Returns `None` (entity goes unavailable) when the
+    orchestrator says "muted/blocked" or no HomePods entity is
+    configured."""
     _key = "volume_target_homepods"
-    _attr_name = "Media Volume Target HomePods"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Volume Target HomePods"
 
     @property
     def native_value(self):
-        return round(self.coordinator.data.volume_target_homepods, 3)
+        vd = getattr(self.coordinator.data, "volume", None)
+        if vd is None or vd.homepods_target is None:
+            return None
+        return round(vd.homepods_target, 3)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
 class _VolDenonSensor(_BaseSensor):
+    """Effective Denon volume target — same shape as HomePods sibling."""
     _key = "volume_target_denon"
-    _attr_name = "Media Volume Target Denon"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Volume Target Denon"
 
     @property
     def native_value(self):
-        return round(self.coordinator.data.volume_target_denon, 3)
+        vd = getattr(self.coordinator.data, "volume", None)
+        if vd is None or vd.denon_target is None:
+            return None
+        return round(vd.denon_target, 3)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
+
+
+class _VolumePolicySensor(_BaseSensor):
+    _key = "volume_policy"
+    _attr_name = "Volume Policy"
+
+    @property
+    def native_value(self):
+        vd = getattr(self.coordinator.data, "volume", None)
+        return vd.policy if vd else VOL_POLICY_IDLE
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
+
+
+class _VolumeApplyAllowed(_BaseBinary):
+    _key = "volume_apply_allowed"
+    _attr_name = "Volume Apply Allowed"
+
+    @property
+    def is_on(self) -> bool:
+        vd = getattr(self.coordinator.data, "volume", None)
+        return bool(vd and vd.apply_allowed)
+
+    @property
+    def extra_state_attributes(self):
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
 # -------------------------------------------------------------- binary_sensor
@@ -264,21 +313,34 @@ class _SubwooferAllowed(_BaseBinary):
 # whichever entity the user happens to look at first.
 
 
-def _orchestrator_attrs(od: Optional[OrchestratorDecision]) -> dict[str, Any]:
-    """Build the full attribute set for the orchestrator entities."""
+def _orchestrator_attrs(
+    od: Optional[OrchestratorDecision],
+    vd: Optional[VolumeDecision] = None,
+) -> dict[str, Any]:
+    """Build the unified debug-attribute set.
+
+    Used verbatim by every audio + volume orchestrator entity so the
+    HA Devtools Template view can reach any signal from any entity.
+    """
     if od is None:
         # Pre-first-commit state: surface stable defaults so HA template
         # automations don't see `None` flicker on startup.
         od = OrchestratorDecision()
+    if vd is None:
+        vd = VolumeDecision()
     return {
         "reason": od.reason,
         "blocked_reason": od.blocked_reason,
+        "configured_entities": dict(od.configured_entities),
+        "missing_orchestrator_inputs": list(od.missing_orchestrator_inputs),
+        "missing_volume_inputs": list(od.missing_volume_inputs),
         "media_context": od.media_context,
         "media_subcontext": od.media_subcontext,
         "media_device": od.media_device,
         "gaming_source": od.gaming_source,
         "gaming_platform": od.gaming_platform,
         "entertainment_active": od.entertainment_active,
+        "audio_owner": od.audio_owner,
         "tv_state": od.tv_state,
         "appletv_state": od.appletv_state,
         "ps5_state": od.ps5_state,
@@ -289,12 +351,22 @@ def _orchestrator_attrs(od: Optional[OrchestratorDecision]) -> dict[str, Any]:
         "homepods_state": od.homepods_state,
         "manual_playback_active": od.manual_playback_active,
         "planned_radio_active": od.planned_radio_active,
+        "media_stop_latch": od.media_stop_latch,
+        "bio_state": od.bio_state,
         "bio_sleep": od.bio_sleep,
-        "auto_paused_homepods": od.auto_paused_homepods,
-        "resume_candidate": od.resume_candidate,
-        # Detailed debug — which signals were active when the
-        # orchestrator picked the winner.
-        "audio_owner": od.audio_owner,
+        "day_state": od.day_state,
+        "opening_any_open": od.opening_any_open,
+        "quiet_mode_active": vd.quiet_mode_active,
+        # Volume-orchestrator surface
+        "volume_policy": vd.policy,
+        "volume_apply_allowed": vd.apply_allowed,
+        "base_homepods_target": vd.base_homepods_target,
+        "base_denon_target": vd.base_denon_target,
+        "effective_homepods_target": vd.effective_homepods_target,
+        "effective_denon_target": vd.effective_denon_target,
+        "day_offset": vd.day_offset,
+        "opening_offset": vd.opening_offset,
+        # Detailed signal breakdown
         "winning_stack": od.winning_stack,
         "private_signal_active": od.private_signal_active,
         "gaming_signal_active": od.gaming_signal_active,
@@ -302,10 +374,18 @@ def _orchestrator_attrs(od: Optional[OrchestratorDecision]) -> dict[str, Any]:
         "tv_signal_active": od.tv_signal_active,
         "ps5_gaming_active": od.ps5_gaming_active,
         "switch_gaming_active": od.switch_gaming_active,
+        "auto_paused_homepods": od.auto_paused_homepods,
+        "resume_candidate": od.resume_candidate,
         "should_pause": od.should_pause,
         "resume_allowed": od.resume_allowed,
         "action": od.action,
     }
+
+
+def _orch_pair(coord) -> tuple[Optional[OrchestratorDecision], Optional[VolumeDecision]]:
+    """Pull both orchestrator outputs off the coordinator data."""
+    d = coord.data
+    return getattr(d, "orchestrator", None), getattr(d, "volume", None)
 
 
 class _HomePodsShouldPause(_BaseBinary):
@@ -319,7 +399,7 @@ class _HomePodsShouldPause(_BaseBinary):
 
     @property
     def extra_state_attributes(self):
-        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
 class _HomePodsResumeAllowed(_BaseBinary):
@@ -333,7 +413,7 @@ class _HomePodsResumeAllowed(_BaseBinary):
 
     @property
     def extra_state_attributes(self):
-        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
 class _HomePodsActionSensor(_BaseSensor):
@@ -347,7 +427,7 @@ class _HomePodsActionSensor(_BaseSensor):
 
     @property
     def extra_state_attributes(self):
-        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))
 
 
 class _AudioOwnerSensor(_BaseSensor):
@@ -361,4 +441,4 @@ class _AudioOwnerSensor(_BaseSensor):
 
     @property
     def extra_state_attributes(self):
-        return _orchestrator_attrs(self.coordinator.data.orchestrator)
+        return _orchestrator_attrs(*_orch_pair(self.coordinator))

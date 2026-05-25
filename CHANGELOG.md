@@ -1,5 +1,121 @@
 # Changelog
 
+## 0.3.8 - 2026-05-25
+
+### Hinzugefügt
+
+- **Benni Media Context: Konfigurierbare Orchestrator-Inputs.** Sämtliche
+  Eingänge des Audio- und Volume-Orchestrators sind jetzt über
+  Config-Entry-Options auswählbar — keine harten Entity-IDs, keine
+  Blindheuristik. Es gibt eine zentrale Input-Registry (`ORCH_INPUTS`)
+  als Single Source of Truth; der Coordinator löst alle Slots mit
+  Legacy-Fallback auf und liefert sie über `configured_entities` und
+  `missing_orchestrator_inputs` / `missing_volume_inputs` an die
+  Debug-Attribute.
+- **Neue Options-Cards:**
+  - „Orchestrator": Picker für `bio_state_entity`,
+    `manual_playback_entity`, `planned_radio_entity`,
+    `pc_gaming_active_entity`, `media_stop_latch_entity`,
+    `opening_any_open_entity`, `quiet_mode_entity` — mit Domain-
+    Filter pro Slot.
+  - „Volume": 9 Tuning-Felder (`volume_homepods_media_base`,
+    `volume_denon_media_base`, `volume_ducked_target`,
+    `volume_homepods_max`, `volume_denon_max`, `volume_active_min`,
+    `volume_night_offset`, `volume_edge_day_offset`,
+    `volume_opening_offset`) als bare TextSelector mit Dot/Komma-
+    Coercion und Range-Check im Step-Handler.
+- **Volume-Orchestrator** (`volume_orchestrator.py`) als reine
+  Entscheidungslogik, getrennt vom Audio-Orchestrator. Audio entscheidet
+  Owner/Aktion; Volume entscheidet Ziel-Lautstärken + Apply-Erlaubnis.
+- **Neue HA-Entities:**
+  - `sensor.benni_media_context_volume_policy`
+    — `idle`, `media`, `ducked`, `muted`, `blocked`.
+  - `sensor.benni_media_context_volume_target_homepods`
+    — Float 0.0–1.0 oder `unavailable` (HomePods nicht konfiguriert
+    bzw. policy=`muted`/`blocked`).
+  - `sensor.benni_media_context_volume_target_denon`
+    — analog für Denon.
+  - `binary_sensor.benni_media_context_volume_apply_allowed`.
+- Jede Audio- und Volume-Entity trägt das volle gemeinsame
+  Debug-Attribut-Set: `reason`, `blocked_reason`,
+  `configured_entities`, `missing_orchestrator_inputs`,
+  `missing_volume_inputs`, `media_context`, `media_subcontext`,
+  `media_device`, `gaming_source`, `gaming_platform`,
+  `entertainment_active`, `audio_owner`, `homepods_state`,
+  `denon_state`, `tv_state`, `appletv_state`, `ps5_state`,
+  `switch_state`, `pc_gaming_active`, `manual_playback_active`,
+  `planned_radio_active`, `media_stop_latch`, `bio_state`,
+  `day_state`, `opening_any_open`, `quiet_mode_active`,
+  `base_homepods_target`, `base_denon_target`,
+  `effective_homepods_target`, `effective_denon_target`,
+  `day_offset`, `opening_offset`, plus die bisherige
+  Signal-Aufschlüsselung.
+
+### Audio-Orchestrator Änderungen
+
+- Liest `pc_gaming_active_entity` (wenn konfiguriert) zuerst — das
+  überschreibt die Title-Classifier-Heuristik. Bloß angeschalteter PC
+  pausiert weiterhin keine HomePods.
+- `media_stop_latch_entity` (wenn konfiguriert) wird zum externen
+  Stop-Latch und übersteuert die interne Manual-Stop-Buchführung.
+- `quiet_mode_entity` (wenn konfiguriert) wird zur autoritativen
+  Quiet-Mode-Quelle; die Tür/Anruf/Aktivitäts-Heuristik bleibt als
+  Fallback.
+- Wenn `homepods_player_entity` fehlt → `action=none`,
+  `blocked_reason="homepods_entity_missing"` — kein Pause/Resume gegen
+  eine Phantom-Entity.
+
+### Volume-Fachregeln
+
+- `blocked` wenn weder HomePods noch Denon konfiguriert.
+- `muted` (apply_allowed=False) bei `bio_sleep`.
+- `ducked` (apply_allowed=True, aktives Gerät auf
+  `volume_ducked_target`) bei Quiet Mode.
+- `media`: Owner=`homepods` → HomePods aktiv, Denon=0; Owner=
+  `tv_denon`/`gaming_stack`/`private_stack` → Denon aktiv,
+  HomePods=0.
+- `idle`: beide Ziele 0.
+- Day-Offset: `night`/`late_night`/`early_night` →
+  `volume_night_offset`; `early_morning`/`late_evening` →
+  `volume_edge_day_offset`; sonst 0.
+- `opening_any_open` true → `volume_opening_offset` zusätzlich.
+- Clamps: aktives Ziel mindestens `volume_active_min`, HomePods max
+  `volume_homepods_max`, Denon max `volume_denon_max`. Stiller Kanal
+  bleibt 0, Offsets bumpen ihn nicht hoch.
+
+### Tests
+
+- `test_volume_orchestrator.py`: 25 Tests für die volle Volume-Matrix
+  (idle, owner-Routing, quiet-mode-ducked, sleep-mute, blocked-no-
+  speakers, Night/Edge/Opening-Offsets stacken, Active-Min-Floor,
+  Max-Cap, partielle Speaker-Konfiguration, Debug-Echo).
+- `test_options_orchestrator_and_volume.py`: 12 Tests für die zwei
+  neuen Options-Cards (Menu-Eintrag, alle Slots im Schema,
+  Save/Clear-Semantik, Dot-Default-Rendering,
+  Komma-Submit-Roundtrip, `out_of_range`/`invalid_number`/Blank-
+  Verhalten).
+- `test_orchestrator.py`: 8 neue Regressions für die
+  konfigurierten-Inputs-Surface (echoed `configured_entities`,
+  `missing_homepods_entity_blocks_action`, externes
+  `pc_gaming_active` true/false überschreibt Classifier,
+  `media_stop_latch` setzt manual_stop, externes
+  `quiet_mode_entity` true/false überschreibt Heuristik,
+  `bio_state`/`day_state` Echo).
+- Smoke-Test um die zwei neuen Entity-Keys erweitert.
+- **Full suite: 656 passed, 2 warnings** (+43, von 613).
+
+### Kompatibilität
+
+- Keine Migration nötig. Bestehende Entries laufen weiter — Volume-
+  Defaults greifen, sobald die Options leer sind.
+- Bestehende Sensor-Keys (`volume_target_homepods`,
+  `volume_target_denon`) bleiben stabil; ihre Werte kommen jetzt
+  jedoch aus dem Volume-Orchestrator statt aus der Legacy
+  `compute_volumes()`-Berechnung.
+- `homepods_player_entity` ist der einzige als "required" markierte
+  Orchestrator-Input — ohne ihn wird der Audio-Orchestrator explizit
+  blockiert statt zu raten.
+
 ## 0.3.7 - 2026-05-25
 
 ### Hinzugefügt
