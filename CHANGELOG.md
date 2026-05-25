@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.8.1 - 2026-05-25
+
+### Behoben
+
+- **Benni Media Context: `NameError: name '_BaseBinary' is not defined`
+  beim Entry-Setup.** Die in 0.3.8 hinzugefügte Klasse
+  `_VolumeApplyAllowed(_BaseBinary)` stand fälschlicherweise im
+  Sensor-Block von [entities.py](custom_components/bennis_toolbox/modules/benni_media_context/entities.py)
+  — also *vor* der Definition von `_BaseBinary`. Python erkennt
+  Forward-References auf Basisklassen erst beim tatsächlichen
+  Modul-Import; das passierte im HA-Setup, nicht aber in den
+  bisherigen AST-/Stub-Tests. Klasse jetzt korrekt zu den anderen
+  Orchestrator-Binarys nach `_HomePodsResumeAllowed` verschoben.
+
+### Tests
+
+- Neuer `test_entities_definition_order.py` (3 Tests) als statische
+  AST-Regression: jede Klasse, die `_BaseSensor` / `_BaseBinary`
+  erbt, muss diese Basisklasse vorher im Quelltext sehen.
+  Verifiziert auch konkret, dass `_VolumeApplyAllowed` → `_BaseBinary`
+  und `_VolumePolicySensor` → `_BaseSensor` jeweils nach ihrer
+  Basis stehen. Die Heuristik fängt diesen Fehler-Typ generisch
+  für alle künftigen Entity-Klassen.
+- Full suite: **659 passed** (+3, von 656).
+
 ## 0.3.8 - 2026-05-25
 
 ### Hinzugefügt
