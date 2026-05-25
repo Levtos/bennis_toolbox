@@ -19,7 +19,13 @@ from .base import ModuleSpec, ModuleStatus
 _LOGGER = logging.getLogger(__name__)
 
 # Reihenfolge = Anzeigereihenfolge im Config-Flow-Selector.
+#
+# `benni_core_*` Module bilden gemeinsam das neue Fundament (drei Herzen +
+# Device Layer). Sie stehen vorne, weil alle Aggregat-Module darauf aufbauen.
+# Bestehende Alt-Module bleiben darunter, bis sie auf das neue Fundament
+# migriert sind — siehe memory/toolbox_rebuild_plan.md.
 REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
+    "benni_core_day_state",
     "benni_context",
     "benni_media_context",
     "notification_router",
