@@ -221,44 +221,71 @@ def test_preheat_caps_after_max_duration():
 def test_bio_sleep_to_waking_via_wake_needed():
     state, _, _ = L.compute_bio_state(
         prev_state=C.BIO_SLEEP, wake_needed=True, indicators={},
-        presence_personal=C.PERS_HOME, now=NOW,
+        presence_personal=C.PERS_HOME, day_state=C.DAY_LATE_MORNING, now=NOW,
         prev_sleep_start=None, prev_awake_start=None,
     )
     assert state == C.BIO_WAKING
 
 
-def test_bio_waking_to_awake_via_strong_indicator():
+def test_bio_sleep_to_awake_via_strong_indicator_in_daytime():
     state, _, awake_start = L.compute_bio_state(
-        prev_state=C.BIO_WAKING, wake_needed=False,
+        prev_state=C.BIO_SLEEP, wake_needed=False,
         indicators={"coffee": True},
-        presence_personal=C.PERS_HOME, now=NOW,
+        presence_personal=C.PERS_HOME, day_state=C.DAY_LATE_MORNING, now=NOW,
         prev_sleep_start=None, prev_awake_start=None,
     )
     assert state == C.BIO_AWAKE
     assert awake_start == NOW
 
 
-def test_bio_waking_requires_two_soft_indicators():
+def test_bio_waking_to_awake_via_strong_indicator_in_daytime():
+    state, _, awake_start = L.compute_bio_state(
+        prev_state=C.BIO_WAKING, wake_needed=False,
+        indicators={"coffee": True},
+        presence_personal=C.PERS_HOME, day_state=C.DAY_LATE_MORNING, now=NOW,
+        prev_sleep_start=None, prev_awake_start=None,
+    )
+    assert state == C.BIO_AWAKE
+    assert awake_start == NOW
+
+
+def test_bio_soft_indicator_wakes_directly_in_daytime():
     state, _, _ = L.compute_bio_state(
-        prev_state=C.BIO_WAKING, wake_needed=False,
+        prev_state=C.BIO_SLEEP, wake_needed=False,
         indicators={"pc": True},
-        presence_personal=C.PERS_HOME, now=NOW,
+        presence_personal=C.PERS_HOME, day_state=C.DAY_LATE_MORNING, now=NOW,
         prev_sleep_start=None, prev_awake_start=None,
     )
-    assert state == C.BIO_WAKING
-    state2, _, _ = L.compute_bio_state(
-        prev_state=C.BIO_WAKING, wake_needed=False,
-        indicators={"pc": True, "ps5": True},
-        presence_personal=C.PERS_HOME, now=NOW,
+    assert state == C.BIO_AWAKE
+
+
+def test_bio_homeoffice_indicator_does_not_wake():
+    state, _, awake_start = L.compute_bio_state(
+        prev_state=C.BIO_SLEEP, wake_needed=False,
+        indicators={"homeoffice": True},
+        presence_personal=C.PERS_HOME, day_state=C.DAY_LATE_MORNING, now=NOW,
         prev_sleep_start=None, prev_awake_start=None,
     )
-    assert state2 == C.BIO_AWAKE
+    assert state == C.BIO_SLEEP
+    assert awake_start is None
+
+
+def test_bio_activity_wake_indicators_are_blocked_at_night():
+    for day_state in (C.DAY_EARLY_NIGHT, C.DAY_LATE_NIGHT, None):
+        state, _, awake_start = L.compute_bio_state(
+            prev_state=C.BIO_SLEEP, wake_needed=False,
+            indicators={"coffee": True, "pc": True, "ps5": True, "door": True},
+            presence_personal=C.PERS_HOME, day_state=day_state, now=NOW,
+            prev_sleep_start=None, prev_awake_start=None,
+        )
+        assert state == C.BIO_SLEEP
+        assert awake_start is None
 
 
 def test_bio_forced_awake_when_leaving_while_not_awake():
     state, _, awake_start = L.compute_bio_state(
         prev_state=C.BIO_SLEEP, wake_needed=False, indicators={},
-        presence_personal=C.PERS_AWAY, now=NOW,
+        presence_personal=C.PERS_AWAY, day_state=C.DAY_LATE_NIGHT, now=NOW,
         prev_sleep_start=None, prev_awake_start=None,
     )
     assert state == C.BIO_AWAKE
@@ -304,16 +331,43 @@ def test_activity_idle_when_sleeping():
         day_context=C.DC_WERKTAG, day_state=C.DAY_AFTERNOON,
         homeoffice=True, private_active=False,
         household_active=False, media_context="tv",
-    ) == C.ACT_IDLE
+    ) == C.ACT_SLEEP
 
 
-def test_activity_work_home_takes_priority():
+def test_activity_waking_is_explicit_state():
+    assert L.compute_activity(
+        bio=C.BIO_WAKING, presence_personal=C.PERS_HOME,
+        day_context=C.DC_WERKTAG, day_state=C.DAY_AFTERNOON,
+        homeoffice=True, private_active=True,
+        household_active=True, media_context="tv",
+    ) == C.ACT_WAKING
+
+
+def test_activity_private_beats_work_home():
     assert L.compute_activity(
         bio=C.BIO_AWAKE, presence_personal=C.PERS_HOME,
         day_context=C.DC_WERKTAG, day_state=C.DAY_AFTERNOON,
         homeoffice=True, private_active=True,
         household_active=False, media_context=None,
+    ) == C.ACT_PRIVATE
+
+
+def test_activity_work_home_when_private_inactive():
+    assert L.compute_activity(
+        bio=C.BIO_AWAKE, presence_personal=C.PERS_HOME,
+        day_context=C.DC_WERKTAG, day_state=C.DAY_AFTERNOON,
+        homeoffice=True, private_active=False,
+        household_active=False, media_context=None,
     ) == C.ACT_WORK_HOME
+
+
+def test_activity_does_not_infer_work_away_from_presence_alone():
+    assert L.compute_activity(
+        bio=C.BIO_AWAKE, presence_personal=C.PERS_AWAY,
+        day_context=C.DC_WERKTAG, day_state=C.DAY_AFTERNOON,
+        homeoffice=False, private_active=False,
+        household_active=False, media_context=None,
+    ) == C.ACT_IDLE
 
 
 def test_activity_free_time_via_media_context():

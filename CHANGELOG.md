@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.3.6.10 - 2026-05-25
+
+### Geändert
+
+- Benni Context: Bio-/Activity-Logik gegen die reviewed
+  Lastenhefte abgeglichen.
+- Bio-State:
+  - `wake_needed` vom Wake Planner setzt `sleep` nur auf
+    `waking`; echte Aktivitätsindikatoren setzen anschließend
+    direkt auf `awake`.
+  - Kaffee, Tür/Fenster-Wake-Signal, PC und PS5 wecken nur noch in
+    Tagesphasen `early_morning`, `late_morning`, `forenoon`,
+    `afternoon`, `early_evening`, `late_evening`.
+  - `early_night`, `late_night` und fehlender Day-State blockieren
+    diese Aktivitäts-Wake-Trigger konservativ.
+  - `homeoffice` ist kein Wake-Trigger mehr; es bleibt ein
+    Activity-Input.
+  - Verlassen der Wohnung während `sleep`/`waking` erzwingt weiterhin
+    `awake`.
+- Activity-State:
+  - `bio=sleep` wird jetzt als Activity `sleep` durchgereicht.
+  - `bio=waking` wird jetzt als Activity `waking` durchgereicht.
+  - Priorität ist jetzt: `sleep` > `waking` > `private_time` >
+    `work_home` > `household` > `free_time` > `idle`.
+  - `private_time` gewinnt vor `work_home`.
+  - `work_away` wird nicht mehr allein aus `presence=abwesend`
+    geraten; dafür braucht es später eine echte Arbeitsort-Quelle.
+
+### Tests
+
+- `benni_context`: 38 Tests (+1), darunter Regressionen für
+  Activity-Wake bei Tag, Blockade bei Nacht/fehlendem Day-State,
+  `homeoffice` ohne Wake-Wirkung, `sleep`/`waking` als Activity und
+  `private_time` vor `work_home`.
+- Full test suite at release preparation: `590 passed, 2 warnings`.
+
+### Kompatibilität
+
+- Keine `unique_id`-Änderungen.
+- Keine CONF-Key-Renames.
+- Keine Entity-Registry-Migration.
+- Bestehende `benni_context`-Entries laufen weiter; die Änderung ist
+  reine Entscheidungslogik.
+
 ## 0.3.6.9 - 2026-05-22
 
 ### Hinzugefügt

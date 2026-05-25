@@ -20,6 +20,8 @@ from .const import (
     ACT_HOUSEHOLD,
     ACT_IDLE,
     ACT_PRIVATE,
+    ACT_SLEEP,
+    ACT_WAKING,
     ACT_WORK_AWAY,
     ACT_WORK_HOME,
     BAND_FAR,
@@ -306,7 +308,25 @@ def compute_preheat(
 
 
 _STRONG_INDICATORS = ("coffee", "door")
-_SOFT_INDICATORS = ("pc", "ps5", "homeoffice")
+_SOFT_INDICATORS = ("pc", "ps5")
+_WAKE_ALLOWED_DAY_STATES = (
+    DAY_EARLY_MORNING,
+    DAY_LATE_MORNING,
+    DAY_FORENOON,
+    DAY_AFTERNOON,
+    DAY_EARLY_EVENING,
+    DAY_LATE_EVENING,
+)
+
+
+def wake_indicators_allowed(day_state: str | None) -> bool:
+    """Return whether activity-based wake indicators may change Bio-State.
+
+    The reviewed Context State spec allows coffee/door/PC/PS5 wake indicators
+    only in the non-night master phases. Missing day-state is treated
+    conservatively: do not infer wake from activity noise.
+    """
+    return day_state in _WAKE_ALLOWED_DAY_STATES
 
 
 def compute_bio_state(
@@ -315,6 +335,7 @@ def compute_bio_state(
     wake_needed: bool,
     indicators: dict[str, bool],
     presence_personal: str,
+    day_state: str | None,
     now: datetime,
     prev_sleep_start: datetime | None,
     prev_awake_start: datetime | None,
@@ -323,11 +344,12 @@ def compute_bio_state(
 
     Rules:
 
-    * ``sleep`` → ``waking`` when either the Wake Planner says ``wake_needed``
-      or any soft/strong indicator fires.
-    * ``waking`` → ``awake`` only on **strong** evidence: a strong indicator
-      (coffee, door open) OR two soft indicators simultaneously. The Wake
-      Planner alone never confirms awake — by design.
+    * ``sleep`` → ``waking`` when the Wake Planner says ``wake_needed``.
+    * ``sleep``/``waking`` → ``awake`` when an allowed wake indicator fires
+      in a non-night day state. Coffee/door are strong indicators; PC/PS5 are
+      explicit wake indicators too. TV is intentionally not an input.
+    * ``waking`` remains a Wake-Up-module transition state; the Wake Planner
+      alone never confirms awake.
     * Leaving home while not asleep → awake (you can't physically leave while
       sleeping; this catches a missed transition).
     * Manual transitions (services.py) flow through this function by passing
@@ -337,19 +359,22 @@ def compute_bio_state(
     awake_start = prev_awake_start
 
     strong = any(indicators.get(k) for k in _STRONG_INDICATORS)
-    soft_count = sum(1 for k in _SOFT_INDICATORS if indicators.get(k))
+    soft = any(indicators.get(k) for k in _SOFT_INDICATORS)
+    activity_wake = wake_indicators_allowed(day_state) and (strong or soft)
 
     # Genuine departure forces awake — you can't be sleeping while walking out.
     if presence_personal == PERS_AWAY and prev_state != BIO_AWAKE:
         return BIO_AWAKE, sleep_start, now
 
     if prev_state == BIO_SLEEP:
-        if wake_needed or strong or soft_count >= 1:
+        if activity_wake:
+            return BIO_AWAKE, sleep_start, now
+        if wake_needed:
             return BIO_WAKING, sleep_start, awake_start
         return BIO_SLEEP, sleep_start, awake_start
 
     if prev_state == BIO_WAKING:
-        if strong or soft_count >= 2:
+        if activity_wake:
             return BIO_AWAKE, sleep_start, now
         return BIO_WAKING, sleep_start, awake_start
 
@@ -405,23 +430,21 @@ def compute_activity(
 ) -> str:
     """Pick the single dominant activity bucket.
 
-    Order matters: work > private > household > free_time > idle.
+    Order matters: sleep > waking > private > work > household > free_time > idle.
     TV / gaming / cinema etc. live in ``media_context`` (attribute), not here.
     """
+    if bio == BIO_SLEEP:
+        return ACT_SLEEP
+    if bio == BIO_WAKING:
+        return ACT_WAKING
+
     if bio != BIO_AWAKE:
         return ACT_IDLE
 
-    if homeoffice and presence_personal == PERS_HOME and day_context == DC_WERKTAG:
-        return ACT_WORK_HOME
-    if (
-        presence_personal == PERS_AWAY
-        and day_context == DC_WERKTAG
-        and day_state in (DAY_LATE_MORNING, DAY_FORENOON, DAY_AFTERNOON)
-    ):
-        return ACT_WORK_AWAY
-
     if private_active:
         return ACT_PRIVATE
+    if homeoffice and presence_personal == PERS_HOME and day_context == DC_WERKTAG:
+        return ACT_WORK_HOME
     if household_active:
         return ACT_HOUSEHOLD
     if media_context and media_context not in ("idle", "none", "off"):

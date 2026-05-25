@@ -265,11 +265,14 @@ class BenniContextCoordinator(DataUpdateCoordinator[ComputedState]):
             "door": self._read_bool(CONF_DOOR_WAKE),
             "homeoffice": self._read_bool(CONF_HOMEOFFICE_PING),
         }
+        local_now = dt_util.as_local(now)
+        day_state = logic.compute_day_state(local_now)
         new_bio, sleep_start, awake_start = logic.compute_bio_state(
             prev_state=self._persistent.bio_state,
             wake_needed=wake_needed,
             indicators=wake_indicators,
             presence_personal=presence_personal,
+            day_state=day_state,
             now=now,
             prev_sleep_start=_parse_iso(self._persistent.last_sleep_start),
             prev_awake_start=_parse_iso(self._persistent.last_awake_start),
@@ -282,8 +285,6 @@ class BenniContextCoordinator(DataUpdateCoordinator[ComputedState]):
             awake_start.isoformat() if awake_start else None
         )
 
-        local_now = dt_util.as_local(now)
-        day_state = logic.compute_day_state(local_now)
         holiday = self._read_bool(CONF_HOLIDAY_SENSOR)
         day_context = logic.compute_day_context(local_now, holiday)
 
