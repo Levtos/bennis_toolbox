@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.5.0 - 2026-05-26
+
+### Hinzugefügt
+
+- **Neues Modul `benni_core_presence_state`** — drittes der drei "Herzen"
+  der benni_core-Architektur. Implementiert die räumliche Kontextlogik
+  nach Lastenheft Context State v1.1 §4.2-4.5 und R-PS-01..R-PS-11.
+- **Entities (7 sensor + 1 binary_sensor):**
+  - `sensor.benni_core_presence_personal` (enum: zuhause/abwesend/bei_eltern)
+  - `sensor.benni_core_presence_household` (enum: leer/nicht_leer)
+  - `sensor.benni_core_presence_transition` (enum: none/coming_home/leaving_home/passing_through)
+  - `sensor.benni_core_presence_band` (enum: home/near/preheat/far)
+  - `sensor.benni_core_presence_direction` (enum: towards/away_from/stationary/unknown)
+  - `sensor.benni_core_presence_distance` (m, device_class distance)
+  - `sensor.benni_core_presence_preheat_source` (text)
+  - `binary_sensor.benni_core_presence_preheat_active` (running)
+- **Pure-Logic-Module** mit 32 pytest-Cases gegen R-PS-01..03 (Home-
+  Candidate-Hierarchie), R-PS-05 (bei_eltern), R-PS-06 (Household),
+  R-PS-11 (Band mit asymmetrischer Hysterese), §4.2 (Personal-Komposition).
+- **Coordinator mit Poll-basiertem Timer-Management:**
+  - Home-Gate-Stabilisierung 60s entry / 150s exit (R-PS-04)
+  - Transition-Hold 120s (§4.4)
+  - Preheat-Hold 1200s (§6) mit drei Endbedingungen
+  - Persistenter Zustand über HA-Restart via Toolbox-Storage
+- **Preheat-Auslösung Ring** (R-PS-07): Band wechselt auf preheat +
+  Direction towards + nicht zuhause → Preheat aktiv, Source `ring`.
+- **Preheat-Ende:**
+  - Home-Gate=on → Preheat off + Transition coming_home (R-PS-09)
+  - away_from + far → Preheat off + Transition passing_through (R-PS-10)
+  - Timeout nach 1200s (LH §6)
+- **Config Flow + Options Flow** mit zwei Schritten (Entity-Picker +
+  Schwellen). Single-Instance. Konfigurierbare Schwellen mit LH-Defaults:
+  home=150m, near=250m, preheat=1500m, hysteresis=100m, preheat=1200s.
+- **bei_eltern hat Vorrang vor home_gate** in der Personal-Komposition
+  (LH §4.2): wenn GPS noch im Home-Bereich aber WLAN nicht eingebucht,
+  gewinnt bei_eltern — sonst würde Benni fälschlich als zuhause gelten
+  wenn er bei den 20m entfernten Eltern ist.
+
+### Beobachtete LH-Subtilität (dokumentiert)
+
+Mit den Default-Werten home=150m, near=250m, hysteresis=100m ist die
+home-Hysterese-Schwelle (150+100=250m) **gleich der near-Grenze**. Folge:
+NEAR ist vom HOME aus per Hysterese nicht direkt erreichbar — beim
+Entfernen springt man von HOME direkt zu PREHEAT. NEAR wird nur durchlaufen
+beim Annähern von außen (PREHEAT→NEAR→HOME). LH-konform (NEAR ist
+Pufferzone "von außen"), aber bei kleinerer Hysterese (z.B. 50m) öffnet
+sich das NEAR-Fenster auch beim Entfernen — Test
+`test_band_home_to_near_reachable_with_smaller_hysteresis` dokumentiert das.
+
+### Noch offen (TODO für Folge-PR)
+
+- **R-PS-08 Preheat-Auslösung über Quellzone-Exit** (`source_zones` im
+  Config Flow vorbereitet, aber Logik fehlt). Braucht zusätzlichen
+  Person-State-Change-Listener mit Zone-Vergleich (from/to). Auslösbar
+  separat ohne Architektur-Refactor.
+
+### Tests
+
+- 32 neue pytest-Cases unter `tests/benni_core_presence_state/`
+- Full suite: **755 passed** (+35 von 720)
+- Timer-basierte Coordinator-Logik (Home-Gate, Transition, Preheat-Ende)
+  ist noch nicht im Pure-Layer testbar — wird über Live-Verifikation
+  gegen einhornzentrale abgesichert.
+
 ## 0.4.1.3 - 2026-05-26
 
 ### Behoben
