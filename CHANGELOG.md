@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.4.0 - 2026-05-26
+
+### Hinzugefügt
+
+- **Neues Modul `benni_core_user_state`** — zweites der drei "Herzen" der
+  benni_core-Architektur (nach day_state). Implementiert die Bio-State-
+  Maschine `sleep`/`waking`/`awake` nach Lastenheft Context State v1.1
+  (§4.1, R-US-01..R-US-07) als eigenständiges Top-Level-Toolbox-Modul.
+- **Entities:**
+  - `sensor.benni_core_user_bio_state` (device_class `enum`) mit
+    Attributen `sleep_started_at`, `awake_started_at`,
+    `sleep_duration_minutes`, `awake_duration_minutes`, plus
+    Tracing-Attribute `last_trigger`, `last_trigger_blocked`,
+    `last_trigger_blocked_reason`.
+  - `sensor.benni_core_user_sleep_duration_minutes` (device_class
+    `duration`, unit `min`).
+  - `sensor.benni_core_user_awake_duration_minutes` (device_class
+    `duration`, unit `min`).
+- **Persistenz** (R-US-05): Bio-State und Timestamps werden in
+  `.storage/bennis_toolbox_benni_core_user_state_state_<entry_id>`
+  abgelegt und nach HA-Restart wiederhergestellt — kein
+  Bootstrap-Override.
+- **Services** (`bennis_toolbox.benni_core_user_state_*`):
+  - `set_sleep` — Sleep-Request, blockiert intern wenn PC aktiv
+    (R-US-02, Konsistenz mit der pure-Logik garantiert).
+  - `set_waking` — manueller WAKING-Übergang (Hook für späteres
+    Wake-Up-Modul).
+  - `set_awake` — manueller AWAKE-Übergang.
+- **Wake-Trigger über State-Change-Events:**
+  - `pc_active_entity`, `ps5_active_entity`, `coffee_active_entity` →
+    Übergang off→on löst Wake aus, master_phase-gated auf
+    `morning`/`midday`/`evening` (R-US-06, R-US-07).
+  - `opening_entities` (Multi-Select Fenster/Türen) → jede echte
+    State-Transition löst Wake aus, gleicher Gate-Mechanismus.
+  - TV ist bewusst nicht als Wake-Trigger vorgesehen (LH KH-7:
+    Fernbedienung kann im Schlaf aktiviert werden).
+- **master_phase-Gate liest `sensor.benni_core_day_state`** (default,
+  konfigurierbar). Bei `master_phase=night` werden alle aktivitäts-
+  basierten Wake-Trigger blockiert — verhindert ungewollte Weckung
+  durch nächtlichen PC-Updateprozess oder kurze Fensteröffnung.
+- **Config Flow + Options Flow** mit EntitySelectors für alle Slots,
+  single-instance erzwungen (`benni_core_user_state_singleton`).
+
+### Tests
+
+- Neue `tests/benni_core_user_state/test_logic.py` (24 Tests) gegen alle
+  Regeln R-US-01..R-US-07 plus Edge-Cases aus LH §9:
+  - PC-Guard für Sleep-Eintritt (inkl. konservativer `unknown`-Block)
+  - Wake-Trigger Gating (morning/midday/evening greift,
+    night blockiert)
+  - Persistenz-Semantik (blockierte Trigger mutieren Timestamps nicht)
+  - Duration-Berechnung in allen drei Bio-States
+- `test_repo_structure.py`: `benni_core_user_state` in
+  EXPECTED_MODULE_IDS.
+- Full suite: **718 passed** (+27, von 691).
+
+### Architektur
+
+- Aufteilung der drei `context_state`-Teilmodule (User, Presence,
+  Activity) in **drei separate Toolbox-Module** statt eines
+  monolithischen `benni_core_context_state` — folgt LH `naming.md`-
+  Empfehlung und der LH-Aussage "konzeptuell verwandt, aber
+  implementierungstechnisch unabhängig". `benni_core_presence_state`
+  und `benni_core_activity_state` (WIP, blockiert durch fehlendes
+  Wake-Up-Modul-LH) folgen separat.
+
 ## 0.3.8.2 - 2026-05-25
 
 ### Behoben
