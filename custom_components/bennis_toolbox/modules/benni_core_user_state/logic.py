@@ -229,10 +229,12 @@ def compute_user_state(
     # SLEEP_REQUEST — R-US-01 + R-US-02
     if trigger is TriggerKind.SLEEP_REQUEST:
         if current is BioState.SLEEP:
-            # Bereits sleep — no-op, kein Block weil nichts zu blockieren.
+            # Bereits sleep — kein Block. Bootstrap-Repair: wenn der
+            # Timestamp fehlt (z.B. nach erstem Setup ohne vorherigen
+            # echten Wechsel), jetzt nachsetzen.
             return _result(
                 new_state=current,
-                sleep_started_at=persisted.sleep_started_at,
+                sleep_started_at=persisted.sleep_started_at or now,
                 awake_started_at=persisted.awake_started_at,
                 persisted=persisted,
                 trigger=trigger,
@@ -284,10 +286,14 @@ def compute_user_state(
     # AWAKE_SIGNAL — R-US-04 (aus sleep oder waking)
     if trigger is TriggerKind.AWAKE_SIGNAL:
         if current is BioState.AWAKE:
+            # Bereits awake — kein State-Wechsel. Bootstrap-Repair: wenn
+            # der Timestamp fehlt (z.B. nach erstem Setup ohne vorherigen
+            # echten Wechsel), jetzt nachsetzen. Dann tickern auch die
+            # Duration-Sensoren korrekt los.
             return _result(
                 new_state=current,
                 sleep_started_at=persisted.sleep_started_at,
-                awake_started_at=persisted.awake_started_at,
+                awake_started_at=persisted.awake_started_at or now,
                 persisted=persisted,
                 trigger=trigger,
                 now=now,
