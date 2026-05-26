@@ -26,6 +26,7 @@ EXPECTED_MODULE_IDS: set[str] = {
     # Siehe memory/toolbox_rebuild_plan.md.
     "benni_core_day_state",
     "benni_core_user_state",
+    "benni_core_presence_state",
     # Alt-Module bleiben bis zur Migration auf das neue Fundament.
     "benni_context",
     "benni_media_context",
