@@ -112,7 +112,20 @@ class UserStateCoordinator(DataUpdateCoordinator[UserStateResult]):
     # ─────────────────────────────────────────────────────── Storage
 
     async def async_load_stored(self) -> None:
-        raw = await self._store.async_load() or {}
+        raw = await self._store.async_load()
+        if raw is None:
+            # Allererster Start nach Config Flow — keine Persistenz vorhanden.
+            # Wir initialisieren mit DEFAULT_BIO_STATE und setzen einen
+            # passenden Started-At-Timestamp, damit die Duration-Sensoren
+            # sofort tickern statt unknown zu bleiben.
+            now = dt_util.now()
+            self._persisted = UserStatePersisted(
+                bio_state=DEFAULT_BIO_STATE,
+                sleep_started_at=now if DEFAULT_BIO_STATE is BioState.SLEEP else None,
+                awake_started_at=now if DEFAULT_BIO_STATE is BioState.AWAKE else None,
+            )
+            await self._async_save()
+            return
         self._persisted = _persisted_from_dict(raw)
 
     async def _async_save(self) -> None:

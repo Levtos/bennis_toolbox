@@ -77,6 +77,19 @@ def test_sleep_request_when_already_sleeping_is_noop():
     assert r.bio_state == C.BioState.SLEEP
     assert r.trigger_blocked is False
     assert r.state_changed is False  # sleep_started_at bleibt = unverändert
+    assert r.sleep_started_at == NOW - timedelta(hours=4)
+
+
+def test_sleep_request_when_already_sleeping_bootstrap_repairs_missing_timestamp():
+    # Bootstrap-Fall: current ist SLEEP aber sleep_started_at fehlt
+    # (z.B. nach einem manuellen set_sleep direkt nach Bootstrap, ohne dass
+    # vorher ein echter Sleep-Eintritt stattfand). SLEEP_REQUEST setzt
+    # den Timestamp nach.
+    p = _persisted(C.BioState.SLEEP, sleep_at=None)
+    r = L.compute_user_state(p, L.TriggerKind.SLEEP_REQUEST, _inputs(pc=False), NOW)
+    assert r.bio_state == C.BioState.SLEEP
+    assert r.sleep_started_at == NOW
+    assert r.state_changed is True  # Timestamp wurde gesetzt
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,12 +134,26 @@ def test_awake_signal_from_waking_enters_awake():
     assert r.awake_started_at == NOW
 
 
-def test_awake_signal_when_already_awake_is_noop():
+def test_awake_signal_when_already_awake_with_timestamp_is_noop():
     p = _persisted(C.BioState.AWAKE, awake_at=NOW - timedelta(hours=2))
     r = L.compute_user_state(p, L.TriggerKind.AWAKE_SIGNAL, _inputs(phase="morning"), NOW)
     assert r.bio_state == C.BioState.AWAKE
     assert r.state_changed is False
     assert r.trigger_blocked is False
+    assert r.awake_started_at == NOW - timedelta(hours=2)
+
+
+def test_awake_signal_when_already_awake_bootstrap_repairs_missing_timestamp():
+    # Bootstrap-Fall: nach allererstem Config-Flow ist DEFAULT_BIO_STATE=AWAKE
+    # aktiv, aber awake_started_at noch None. Ein manueller set_awake-Aufruf
+    # soll den Timestamp jetzt initialisieren, damit Duration-Sensoren ticken.
+    p = _persisted(C.BioState.AWAKE, awake_at=None)
+    r = L.compute_user_state(p, L.TriggerKind.AWAKE_SIGNAL, _inputs(phase="morning"), NOW)
+    assert r.bio_state == C.BioState.AWAKE
+    assert r.awake_started_at == NOW
+    assert r.state_changed is True
+    # Duration-Sensor wird jetzt sofort tickern (0 Minuten gerade)
+    assert r.awake_duration_minutes == 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────

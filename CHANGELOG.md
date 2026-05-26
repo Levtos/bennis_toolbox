@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.1.3 - 2026-05-26
+
+### Behoben
+
+- **Benni Core User State: Bootstrap-Timestamp-Initialisierung.**
+  Nach dem allerersten Config Flow startete der Coordinator mit
+  `DEFAULT_BIO_STATE = awake`, aber `awake_started_at = None`. Folge:
+  `sensor.benni_core_user_awake_duration` blieb dauerhaft `unknown`,
+  bis ein echter State-Wechsel passierte. Bei Live-Verifikation
+  (Service `set_awake` aus dem `awake`-State heraus) zeigte sich, dass
+  auch dieser Aufruf nichts initialisierte — die ursprüngliche Logik
+  war strikt "idempotent" gestaltet.
+- **Fix in zwei Schichten:**
+  - `coordinator.async_load_stored`: bei leerer Storage (erster Start
+    nach Config Flow) wird `awake_started_at = now` (bzw.
+    `sleep_started_at` falls Default sleep wäre) gesetzt und sofort
+    persistiert. Duration-Sensor tickert ab Sekunde 1.
+  - `logic.compute_user_state`: SLEEP_REQUEST bei bereits-sleep und
+    AWAKE_SIGNAL bei bereits-awake setzen jetzt einen fehlenden
+    Timestamp nach, statt ihn nur durchzureichen. Ermöglicht
+    manuelles Reparieren via Service-Call.
+
+### Tests
+
+- Zwei neue Regression-Cases:
+  `test_sleep_request_when_already_sleeping_bootstrap_repairs_missing_timestamp`
+  und `test_awake_signal_when_already_awake_bootstrap_repairs_missing_timestamp`.
+- Bestehender `test_awake_signal_when_already_awake_is_noop` umbenannt
+  zu `..._with_timestamp_is_noop` (semantik geschärft).
+- Full suite: **720 passed** (User-State-Tests +2 von 24 → 26).
+
 ## 0.4.0 - 2026-05-26
 
 ### Hinzugefügt
