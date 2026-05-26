@@ -26,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 # migriert sind — siehe memory/toolbox_rebuild_plan.md.
 REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
     "benni_core_day_state",
+    "benni_core_user_state",
     "benni_context",
     "benni_media_context",
     "notification_router",
