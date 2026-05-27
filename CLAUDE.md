@@ -31,6 +31,15 @@ Alle anderen früheren Module (`title_classifier`, `wake_planner`, `stash_ha`, `
 - **Services:** `bennis_toolbox.<module>_<action>` via ServiceDef in `services_impl.py`
 - **Strukturelle Tests** in `tests/test_repo_structure.py` checken jedes Modul automatisch (Spec lädt HA-frei, keine Cross-Modul-Imports, EXPECTED_MODULE_IDS gepflegt)
 
+## Extraction Lessons — title_classifier Pilot (2026-05-27)
+
+- Standalone-Zielname konsequent `title_classifier`; alter Repo-/Domain-Name `etm` wurde komplett entfernt.
+- Toolbox-Imports waren gebündelt in `const`, `storage`, `services`, Panel-/WebSocket-Helpern und Unique-ID-Helpern; dafür braucht das Zielrepo eigene Root-Adapter.
+- Für Standalone-HA braucht das Zielrepo einen echten `__init__.py`-Dispatcher: Services/WebSockets registrieren, `sensor`/`number` forwarden, Panel lazy registrieren.
+- Frontend-WebSocket-Strings müssen zusammen mit `websocket_type()` umgestellt werden.
+- Tests ließen sich übernehmen; nötig waren nur Package-Pfad und Storage-Helper-Stub.
+- Migration-sensitive Stellen: Service-Domain, WebSocket-Namespace, Storage-Key und unique_id-Prefix vor Cut-over explizit dokumentieren.
+
 ## Verwandte Repos
 
 | Repo | Rolle |
