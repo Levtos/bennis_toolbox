@@ -32,9 +32,7 @@ EXPECTED_MODULE_IDS: set[str] = {
     "benni_media_context",
     "notification_router",
     "plug_policy_engine",
-    "wake_planner",
     "maw",
-    "stash_ha",
     "cover_policy",
 }
 
@@ -44,12 +42,10 @@ LEGACY_TOP_LEVEL_DOMAINS: set[str] = {
     "media_art_wrapper",
     "benni_notification_router",
     "benni_plug_policy",
-    "wake_planner",
     "benni_context",
     "benni_media_context",
     "notification_router",
     "plug_policy_engine",
-    "stash_ha",
     "maw",
 }
 
@@ -287,8 +283,6 @@ LEGACY_WS_PATTERNS: tuple[str, ...] = (
     # Pro Modul-ID das Bare-Prefix verbieten. Jeder dieser Strings darf im
     # produktiven Frontend nur noch als `bennis_toolbox/<module>/...`
     # auftauchen — die Bare-Form ist die alte HA-Domain-Schreibweise.
-    '"wake_planner/',
-    "'wake_planner/",
     '"benni_context/',
     "'benni_context/",
     '"benni_media_context/',
@@ -299,8 +293,6 @@ LEGACY_WS_PATTERNS: tuple[str, ...] = (
     "'plug_policy_engine/",
     '"maw/',
     "'maw/",
-    '"stash_ha/',
-    "'stash_ha/",
 )
 
 

@@ -32,9 +32,7 @@ REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
     "benni_media_context",
     "notification_router",
     "plug_policy_engine",
-    "wake_planner",
     "maw",
-    "stash_ha",
     "cover_policy",
 )
 
