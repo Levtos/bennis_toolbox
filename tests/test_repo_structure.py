@@ -307,7 +307,7 @@ LEGACY_WS_PATTERNS: tuple[str, ...] = (
 def test_no_bare_module_id_websocket_types_in_frontend() -> None:
     """Frontend-Dateien dürfen WS-Type-Strings nur unter dem Toolbox-Präfix
     senden: `bennis_toolbox/<module_id>/<command>`. Eine nackte
-    `<module_id>/<command>`-Form (z.B. `"wake_planner/get_state"`) gehört
+    `<module_id>/<command>`-Form gehört
     zum alten HA-Domain-Schema und ist verboten.
 
     Wir scannen `.js`/`.ts`-Dateien unter jedem `modules/<id>/frontend/`.
@@ -334,7 +334,7 @@ def test_no_bare_module_id_websocket_types_in_frontend() -> None:
                     idx = src.find(needle, idx)
                     if idx == -1:
                         break
-                    # Erlaubt: `"bennis_toolbox/wake_planner/...` → check the
+                    # Erlaubt: `"bennis_toolbox/<module>/...` → check the
                     # 17 chars before the match.
                     head = src[max(0, idx - 17):idx]
                     if not head.endswith("bennis_toolbox/"):
