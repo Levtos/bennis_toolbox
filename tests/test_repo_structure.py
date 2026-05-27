@@ -33,7 +33,6 @@ EXPECTED_MODULE_IDS: set[str] = {
     "notification_router",
     "plug_policy_engine",
     "title_classifier",
-    "wake_planner",
     "maw",
     "stash_ha",
     "cover_policy",
@@ -45,7 +44,6 @@ LEGACY_TOP_LEVEL_DOMAINS: set[str] = {
     "media_art_wrapper",
     "benni_notification_router",
     "benni_plug_policy",
-    "wake_planner",
     "title_classifier",
     "benni_context",
     "benni_media_context",
@@ -289,8 +287,6 @@ LEGACY_WS_PATTERNS: tuple[str, ...] = (
     # Pro Modul-ID das Bare-Prefix verbieten. Jeder dieser Strings darf im
     # produktiven Frontend nur noch als `bennis_toolbox/<module>/...`
     # auftauchen — die Bare-Form ist die alte HA-Domain-Schreibweise.
-    '"wake_planner/',
-    "'wake_planner/",
     '"title_classifier/',
     "'title_classifier/",
     '"benni_context/',
@@ -311,7 +307,7 @@ LEGACY_WS_PATTERNS: tuple[str, ...] = (
 def test_no_bare_module_id_websocket_types_in_frontend() -> None:
     """Frontend-Dateien dürfen WS-Type-Strings nur unter dem Toolbox-Präfix
     senden: `bennis_toolbox/<module_id>/<command>`. Eine nackte
-    `<module_id>/<command>`-Form (z.B. `"wake_planner/get_state"`) gehört
+    `<module_id>/<command>`-Form gehört
     zum alten HA-Domain-Schema und ist verboten.
 
     Wir scannen `.js`/`.ts`-Dateien unter jedem `modules/<id>/frontend/`.
@@ -338,7 +334,7 @@ def test_no_bare_module_id_websocket_types_in_frontend() -> None:
                     idx = src.find(needle, idx)
                     if idx == -1:
                         break
-                    # Erlaubt: `"bennis_toolbox/wake_planner/...` → check the
+                    # Erlaubt: `"bennis_toolbox/<module>/...` → check the
                     # 17 chars before the match.
                     head = src[max(0, idx - 17):idx]
                     if not head.endswith("bennis_toolbox/"):
