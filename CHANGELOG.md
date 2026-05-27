@@ -4,7 +4,7 @@
 
 ### Removed
 
-- `wake_planner` — extrahiert in `ha_wake_planner` (Hybrid-Pivot).
+- `title_classifier` — extrahiert in `Title_classifier` (Hybrid-Pivot).
 
 ## 0.5.0 - 2026-05-26
 

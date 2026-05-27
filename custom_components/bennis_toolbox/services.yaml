@@ -1,68 +1,91 @@
 # Services aller Toolbox-Module — Namensschema: <module_id>_<action>.
 # Domain in der HA-UI: bennis_toolbox.
 
-# --- Title Classifier --------------------------------------------------------
-
-title_classifier_set_enum:
-  name: Title Classifier — Set enum
-  description: Maps a specific title to an enum value (0–9) for one watcher.
+wake_planner_skip_next:
+  name: Wake Planner — Skip next wake
+  description: Skips the next scheduled wake for one person.
   fields:
-    entry_id:
-      required: true
-      selector:
-        text:
-    key:
-      required: true
-      selector:
-        text:
-    enum:
-      required: true
-      selector:
-        number:
-          min: 0
-          max: 9
-          step: 1
-          mode: box
-
-title_classifier_delete_entry:
-  name: Title Classifier — Delete entry
-  fields:
-    entry_id:
-      required: true
-      selector:
-        text:
-    key:
+    person_id:
       required: true
       selector:
         text:
 
-title_classifier_clear_old:
-  name: Title Classifier — Clear entries not seen for N days
+wake_planner_set_override:
+  name: Wake Planner — Set override
+  description: Manually overrides the wake time for one person until an optional date.
   fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    wake_time:
+      required: true
+      selector:
+        time:
+    until:
+      required: false
+      selector:
+        date:
+
+wake_planner_clear_override:
+  name: Wake Planner — Clear override
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+wake_planner_add_person:
+  name: Wake Planner — Add person
+  fields:
+    name:
+      required: true
+      selector:
+        text:
+    person_entity_id:
+      required: false
+      selector:
+        entity:
+          domain: person
     entry_id:
       required: false
       selector:
         text:
-    days:
-      required: false
-      default: 30
-      selector:
-        number:
-          min: 1
-          step: 1
-          mode: box
 
-title_classifier_import_entries:
-  name: Title Classifier — Bulk-import mappings
+wake_planner_remove_person:
+  name: Wake Planner — Remove person
   fields:
-    entry_id:
+    person_id:
       required: true
       selector:
         text:
-    entries:
+
+wake_planner_set_rules:
+  name: Wake Planner — Set rules
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    rules:
       required: true
       selector:
         object:
+
+wake_planner_set_special_rules:
+  name: Wake Planner — Set holiday/global rules
+  fields:
+    holiday_behavior:
+      required: false
+      selector:
+        select:
+          options:
+            - skip
+            - weekend_profile
+    manual_holiday_dates:
+      required: false
+      selector:
+        text:
 
 # --- Benni Context -----------------------------------------------------------
 

@@ -10,7 +10,6 @@ Module exportieren in ihrem `__init__.py` optional `SERVICES`:
 Die Toolbox registriert sie unter ihrer Domain mit präfixiertem Namen:
 
     bennis_toolbox.wake_planner_set_plan
-    bennis_toolbox.title_classifier_classify
 """
 
 from __future__ import annotations

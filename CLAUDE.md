@@ -13,7 +13,7 @@ HACS-Custom-Integration `bennis_toolbox` für Home Assistant. Nach **Hybrid-Pivo
 - Legacy: `benni_context` (bleibt bis komplette Migration)
 - Utilities: `storage.py`, `services.py`, `_platform_dispatch.py`, `config_flow.py`, `base.py`, `const.py`
 
-Alle anderen früheren Module (`title_classifier`, `wake_planner`, `stash_ha`, `notification_router`, `maw`, `plug_policy_engine`, `cover_policy`, `benni_media_context`) werden von Codex schrittweise in **eigene Custom-Repos** extrahiert. Siehe `einhornzentrale/docs/roadmap.md`.
+`title_classifier` wurde in `Title_classifier` extrahiert und aus der Toolbox entfernt. Alle anderen früheren Module (`wake_planner`, `stash_ha`, `notification_router`, `maw`, `plug_policy_engine`, `cover_policy`, `benni_media_context`) werden von Codex schrittweise in **eigene Custom-Repos** extrahiert. Siehe `einhornzentrale/docs/roadmap.md`.
 
 ## Architektur-Pattern
 
