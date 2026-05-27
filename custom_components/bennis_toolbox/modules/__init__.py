@@ -33,7 +33,6 @@ REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
     "notification_router",
     "plug_policy_engine",
     "title_classifier",
-    "wake_planner",
     "maw",
     "stash_ha",
     "cover_policy",

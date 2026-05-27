@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 - 2026-05-27
+
+### Removed
+
+- `wake_planner` — extrahiert in `ha_wake_planner` (Hybrid-Pivot).
+
 ## 0.5.0 - 2026-05-26
 
 ### Hinzugefügt
