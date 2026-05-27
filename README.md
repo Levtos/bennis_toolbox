@@ -30,8 +30,6 @@ verfügbaren Module:
 | `plug_policy_engine`    | Plug Policy Engine     | **ready**       |
 | `title_classifier`      | Title Classifier       | **ready**       |
 | `maw`                   | Media Art Wrapper      | stub            |
-| `stash_ha`              | Stash HA               | **ready**       |
-
 **Statuswerte:**
 - `ready` — voll lauffähig, Entities/Services aktiv.
 - `pending` — Spec ist registriert, Fachlogik liegt unter `_reference/`

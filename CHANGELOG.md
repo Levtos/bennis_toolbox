@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 - 2026-05-27
+
+### Removed
+
+- `stash_ha` — extrahiert in `stash-ha` (Hybrid-Pivot).
+
 ## 0.5.1 - 2026-05-27
 
 ### Removed
