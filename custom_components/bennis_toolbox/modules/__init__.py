@@ -28,6 +28,7 @@ REGISTERED_MODULE_IDS: Final[tuple[str, ...]] = (
     "benni_core_day_state",
     "benni_core_user_state",
     "benni_core_presence_state",
+    "benni_core_devices",
     "benni_context",
     "benni_media_context",
     "notification_router",

@@ -4,7 +4,9 @@
       "user": {
         "title": "Benni's Toolbox",
         "description": "Pick which module to add to the toolbox. Modules marked \"pending\" exist in the repo but are not yet fully wired — you can still create an entry for them.",
-        "data": { "_module_id": "Module" }
+        "data": {
+          "_module_id": "Module"
+        }
       },
       "module_step": {
         "title": "Module setup",
@@ -33,7 +35,46 @@
           "scan_interval": "Scan interval in seconds",
           "apply_enabled": "Actually drive the cover (otherwise decision sensors only)",
           "manual_override_duration": "Manual override holds … seconds",
-          "startup_block_seconds": "Block apply for … seconds after HA start"
+          "startup_block_seconds": "Block apply for … seconds after HA start",
+          "device_type": "Device type"
+        }
+      },
+      "slots": {
+        "title": "Configure device",
+        "description": "Set the slug and source entities. Required fields depend on the device type. Watt buckets optional as a YAML list.",
+        "data": {
+          "slug": "Slug (unique, a-z0-9_)",
+          "display_name": "Display name",
+          "integration_entity": "Integration entity (media_player etc.)",
+          "power_entity": "Power sensor (e.g. console on)",
+          "status_entity": "Status entity (network / sub-state)",
+          "title_entity": "Title entity (current title)",
+          "watt_sensor": "Watt sensor (fallback / power_state)",
+          "wifi_sensor": "Wi-Fi connectivity",
+          "switch_entity": "Switch entity (smart plug)",
+          "light_entity": "Light entity",
+          "cover_entity": "Cover entity",
+          "position_entity": "Position sensor (cover, optional)",
+          "value_entity": "Source sensor (sensor wrapper)",
+          "watt_threshold_on": "Watt threshold 'on' (W)",
+          "sticky_hold_seconds": "Sticky hold (seconds)",
+          "expose_secondary_sensors": "Create secondary sensors",
+          "watt_buckets": "Watt buckets (YAML list, optional)"
+        }
+      },
+      "pick_mode": {
+        "title": "Add device(s)",
+        "description": "Add a single device or import several at once via a YAML list.",
+        "menu_options": {
+          "single": "Single device",
+          "bulk": "Bulk import (YAML)"
+        }
+      },
+      "bulk": {
+        "title": "Bulk import (YAML)",
+        "description": "YAML list of devices. Each entry needs slug + device_type + the type's required slots. Either all valid or nothing is created.",
+        "data": {
+          "bulk_yaml": "Devices (YAML list)"
         }
       }
     },
@@ -42,13 +83,22 @@
       "unknown_module": "This module is no longer registered.",
       "invalid_flow_state": "Broken flow state.",
       "already_configured": "This module instance already exists.",
-      "single_instance_allowed": "Only one instance per module allowed."
+      "single_instance_allowed": "Only one instance per module allowed.",
+      "import_not_supported": "This module does not support import.",
+      "bulk_import_started": "Bulk import started — devices are being created.",
+      "import_invalid": "Import data invalid or incomplete."
     },
     "error": {
       "unknown_module": "Unknown module.",
       "cannot_connect": "Connection failed.",
       "invalid_url": "URL missing or invalid.",
-      "required": "Required field."
+      "required": "Required field.",
+      "invalid_slug": "Invalid slug — lowercase letters, digits, underscore only.",
+      "invalid_type": "Unknown device type.",
+      "invalid_yaml": "Input is not valid YAML.",
+      "buckets_not_list": "Watt buckets must be a list.",
+      "bucket_missing_state": "Each watt bucket needs a \"state\" field.",
+      "bulk_invalid": "Bulk import invalid — see errors: {errors}"
     }
   },
   "options": {
@@ -75,7 +125,8 @@
           "pc": "PC",
           "denon": "Denon",
           "homepods": "HomePods",
-          "context": "Context / global sources"
+          "context": "Context / global sources",
+          "slots": "Source entities"
         }
       },
       "tv": {
@@ -198,7 +249,11 @@
         "data": {
           "apply_enabled": "Actually drive the cover (otherwise decision sensors only)",
           "manual_override_duration": "Manual override holds … seconds",
-          "startup_block_seconds": "Block apply for … seconds after HA start"
+          "startup_block_seconds": "Block apply for … seconds after HA start",
+          "watt_threshold_on": "Watt threshold 'on' (W)",
+          "sticky_hold_seconds": "Sticky hold (seconds)",
+          "expose_secondary_sensors": "Create secondary sensors",
+          "watt_buckets": "Watt buckets (YAML list, optional)"
         }
       },
       "device_basics": {
@@ -237,6 +292,29 @@
           "diffuser_on_minutes": "Diffuser: on phase (minutes)",
           "diffuser_off_minutes": "Diffuser: off phase (minutes)",
           "allowed_contexts": "Allowed day contexts (policy SC) — morning / day / evening / night; detailed phase values (e.g. late_morning, afternoon, early_night) are mapped onto these four buckets internally"
+        }
+      },
+      "slots": {
+        "title": "Edit source entities",
+        "description": "Adjust the source entities of this device. Required fields depend on the type.",
+        "data": {
+          "slug": "Slug (unique, a-z0-9_)",
+          "display_name": "Display name",
+          "integration_entity": "Integration entity (media_player etc.)",
+          "power_entity": "Power sensor (e.g. console on)",
+          "status_entity": "Status entity (network / sub-state)",
+          "title_entity": "Title entity (current title)",
+          "watt_sensor": "Watt sensor (fallback / power_state)",
+          "wifi_sensor": "Wi-Fi connectivity",
+          "switch_entity": "Switch entity (smart plug)",
+          "light_entity": "Light entity",
+          "cover_entity": "Cover entity",
+          "position_entity": "Position sensor (cover, optional)",
+          "value_entity": "Source sensor (sensor wrapper)",
+          "watt_threshold_on": "Watt threshold 'on' (W)",
+          "sticky_hold_seconds": "Sticky hold (seconds)",
+          "expose_secondary_sensors": "Create secondary sensors",
+          "watt_buckets": "Watt buckets (YAML list, optional)"
         }
       }
     },
