@@ -132,7 +132,8 @@
           "remove_device": "Gerät entfernen",
           "calendar": "Kalender",
           "special_rules": "Spezialregeln",
-          "fields": "Felder & Entities"
+          "fields": "Felder & Entities",
+          "bulk": "Bulk-Import (YAML)"
         }
       },
       "slots": {
@@ -231,7 +232,84 @@
           "position_entity": "Positions-Sensor",
           "value_entity": "Quell-Sensor (Sensor-Wrapper)"
         }
+      },
+      "add_type": {
+        "title": "Gerät: Typ",
+        "description": "Geräte-Typ steuert nur die Attribut-Semantik und die Default-Feldauswahl.",
+        "data": {
+          "device_type": "Geräte-Typ"
+        }
+      },
+      "add_fields": {
+        "title": "Gerät: Felder",
+        "description": "Anzeigename + welche Felder belegt werden sollen. Gewählte Felder werden im nächsten Schritt zu Pflicht-Pickern. Slug wird automatisch aus dem Namen abgeleitet.",
+        "data": {
+          "display_name": "Anzeigename",
+          "fields": "Felder belegen (Multi-Select)"
+        }
+      },
+      "add_slots": {
+        "title": "Gerät: Entities",
+        "description": "Eine Entity je gewähltem Feld.",
+        "data": {
+          "integration_entity": "Integration-Entity",
+          "power_entity": "Power-Sensor",
+          "status_entity": "Status-Entity",
+          "title_entity": "Titel-Entity",
+          "watt_sensor": "Watt-Sensor",
+          "wifi_sensor": "WLAN-Status",
+          "switch_entity": "Schalter/Plug",
+          "light_entity": "Licht",
+          "cover_entity": "Rollo/Cover",
+          "position_entity": "Positions-Sensor",
+          "value_entity": "Wert-Sensor"
+        }
+      },
+      "add_runtime": {
+        "title": "Gerät: Laufzeit",
+        "description": "Fallback-Schwelle, Sticky-Hold, optionale Sekundär-Sensoren. Watt-Zeilen (off/idle/playing) erscheinen nur wenn ein Watt-Sensor gewählt wurde.",
+        "data": {
+          "watt_threshold_on": "Watt-Schwelle 'an' (W)",
+          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
+          "watt_off_op": "off: Operator",
+          "watt_off_value": "off: Watt-Wert",
+          "watt_idle_op": "idle: Operator",
+          "watt_idle_value": "idle: Watt-Wert",
+          "watt_playing_op": "playing: Operator",
+          "watt_playing_value": "playing: Watt-Wert"
+        }
+      },
+      "edit_device": {
+        "title": "Gerät bearbeiten",
+        "description": "Welches Gerät?",
+        "data": {
+          "slug": "Gerät"
+        }
+      },
+      "remove_device": {
+        "title": "Gerät entfernen",
+        "description": "Welches Gerät entfernen?",
+        "data": {
+          "slug": "Gerät"
+        }
+      },
+      "bulk": {
+        "title": "Bulk-Import (YAML)",
+        "description": "YAML-Liste von Geräten. Jeder Eintrag braucht device_type + optional display_name (slug wird abgeleitet) + die Slot-Entities. Entweder alle gültig oder nichts wird angelegt.",
+        "data": {
+          "bulk_yaml": "Geräte (YAML-Liste)"
+        }
       }
+    },
+    "abort": {
+      "no_devices": "Keine Geräte vorhanden."
+    },
+    "error": {
+      "invalid_yaml": "Eingabe ist kein gültiges YAML.",
+      "bulk_invalid": "Bulk-Import ungültig: {errors}",
+      "invalid_type": "Unbekannter Geräte-Typ.",
+      "required": "Pflichtfeld."
     }
   }
 }

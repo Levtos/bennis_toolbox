@@ -138,7 +138,8 @@
           "denon": "Denon",
           "homepods": "HomePods",
           "context": "Context / global sources",
-          "fields": "Fields & entities"
+          "fields": "Fields & entities",
+          "bulk": "Bulk import (YAML)"
         }
       },
       "tv": {
@@ -358,6 +359,74 @@
           "position_entity": "Position sensor",
           "value_entity": "Source sensor (sensor wrapper)"
         }
+      },
+      "add_type": {
+        "title": "Device: type",
+        "description": "Device type only drives attribute semantics and default field selection.",
+        "data": {
+          "device_type": "Device type"
+        }
+      },
+      "add_fields": {
+        "title": "Device: fields",
+        "description": "Display name + which fields to use. Chosen fields become required pickers next. Slug is derived from the name.",
+        "data": {
+          "display_name": "Display name",
+          "fields": "Fields to use (multi-select)"
+        }
+      },
+      "add_slots": {
+        "title": "Device: entities",
+        "description": "One entity per chosen field.",
+        "data": {
+          "integration_entity": "Integration entity",
+          "power_entity": "Power sensor",
+          "status_entity": "Status entity",
+          "title_entity": "Title entity",
+          "watt_sensor": "Watt sensor",
+          "wifi_sensor": "Wi-Fi status",
+          "switch_entity": "Switch/plug",
+          "light_entity": "Light",
+          "cover_entity": "Cover",
+          "position_entity": "Position sensor",
+          "value_entity": "Value sensor"
+        }
+      },
+      "add_runtime": {
+        "title": "Device: runtime",
+        "description": "Fallback threshold, sticky hold, optional secondary sensors. Watt rows appear only if a watt sensor was chosen.",
+        "data": {
+          "watt_threshold_on": "Watt threshold 'on' (W)",
+          "sticky_hold_seconds": "Sticky hold (seconds)",
+          "expose_secondary_sensors": "Create secondary sensors",
+          "watt_off_op": "off: operator",
+          "watt_off_value": "off: watt value",
+          "watt_idle_op": "idle: operator",
+          "watt_idle_value": "idle: watt value",
+          "watt_playing_op": "playing: operator",
+          "watt_playing_value": "playing: watt value"
+        }
+      },
+      "edit_device": {
+        "title": "Edit device",
+        "description": "Which device?",
+        "data": {
+          "slug": "Device"
+        }
+      },
+      "remove_device": {
+        "title": "Remove device",
+        "description": "Which device to remove?",
+        "data": {
+          "slug": "Device"
+        }
+      },
+      "bulk": {
+        "title": "Bulk import (YAML)",
+        "description": "YAML list of devices. Each entry needs device_type + optional display_name (slug derived) + slot entities. All valid or nothing is added.",
+        "data": {
+          "bulk_yaml": "Devices (YAML list)"
+        }
       }
     },
     "selector": {
@@ -367,6 +436,15 @@
           "assume_idle": "treat as idle"
         }
       }
+    },
+    "abort": {
+      "no_devices": "No devices configured."
+    },
+    "error": {
+      "invalid_yaml": "Input is not valid YAML.",
+      "bulk_invalid": "Bulk import invalid: {errors}",
+      "invalid_type": "Unknown device type.",
+      "required": "Required field."
     }
   }
 }

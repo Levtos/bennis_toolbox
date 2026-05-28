@@ -66,6 +66,9 @@ CONF_EXPOSE_SECONDARY_SENSORS: Final[str] = "expose_secondary_sensors"
 # Bulk-Import (Config-Flow, R-DC-08)
 CONF_BULK_YAML: Final[str] = "bulk_yaml"
 
+# Single-Hub: Geräte-Liste in entry.options. Dict {slug: device_conf}.
+CONF_DEVICES: Final[str] = "devices"
+
 # Feld-Maske: Multi-Select welche Slots der User belegen will
 CONF_FIELDS: Final[str] = "fields"
 

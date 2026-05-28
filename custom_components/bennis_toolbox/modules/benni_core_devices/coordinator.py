@@ -67,16 +67,23 @@ _LOGGER = logging.getLogger(__name__)
 class DeviceCoordinator(DataUpdateCoordinator[DeviceResult]):
     """Treibt einen Device-Sensor."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, conf: dict[str, Any]
+    ) -> None:
+        slug = str(conf[CONF_SLUG])
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}_{MODULE_ID}_{entry.entry_id}",
+            name=f"{DOMAIN}_{MODULE_ID}_{entry.entry_id}_{slug}",
             update_interval=timedelta(seconds=UPDATE_INTERVAL_SECONDS),
         )
         self.entry = entry
+        self._conf = conf
         self._store = make_store(
-            hass, MODULE_ID, f"state_{entry.entry_id}", version=STORAGE_VERSION
+            hass,
+            MODULE_ID,
+            f"state_{entry.entry_id}_{slug}",
+            version=STORAGE_VERSION,
         )
         self._persisted = DevicePersisted(
             last_powered=None,
@@ -89,43 +96,39 @@ class DeviceCoordinator(DataUpdateCoordinator[DeviceResult]):
 
     # ─────────────────────────────────────────────────────── Config Access
 
-    def _opt(self, key: str, default: Any = None) -> Any:
-        return self.entry.options.get(key, self.entry.data.get(key, default))
+    def _c(self, key: str, default: Any = None) -> Any:
+        return self._conf.get(key, default)
 
     @property
     def slug(self) -> str:
-        return str(self.entry.data[CONF_SLUG])
+        return str(self._conf[CONF_SLUG])
 
     @property
     def display_name(self) -> str:
-        return str(self.entry.data.get(CONF_DISPLAY_NAME) or self.slug)
+        return str(self._conf.get(CONF_DISPLAY_NAME) or self.slug)
 
     @property
     def device_type(self) -> DeviceType:
-        return DeviceType(self.entry.data[CONF_DEVICE_TYPE])
+        return DeviceType(self._conf[CONF_DEVICE_TYPE])
 
     @property
     def watt_threshold_on(self) -> int:
-        return int(self._opt(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON))
+        return int(self._c(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON))
 
     @property
     def sticky_hold_seconds(self) -> int:
-        return int(self._opt(CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS))
+        return int(self._c(CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS))
 
     @property
     def expose_secondary_sensors(self) -> bool:
-        return bool(self._opt(CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS))
+        return bool(self._c(CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS))
 
     @property
     def configured_slot_entities(self) -> dict[str, str]:
-        """Slot-Key → Entity-ID, nur tatsächlich konfigurierte.
-
-        Iteriert über den globalen Slot-Katalog (Felder sind user-gewählt,
-        nicht typ-fix), nicht mehr über typ-spezifische Profil-Slots.
-        """
+        """Slot-Key → Entity-ID, nur tatsächlich konfigurierte (aus conf)."""
         out: dict[str, str] = {}
         for key in ALL_SLOT_KEYS:
-            eid = self.entry.data.get(key)
+            eid = self._conf.get(key)
             if eid:
                 out[key] = str(eid)
         return out
@@ -255,7 +258,7 @@ class DeviceCoordinator(DataUpdateCoordinator[DeviceResult]):
             display_name=self.display_name,
             device_type=self.device_type.value,
             watt_threshold_on=self.watt_threshold_on,
-            watt_buckets=logic.parse_watt_buckets(self._opt(CONF_WATT_BUCKETS)),
+            watt_buckets=logic.parse_watt_buckets(self._c(CONF_WATT_BUCKETS)),
             sticky_hold_seconds=self.sticky_hold_seconds,
             area_id=self._derive_area_id(),
             configured_slots=tuple(self.configured_slot_entities.keys()),
@@ -320,23 +323,25 @@ class DeviceCoordinator(DataUpdateCoordinator[DeviceResult]):
 
 
 @callback
-def coordinator_from_hass(
+def coordinators_for_entry(
     hass: HomeAssistant, entry: ConfigEntry
-) -> DeviceCoordinator | None:
+) -> dict[str, DeviceCoordinator]:
+    """Alle Device-Coordinators (slug → coord) des Hub-Entries."""
     bucket = hass.data.get(DOMAIN, {}).get(DATA_ENTRIES, {}).get(entry.entry_id)
     if not bucket:
-        return None
-    return bucket.get("coordinator")
+        return {}
+    coords = bucket.get("coordinators")
+    return coords if isinstance(coords, dict) else {}
 
 
 @callback
 def all_coordinators(hass: HomeAssistant) -> list[DeviceCoordinator]:
-    """Alle Device-Coordinators (für Service-Resolution by-slug)."""
+    """Alle Device-Coordinators über alle Hub-Entries (Service-Resolution)."""
     out: list[DeviceCoordinator] = []
     for bucket in hass.data.get(DOMAIN, {}).get(DATA_ENTRIES, {}).values():
-        c = bucket.get("coordinator")
-        if isinstance(c, DeviceCoordinator):
-            out.append(c)
+        coords = bucket.get("coordinators")
+        if isinstance(coords, dict):
+            out.extend(c for c in coords.values() if isinstance(c, DeviceCoordinator))
     return out
 
 
