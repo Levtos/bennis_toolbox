@@ -11,7 +11,7 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, async_generate_entity_id
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ...const import unique_id
@@ -56,11 +56,14 @@ class _BaseDeviceBinarySensor(
         self._attr_unique_id = unique_id(
             MODULE_ID, entry.entry_id, coordinator.slug, suffix
         )
-        self._attr_suggested_object_id = _object_id(coordinator.slug, suffix)
         self._attr_name = name
         from .sensor import _device_info
 
         self._attr_device_info = _device_info(coordinator)
+        self.entity_id = async_generate_entity_id(
+            "binary_sensor.{}", _object_id(coordinator.slug, suffix),
+            hass=coordinator.hass,
+        )
 
     @property
     def _result(self) -> DeviceResult | None:
