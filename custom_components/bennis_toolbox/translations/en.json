@@ -40,26 +40,20 @@
         }
       },
       "slots": {
-        "title": "Configure device",
-        "description": "Set the slug and source entities. Required fields depend on the device type. Watt buckets optional as a YAML list.",
+        "title": "Source entities",
+        "description": "Pick one entity per chosen field.",
         "data": {
-          "slug": "Slug (unique, a-z0-9_)",
-          "display_name": "Display name",
           "integration_entity": "Integration entity (media_player etc.)",
-          "power_entity": "Power sensor (e.g. console on)",
-          "status_entity": "Status entity (network / sub-state)",
-          "title_entity": "Title entity (current title)",
-          "watt_sensor": "Watt sensor (fallback / power_state)",
+          "power_entity": "Power sensor (on/off)",
+          "status_entity": "Status entity (network/sub-state)",
+          "title_entity": "Title entity",
+          "watt_sensor": "Watt sensor",
           "wifi_sensor": "Wi-Fi connectivity",
           "switch_entity": "Switch entity (smart plug)",
           "light_entity": "Light entity",
           "cover_entity": "Cover entity",
-          "position_entity": "Position sensor (cover, optional)",
-          "value_entity": "Source sensor (sensor wrapper)",
-          "watt_threshold_on": "Watt threshold 'on' (W)",
-          "sticky_hold_seconds": "Sticky hold (seconds)",
-          "expose_secondary_sensors": "Create secondary sensors",
-          "watt_buckets": "Watt buckets (YAML list, optional)"
+          "position_entity": "Position sensor",
+          "value_entity": "Source sensor (sensor wrapper)"
         }
       },
       "pick_mode": {
@@ -75,6 +69,24 @@
         "description": "YAML list of devices. Each entry needs slug + device_type + the type's required slots. Either all valid or nothing is created.",
         "data": {
           "bulk_yaml": "Devices (YAML list)"
+        }
+      },
+      "fields": {
+        "title": "Configure device",
+        "description": "Slug + display name, which fields to use, runtime knobs and optional watt rows (off/idle/playing) for power_state. Chosen fields become required pickers in the next step.",
+        "data": {
+          "slug": "Slug (unique, a-z0-9_)",
+          "display_name": "Display name",
+          "fields": "Fields to use (multi-select)",
+          "watt_threshold_on": "Watt threshold 'on' (W)",
+          "sticky_hold_seconds": "Sticky hold (seconds)",
+          "expose_secondary_sensors": "Create secondary sensors",
+          "watt_off_op": "off: operator",
+          "watt_off_value": "off: watt value",
+          "watt_idle_op": "idle: operator",
+          "watt_idle_value": "idle: watt value",
+          "watt_playing_op": "playing: operator",
+          "watt_playing_value": "playing: watt value"
         }
       }
     },
@@ -126,7 +138,7 @@
           "denon": "Denon",
           "homepods": "HomePods",
           "context": "Context / global sources",
-          "slots": "Source entities"
+          "fields": "Fields & entities"
         }
       },
       "tv": {
@@ -253,7 +265,12 @@
           "watt_threshold_on": "Watt threshold 'on' (W)",
           "sticky_hold_seconds": "Sticky hold (seconds)",
           "expose_secondary_sensors": "Create secondary sensors",
-          "watt_buckets": "Watt buckets (YAML list, optional)"
+          "watt_off_op": "off: operator",
+          "watt_off_value": "off: watt value",
+          "watt_idle_op": "idle: operator",
+          "watt_idle_value": "idle: watt value",
+          "watt_playing_op": "playing: operator",
+          "watt_playing_value": "playing: watt value"
         }
       },
       "device_basics": {
@@ -315,6 +332,31 @@
           "sticky_hold_seconds": "Sticky hold (seconds)",
           "expose_secondary_sensors": "Create secondary sensors",
           "watt_buckets": "Watt buckets (YAML list, optional)"
+        }
+      },
+      "fields": {
+        "title": "Choose fields",
+        "description": "Display name and which fields to use.",
+        "data": {
+          "display_name": "Display name",
+          "fields": "Fields to use (multi-select)"
+        }
+      },
+      "field_values": {
+        "title": "Assign entities",
+        "description": "One entity per chosen field.",
+        "data": {
+          "integration_entity": "Integration entity (media_player etc.)",
+          "power_entity": "Power sensor (on/off)",
+          "status_entity": "Status entity (network/sub-state)",
+          "title_entity": "Title entity",
+          "watt_sensor": "Watt sensor",
+          "wifi_sensor": "Wi-Fi connectivity",
+          "switch_entity": "Switch entity (smart plug)",
+          "light_entity": "Light entity",
+          "cover_entity": "Cover entity",
+          "position_entity": "Position sensor",
+          "value_entity": "Source sensor (sensor wrapper)"
         }
       }
     },

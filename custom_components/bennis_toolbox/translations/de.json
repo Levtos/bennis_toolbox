@@ -43,26 +43,20 @@
         "title": "Schwellwerte"
       },
       "slots": {
-        "title": "Gerät konfigurieren",
-        "description": "Lege Kurznamen (slug) und Quell-Entities fest. Pflichtfelder hängen vom Typ ab. Watt-Buckets optional als YAML-Liste.",
+        "title": "Quell-Entities",
+        "description": "Wähle eine Entity je gewähltem Feld.",
         "data": {
-          "slug": "Slug (eindeutig, a-z0-9_)",
-          "display_name": "Anzeigename",
           "integration_entity": "Integration-Entity (media_player o.ä.)",
-          "power_entity": "Power-Sensor (z.B. Konsole an)",
-          "status_entity": "Status-Entity (Netzwerk / Sub-State)",
-          "title_entity": "Titel-Entity (aktueller Titel)",
-          "watt_sensor": "Watt-Sensor (Fallback / power_state)",
+          "power_entity": "Power-Sensor (an/aus)",
+          "status_entity": "Status-Entity (Netzwerk/Sub-State)",
+          "title_entity": "Titel-Entity",
+          "watt_sensor": "Watt-Sensor",
           "wifi_sensor": "WLAN-Konnektivität",
           "switch_entity": "Switch-Entity (Smart Plug)",
           "light_entity": "Light-Entity",
           "cover_entity": "Cover-Entity",
-          "position_entity": "Positions-Sensor (Cover, optional)",
-          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
-          "watt_threshold_on": "Watt-Schwelle „an“ (W)",
-          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
-          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
-          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+          "position_entity": "Positions-Sensor",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
         }
       },
       "pick_mode": {
@@ -78,6 +72,24 @@
         "description": "YAML-Liste von Geräten. Jeder Eintrag braucht slug + device_type + die Pflicht-Slots des Typs. Entweder alle gültig oder es wird nichts angelegt.",
         "data": {
           "bulk_yaml": "Geräte (YAML-Liste)"
+        }
+      },
+      "fields": {
+        "title": "Gerät konfigurieren",
+        "description": "Slug + Anzeigename, welche Felder du belegen willst, Runtime-Knöpfe und optional Watt-Zeilen (off/idle/playing) für den power_state. Gewählte Felder werden im nächsten Schritt zu Pflicht-Pickern.",
+        "data": {
+          "slug": "Slug (eindeutig, a-z0-9_)",
+          "display_name": "Anzeigename",
+          "fields": "Felder belegen (Multi-Select)",
+          "watt_threshold_on": "Watt-Schwelle 'an' (W)",
+          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
+          "watt_off_op": "off: Operator",
+          "watt_off_value": "off: Watt-Wert",
+          "watt_idle_op": "idle: Operator",
+          "watt_idle_value": "idle: Watt-Wert",
+          "watt_playing_op": "playing: Operator",
+          "watt_playing_value": "playing: Watt-Wert"
         }
       }
     },
@@ -129,7 +141,7 @@
           "denon": "Denon",
           "homepods": "HomePods",
           "context": "Context / Globale Quellen",
-          "slots": "Quell-Entities"
+          "fields": "Felder & Entities"
         }
       },
       "tv": {
@@ -253,10 +265,15 @@
           "apply_enabled": "Cover wirklich fahren (sonst nur Decision-Sensoren)",
           "manual_override_duration": "Manueller Override hält … Sekunden",
           "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden",
-          "watt_threshold_on": "Watt-Schwelle „an“ (W)",
+          "watt_threshold_on": "Watt-Schwelle 'an' (W)",
           "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
           "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
-          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+          "watt_off_op": "off: Operator",
+          "watt_off_value": "off: Watt-Wert",
+          "watt_idle_op": "idle: Operator",
+          "watt_idle_value": "idle: Watt-Wert",
+          "watt_playing_op": "playing: Operator",
+          "watt_playing_value": "playing: Watt-Wert"
         }
       },
       "device_basics": {
@@ -318,6 +335,31 @@
           "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
           "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
           "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+        }
+      },
+      "fields": {
+        "title": "Felder wählen",
+        "description": "Anzeigename und welche Felder belegt werden sollen.",
+        "data": {
+          "display_name": "Anzeigename",
+          "fields": "Felder belegen (Multi-Select)"
+        }
+      },
+      "field_values": {
+        "title": "Entities zuordnen",
+        "description": "Eine Entity je gewähltem Feld.",
+        "data": {
+          "integration_entity": "Integration-Entity (media_player o.ä.)",
+          "power_entity": "Power-Sensor (an/aus)",
+          "status_entity": "Status-Entity (Netzwerk/Sub-State)",
+          "title_entity": "Titel-Entity",
+          "watt_sensor": "Watt-Sensor",
+          "wifi_sensor": "WLAN-Konnektivität",
+          "switch_entity": "Switch-Entity (Smart Plug)",
+          "light_entity": "Light-Entity",
+          "cover_entity": "Cover-Entity",
+          "position_entity": "Positions-Sensor",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
         }
       }
     },

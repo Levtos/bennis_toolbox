@@ -51,7 +51,7 @@ from .const import (
     UPDATE_INTERVAL_SECONDS,
     DeviceType,
 )
-from .device_types import DeviceTypeProfile, profile_for
+from .device_types import ALL_SLOT_KEYS, DeviceTypeProfile, profile_for
 from .logic import (
     DeviceConfig,
     DeviceInputs,
@@ -118,12 +118,16 @@ class DeviceCoordinator(DataUpdateCoordinator[DeviceResult]):
 
     @property
     def configured_slot_entities(self) -> dict[str, str]:
-        """Slot-Key → Entity-ID, nur tatsächlich konfigurierte."""
+        """Slot-Key → Entity-ID, nur tatsächlich konfigurierte.
+
+        Iteriert über den globalen Slot-Katalog (Felder sind user-gewählt,
+        nicht typ-fix), nicht mehr über typ-spezifische Profil-Slots.
+        """
         out: dict[str, str] = {}
-        for slot in self._profile.slots:
-            eid = self.entry.data.get(slot.key)
+        for key in ALL_SLOT_KEYS:
+            eid = self.entry.data.get(key)
             if eid:
-                out[slot.key] = str(eid)
+                out[key] = str(eid)
         return out
 
     @property

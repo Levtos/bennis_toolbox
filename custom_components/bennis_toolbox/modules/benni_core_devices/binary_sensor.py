@@ -56,6 +56,9 @@ class _BaseDeviceBinarySensor(
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, suffix)
         self._attr_suggested_object_id = _object_id(coordinator.slug, suffix)
         self._attr_name = name
+        from .sensor import _device_info
+
+        self._attr_device_info = _device_info(coordinator)
 
     @property
     def _result(self) -> DeviceResult | None:
