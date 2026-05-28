@@ -31,7 +31,7 @@ from .const import (
     MODULE_ID,
     POWER_STATE_SLUGS,
 )
-from .coordinator import DeviceCoordinator, coordinator_from_hass
+from .coordinator import DeviceCoordinator, coordinators_for_entry
 from .logic import DeviceResult
 
 
@@ -41,13 +41,16 @@ def _object_id(slug: str, suffix: str | None = None) -> str:
 
 
 def _device_info(coordinator: DeviceCoordinator) -> DeviceInfo:
-    """HA-Device pro Config-Entry, damit Haupt- + Sekundär-Sensoren unter
-    einer Geräte-Karte gruppiert erscheinen (Benni Core · Devices)."""
+    """Ein HA-Device pro Gerät, eingehängt unter dem Hub-Gerät (via_device),
+    sodass alle Geräte unter 'Benni Core · Devices' gruppiert erscheinen."""
+    from . import HUB_IDENTIFIER
+
     return DeviceInfo(
         identifiers={(DOMAIN, f"{MODULE_ID}:{coordinator.slug}")},
         name=coordinator.display_name,
         manufacturer="Benni Core · Devices",
         model=coordinator.device_type.value,
+        via_device=HUB_IDENTIFIER,
     )
 
 
@@ -56,14 +59,13 @@ async def async_get_entities(
 ) -> list[Entity]:
     if platform != Platform.SENSOR:
         return []
-    coordinator = coordinator_from_hass(hass, entry)
-    if coordinator is None:
-        return []
-    out: list[Entity] = [DeviceMainSensor(coordinator, entry)]
-    if coordinator.expose_secondary_sensors:
-        out.append(PowerStateSensor(coordinator, entry))
-        if coordinator.watt_slot_key:
-            out.append(WattSensor(coordinator, entry))
+    out: list[Entity] = []
+    for coordinator in coordinators_for_entry(hass, entry).values():
+        out.append(DeviceMainSensor(coordinator, entry))
+        if coordinator.expose_secondary_sensors:
+            out.append(PowerStateSensor(coordinator, entry))
+            if coordinator.watt_slot_key:
+                out.append(WattSensor(coordinator, entry))
     return out
 
 
@@ -101,7 +103,7 @@ class DeviceMainSensor(_BaseDeviceSensor):
         super().__init__(
             coordinator,
             entry,
-            suffix="main",
+            suffix=f"{coordinator.slug}_main",
             object_id=_object_id(coordinator.slug),
             name=coordinator.display_name,
         )
@@ -155,7 +157,7 @@ class PowerStateSensor(_BaseDeviceSensor):
         super().__init__(
             coordinator,
             entry,
-            suffix="power_state",
+            suffix=f"{coordinator.slug}_power_state",
             object_id=_object_id(coordinator.slug, "power_state"),
             name=f"{coordinator.display_name} Power State",
         )
@@ -178,7 +180,7 @@ class WattSensor(_BaseDeviceSensor):
         super().__init__(
             coordinator,
             entry,
-            suffix="watt",
+            suffix=f"{coordinator.slug}_watt",
             object_id=_object_id(coordinator.slug, "watt"),
             name=f"{coordinator.display_name} Watt",
         )

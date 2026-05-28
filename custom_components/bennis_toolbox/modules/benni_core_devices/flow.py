@@ -1,18 +1,18 @@
-"""Config- und Options-Flow für Benni Core · Devices (Feld-Masken-Modell).
+"""Config- und Options-Flow für Benni Core · Devices (Single-Hub-Modell).
 
-Multi-Instance — eine Config-Entry pro Device. Unique-ID: `benni_core_devices:<slug>`.
+Config-Flow: legt EINEN Hub-Eintrag "Benni Core · Devices" an (Single-Instance,
+keine Felder). Die Geräte werden danach im Options-Flow verwaltet.
 
-Config-Flow:
-1. `pick_mode` — Menü: einzelnes Gerät vs. Bulk-Import (YAML)
-2a. single → `module_step` (Typ) → `fields` (Maske + Runtime + Watt-Zeilen)
-              → `slots` (Entity-Picker je gewähltem Feld, Pflicht)
-2b. bulk   → `bulk` (YAML-Liste) → SOURCE_IMPORT-Flow je Device
+Options-Flow (Menü):
+- `add_device`    — Typ → Felder-Maske (Anzeigename + Multi-Select) → Slots
+                    (Pflicht-Picker) → Runtime (Schwelle/Sticky/Sekundär +
+                    Watt-Zeilen nur wenn watt_sensor gewählt)
+- `edit_device`   — Gerät wählen → gleiche Schritte vorausgefüllt
+- `remove_device` — Gerät wählen → entfernen
+- `bulk`          — YAML-Liste → in den Hub mergen
 
-Der `device_type` steuert nur die Attribut-Semantik + Default-Feldauswahl.
-Welche Felder belegt werden, wählt der User frei (Feld-Maske). Gewählte
-Felder werden zu Pflicht-Pickern.
-
-Options-Flow (Menü): `fields` (Maske→Picker) | `runtime` (Knöpfe+Watt-Zeilen).
+Geräte liegen in `entry.options["devices"]` als Dict {slug: device_conf}.
+Der slug wird aus dem Anzeigenamen abgeleitet (nicht mehr manuell getippt).
 """
 
 from __future__ import annotations
@@ -21,19 +21,19 @@ from typing import Any
 
 import voluptuous as vol
 import yaml
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry, OptionsFlow
+from homeassistant.config_entries import ConfigEntry, OptionsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
-from ...const import CONF_MODULE_ID, DOMAIN
+from ...const import CONF_MODULE_ID
 from .const import (
     CONF_BULK_YAML,
     CONF_DEVICE_TYPE,
+    CONF_DEVICES,
     CONF_DISPLAY_NAME,
     CONF_EXPOSE_SECONDARY_SENSORS,
     CONF_FIELDS,
-    CONF_SLUG,
     CONF_STICKY_HOLD_SECONDS,
     CONF_WATT_BUCKETS,
     CONF_WATT_IDLE_OP,
@@ -42,12 +42,14 @@ from .const import (
     CONF_WATT_OFF_VALUE,
     CONF_WATT_PLAYING_OP,
     CONF_WATT_PLAYING_VALUE,
+    CONF_WATT_SENSOR,
     CONF_WATT_THRESHOLD_ON,
     DEFAULT_EXPOSE_SECONDARY_SENSORS,
     DEFAULT_STICKY_HOLD_SECONDS,
     DEFAULT_WATT_THRESHOLD_ON,
     DEVICE_TYPE_SLUGS,
     MODULE_ID,
+    NAME,
     WATT_OPERATOR_CHOICES,
     DeviceType,
 )
@@ -55,13 +57,26 @@ from .device_types import (
     ALL_SLOT_KEYS,
     SLOT_CATALOG,
     default_fields,
-    is_valid_slug,
-    profile_for,
-    validate_import_device,
+    slugify,
+    unique_slug,
     validate_import_payload,
 )
 
-# Reihenfolge der Watt-Bucket-Zeilen (state-name → op-key, value-key)
+# Feld-Labels mit Beispiel für den Multi-Select (schöner als rohe Keys).
+FIELD_LABELS: dict[str, str] = {
+    "integration_entity": "Integration (z. B. media_player.living_tv)",
+    "power_entity": "Power-Sensor (z. B. binary_sensor … _power)",
+    "status_entity": "Status (z. B. media_player.ps5)",
+    "title_entity": "Titel (z. B. sensor … _media_title)",
+    "watt_sensor": "Watt-Sensor (z. B. sensor … _power)",
+    "wifi_sensor": "WLAN-Status (z. B. binary_sensor … _wifi)",
+    "switch_entity": "Schalter / Plug (z. B. switch.coffee)",
+    "light_entity": "Licht (z. B. light.living_ceiling)",
+    "cover_entity": "Rollo / Cover (z. B. cover.blackout)",
+    "position_entity": "Position (z. B. sensor … _position)",
+    "value_entity": "Wert-Sensor (z. B. sensor.garden_lux)",
+}
+
 _WATT_ROWS: tuple[tuple[str, str, str], ...] = (
     ("off", CONF_WATT_OFF_OP, CONF_WATT_OFF_VALUE),
     ("idle", CONF_WATT_IDLE_OP, CONF_WATT_IDLE_VALUE),
@@ -74,7 +89,7 @@ _WATT_ROWS: tuple[tuple[str, str, str], ...] = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _type_step_schema() -> vol.Schema:
+def _type_schema() -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_DEVICE_TYPE): selector.SelectSelector(
@@ -87,14 +102,42 @@ def _type_step_schema() -> vol.Schema:
     )
 
 
-def _bulk_schema(default: str = "") -> vol.Schema:
+def _fields_schema(device_type: DeviceType, defaults: dict[str, Any]) -> vol.Schema:
+    """Anzeigename + Multi-Select der zu belegenden Felder. KEIN slug, KEINE
+    Watt-/Sekundär-Felder hier (kommen erst nach der Feld-Bestätigung)."""
+    pre = defaults.get(CONF_FIELDS) or list(default_fields(device_type))
+    options = [
+        selector.SelectOptionDict(value=k, label=FIELD_LABELS.get(k, k))
+        for k in ALL_SLOT_KEYS
+    ]
     return vol.Schema(
         {
-            vol.Required(CONF_BULK_YAML, default=default): selector.TextSelector(
-                selector.TextSelectorConfig(multiline=True)
+            vol.Required(
+                CONF_DISPLAY_NAME, default=defaults.get(CONF_DISPLAY_NAME, "")
+            ): str,
+            vol.Required(CONF_FIELDS, default=pre): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options,
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
             ),
         }
     )
+
+
+def _slots_schema(field_keys: list[str], defaults: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {}
+    for key in field_keys:
+        spec = SLOT_CATALOG.get(key)
+        if spec is None:
+            continue
+        sel = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=list(spec.domains), multiple=False)
+        )
+        default = defaults.get(key)
+        fields[vol.Required(key, default=default) if default else vol.Required(key)] = sel
+    return vol.Schema(fields)
 
 
 def _operator_selector() -> selector.SelectSelector:
@@ -106,19 +149,9 @@ def _operator_selector() -> selector.SelectSelector:
     )
 
 
-def _fields_schema(device_type: DeviceType, defaults: dict[str, Any]) -> vol.Schema:
-    """Maske: slug, display, Feld-Multiselect, Runtime-Knöpfe, Watt-Zeilen."""
-    pre = defaults.get(CONF_FIELDS) or list(default_fields(device_type))
+def _runtime_schema(field_keys: list[str], defaults: dict[str, Any]) -> vol.Schema:
+    """Schwelle/Sticky/Sekundär — plus Watt-Zeilen NUR wenn watt_sensor gewählt."""
     fields: dict[Any, Any] = {
-        vol.Required(CONF_SLUG, default=defaults.get(CONF_SLUG, "")): str,
-        vol.Required(CONF_DISPLAY_NAME, default=defaults.get(CONF_DISPLAY_NAME, "")): str,
-        vol.Required(CONF_FIELDS, default=pre): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=list(ALL_SLOT_KEYS),
-                multiple=True,
-                mode=selector.SelectSelectorMode.LIST,
-            )
-        ),
         vol.Optional(
             CONF_WATT_THRESHOLD_ON,
             default=defaults.get(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON),
@@ -134,60 +167,44 @@ def _fields_schema(device_type: DeviceType, defaults: dict[str, Any]) -> vol.Sch
             ),
         ): bool,
     }
-    # Watt-Zeilen: pro Zeile Operator (optional) + Wert (optional)
-    for _state, op_key, val_key in _WATT_ROWS:
-        op_default = defaults.get(op_key)
-        if op_default:
-            fields[vol.Optional(op_key, default=op_default)] = _operator_selector()
-        else:
-            fields[vol.Optional(op_key)] = _operator_selector()
-        fields[vol.Optional(val_key, default=defaults.get(val_key))] = vol.Any(
-            None, vol.All(vol.Coerce(float), vol.Range(min=0, max=10000))
-        )
+    if CONF_WATT_SENSOR in field_keys:
+        prefill = _form_from_buckets(defaults.get(CONF_WATT_BUCKETS))
+        for _state, op_key, val_key in _WATT_ROWS:
+            op_d = prefill.get(op_key)
+            marker = vol.Optional(op_key, default=op_d) if op_d else vol.Optional(op_key)
+            fields[marker] = _operator_selector()
+            fields[vol.Optional(val_key, default=prefill.get(val_key))] = vol.Any(
+                None, vol.All(vol.Coerce(float), vol.Range(min=0, max=10000))
+            )
     return vol.Schema(fields)
 
 
-def _slots_schema(field_keys: list[str], defaults: dict[str, Any]) -> vol.Schema:
-    """Entity-Picker je gewähltem Feld (Pflicht), breite Domains aus Katalog."""
-    fields: dict[Any, Any] = {}
-    for key in field_keys:
-        spec = SLOT_CATALOG.get(key)
-        if spec is None:
-            continue
-        sel = selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=list(spec.domains), multiple=False)
-        )
-        default = defaults.get(key)
-        if default:
-            fields[vol.Required(key, default=default)] = sel
-        else:
-            fields[vol.Required(key)] = sel
-    return vol.Schema(fields)
+def _bulk_schema(default: str = "") -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_BULK_YAML, default=default): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)
+            ),
+        }
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Watt-Bucket-Konvertierung (Form ↔ Liste)
+# Watt-Bucket-Konvertierung
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def _buckets_from_form(src: dict[str, Any]) -> list[dict[str, Any]]:
-    """Baut die Bucket-Liste aus den 6 Watt-Form-Feldern.
-
-    Eine Zeile zählt nur, wenn ein Wert gesetzt ist. Operator-Default "<=".
-    Reihenfolge: off → idle → playing.
-    """
     out: list[dict[str, Any]] = []
     for state, op_key, val_key in _WATT_ROWS:
         val = src.get(val_key)
         if val in (None, ""):
             continue
-        op = src.get(op_key) or "<="
-        out.append({"state": state, "op": op, "value": float(val)})
+        out.append({"state": state, "op": src.get(op_key) or "<=", "value": float(val)})
     return out
 
 
 def _form_from_buckets(buckets: Any) -> dict[str, Any]:
-    """Füllt die 6 Watt-Form-Felder aus einer gespeicherten Bucket-Liste."""
     out: dict[str, Any] = {}
     if not isinstance(buckets, list):
         return out
@@ -200,159 +217,240 @@ def _form_from_buckets(buckets: Any) -> dict[str, Any]:
     return out
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry-Builder (geteilt: Config-Flow + Import)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _build_entry_data(
-    device_type: DeviceType, slug: str, field_keys: list[str], src: dict[str, Any]
+def _build_device_conf(
+    device_type: DeviceType,
+    display_name: str,
+    field_keys: list[str],
+    slot_values: dict[str, Any],
+    runtime: dict[str, Any],
 ) -> dict[str, Any]:
-    data: dict[str, Any] = {
-        CONF_MODULE_ID: MODULE_ID,
+    conf: dict[str, Any] = {
         CONF_DEVICE_TYPE: device_type.value,
-        CONF_SLUG: slug,
-        CONF_DISPLAY_NAME: src.get(CONF_DISPLAY_NAME) or slug,
+        CONF_DISPLAY_NAME: display_name,
         CONF_FIELDS: list(field_keys),
     }
     for key in field_keys:
-        v = src.get(key)
-        if v:
-            data[key] = v
-    return data
-
-
-def _build_entry_options(src: dict[str, Any], buckets: list[Any]) -> dict[str, Any]:
-    return {
-        CONF_WATT_THRESHOLD_ON: int(
-            src.get(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON)
-        ),
-        CONF_STICKY_HOLD_SECONDS: int(
-            src.get(CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS)
-        ),
-        CONF_EXPOSE_SECONDARY_SENSORS: bool(
-            src.get(CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS)
-        ),
-        CONF_WATT_BUCKETS: buckets or [],
-    }
+        if slot_values.get(key):
+            conf[key] = slot_values[key]
+    conf[CONF_WATT_THRESHOLD_ON] = int(
+        runtime.get(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON)
+    )
+    conf[CONF_STICKY_HOLD_SECONDS] = int(
+        runtime.get(CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS)
+    )
+    conf[CONF_EXPOSE_SECONDARY_SENSORS] = bool(
+        runtime.get(CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS)
+    )
+    conf[CONF_WATT_BUCKETS] = _buckets_from_form(runtime)
+    return conf
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ConfigFlowHelper
+# ConfigFlowHelper — legt den Hub an (Single-Instance, ohne Felder)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class ConfigFlowHelper:
-    """Wird vom zentralen BennisToolboxConfigFlow aufgerufen."""
-
     def __init__(self, hass: HomeAssistant, flow) -> None:
         self.hass = hass
         self.flow = flow
-        self._chosen_type: DeviceType | None = None
-        self._meta: dict[str, Any] = {}
-        self._field_keys: list[str] = []
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        await self.flow.async_set_unique_id(f"{MODULE_ID}_hub")
+        self.flow._abort_if_unique_id_configured()
+        return self.flow.async_create_entry(
+            title=NAME,
+            data={CONF_MODULE_ID: MODULE_ID},
+            options={CONF_DEVICES: {}},
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OptionsFlowHelper — Geräteverwaltung
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class OptionsFlowHelper:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, flow: OptionsFlow
+    ) -> None:
+        self.hass = hass
+        self.entry = entry
+        self.flow = flow
+        # Draft-State über die Schritte hinweg
+        self._type: DeviceType | None = None
+        self._display: str = ""
+        self._fields: list[str] = []
+        self._slots: dict[str, Any] = {}
+        self._editing_slug: str | None = None
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _devices(self) -> dict[str, dict[str, Any]]:
+        raw = self.entry.options.get(CONF_DEVICES)
+        return dict(raw) if isinstance(raw, dict) else {}
+
+    def _save_devices(self, devices: dict[str, dict[str, Any]]) -> FlowResult:
+        new_options = {**self.entry.options, CONF_DEVICES: devices}
+        return self.flow.async_create_entry(title="", data=new_options)
+
+    # ── Menü ─────────────────────────────────────────────────────────────────
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         return self.flow.async_show_menu(
-            step_id="pick_mode", menu_options=["single", "bulk"]
+            step_id="init",
+            menu_options=["add_device", "edit_device", "remove_device", "bulk"],
         )
 
-    # ── Einzelnes Gerät ──────────────────────────────────────────────────────
+    # ── Gerät hinzufügen ──────────────────────────────────────────────────────
 
-    async def async_step_single(
+    async def async_step_add_device(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        return self.flow.async_show_form(
-            step_id="module_step", data_schema=_type_step_schema()
-        )
+        self._type = None
+        self._editing_slug = None
+        self._slots = {}
+        return self.flow.async_show_form(step_id="add_type", data_schema=_type_schema())
 
-    async def async_step_module_step(
+    async def async_step_add_type(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if not user_input or CONF_DEVICE_TYPE not in user_input:
             return self.flow.async_show_form(
-                step_id="module_step", data_schema=_type_step_schema()
+                step_id="add_type", data_schema=_type_schema()
             )
         try:
-            self._chosen_type = DeviceType(user_input[CONF_DEVICE_TYPE])
+            self._type = DeviceType(user_input[CONF_DEVICE_TYPE])
         except ValueError:
             return self.flow.async_show_form(
-                step_id="module_step",
-                data_schema=_type_step_schema(),
+                step_id="add_type",
+                data_schema=_type_schema(),
                 errors={CONF_DEVICE_TYPE: "invalid_type"},
             )
         return self.flow.async_show_form(
-            step_id="fields", data_schema=_fields_schema(self._chosen_type, {})
+            step_id="add_fields", data_schema=_fields_schema(self._type, {})
         )
 
-    async def async_step_fields(
+    async def async_step_add_fields(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        assert self._chosen_type is not None
+        assert self._type is not None
         if user_input is None:
             return self.flow.async_show_form(
-                step_id="fields", data_schema=_fields_schema(self._chosen_type, {})
+                step_id="add_fields", data_schema=_fields_schema(self._type, {})
             )
-
+        self._display = str(user_input.get(CONF_DISPLAY_NAME, "")).strip()
+        self._fields = [
+            k for k in (user_input.get(CONF_FIELDS) or []) if k in SLOT_CATALOG
+        ]
         errors: dict[str, str] = {}
-        slug = str(user_input.get(CONF_SLUG, "")).strip().lower()
-        if not is_valid_slug(slug):
-            errors[CONF_SLUG] = "invalid_slug"
-        field_keys = [k for k in (user_input.get(CONF_FIELDS) or []) if k in SLOT_CATALOG]
-
+        if not self._display:
+            errors[CONF_DISPLAY_NAME] = "required"
         if errors:
             return self.flow.async_show_form(
-                step_id="fields",
-                data_schema=_fields_schema(self._chosen_type, user_input),
+                step_id="add_fields",
+                data_schema=_fields_schema(self._type, user_input),
                 errors=errors,
             )
-
-        self._meta = dict(user_input)
-        self._meta[CONF_SLUG] = slug
-        self._field_keys = field_keys
-        if not field_keys:
-            # Kein Feld gewählt → direkt anlegen (Device ohne Slots erlaubt)
-            return await self._create_single_entry({})
+        if not self._fields:
+            # keine Felder → direkt zur Runtime (Gerät ohne Slots erlaubt)
+            return self.flow.async_show_form(
+                step_id="add_runtime", data_schema=_runtime_schema([], {})
+            )
         return self.flow.async_show_form(
-            step_id="slots", data_schema=_slots_schema(field_keys, {})
+            step_id="add_slots", data_schema=_slots_schema(self._fields, self._slots)
         )
 
-    async def async_step_slots(
+    async def async_step_add_slots(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        assert self._chosen_type is not None
         if user_input is None:
             return self.flow.async_show_form(
-                step_id="slots", data_schema=_slots_schema(self._field_keys, {})
+                step_id="add_slots",
+                data_schema=_slots_schema(self._fields, self._slots),
             )
-        errors: dict[str, str] = {}
-        for key in self._field_keys:
-            if not user_input.get(key):
-                errors[key] = "required"
+        errors = {k: "required" for k in self._fields if not user_input.get(k)}
         if errors:
             return self.flow.async_show_form(
-                step_id="slots",
-                data_schema=_slots_schema(self._field_keys, user_input),
+                step_id="add_slots",
+                data_schema=_slots_schema(self._fields, user_input),
                 errors=errors,
             )
-        return await self._create_single_entry(user_input)
-
-    async def _create_single_entry(self, slot_values: dict[str, Any]) -> FlowResult:
-        assert self._chosen_type is not None
-        slug = self._meta[CONF_SLUG]
-        await self.flow.async_set_unique_id(f"{MODULE_ID}:{slug}")
-        self.flow._abort_if_unique_id_configured()
-        src = {**self._meta, **slot_values}
-        data = _build_entry_data(self._chosen_type, slug, self._field_keys, src)
-        buckets = _buckets_from_form(self._meta)
-        options = _build_entry_options(self._meta, buckets)
-        return self.flow.async_create_entry(
-            title=data[CONF_DISPLAY_NAME] or slug, data=data, options=options
+        self._slots = dict(user_input)
+        return self.flow.async_show_form(
+            step_id="add_runtime",
+            data_schema=_runtime_schema(self._fields, self._slots),
         )
 
-    # ── Bulk-Import ──────────────────────────────────────────────────────────
+    async def async_step_add_runtime(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        assert self._type is not None
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="add_runtime",
+                data_schema=_runtime_schema(self._fields, {}),
+            )
+        conf = _build_device_conf(
+            self._type, self._display, self._fields, self._slots, user_input
+        )
+        devices = self._devices()
+        if self._editing_slug and self._editing_slug in devices:
+            slug = self._editing_slug
+        else:
+            slug = unique_slug(slugify(self._display) or "device", set(devices.keys()))
+        devices[slug] = conf
+        return self._save_devices(devices)
+
+    # ── Gerät bearbeiten ──────────────────────────────────────────────────────
+
+    async def async_step_edit_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        devices = self._devices()
+        if not devices:
+            return self.flow.async_abort(reason="no_devices")
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="edit_device", data_schema=_pick_schema(devices)
+            )
+        slug = user_input["slug"]
+        conf = devices.get(slug)
+        if not conf:
+            return self.flow.async_abort(reason="no_devices")
+        self._editing_slug = slug
+        self._type = DeviceType(conf[CONF_DEVICE_TYPE])
+        self._display = conf.get(CONF_DISPLAY_NAME, slug)
+        self._fields = list(conf.get(CONF_FIELDS) or [])
+        self._slots = {k: conf.get(k) for k in self._fields}
+        return self.flow.async_show_form(
+            step_id="add_fields",
+            data_schema=_fields_schema(
+                self._type,
+                {CONF_DISPLAY_NAME: self._display, CONF_FIELDS: self._fields},
+            ),
+        )
+
+    # ── Gerät entfernen ───────────────────────────────────────────────────────
+
+    async def async_step_remove_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        devices = self._devices()
+        if not devices:
+            return self.flow.async_abort(reason="no_devices")
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="remove_device", data_schema=_pick_schema(devices)
+            )
+        devices.pop(user_input["slug"], None)
+        return self._save_devices(devices)
+
+    # ── Bulk-Import ───────────────────────────────────────────────────────────
 
     async def async_step_bulk(
         self, user_input: dict[str, Any] | None = None
@@ -370,6 +468,13 @@ class ConfigFlowHelper:
                 data_schema=_bulk_schema(raw),
                 errors={CONF_BULK_YAML: "invalid_yaml"},
             )
+        # slug ist optional im Bulk-YAML — aus display_name ableiten falls fehlt.
+        if isinstance(parsed, list):
+            for d in parsed:
+                if isinstance(d, dict) and not d.get(CONF_SLUG_KEY):
+                    derived = slugify(str(d.get(CONF_DISPLAY_NAME, "")))
+                    if derived:
+                        d[CONF_SLUG_KEY] = derived
         valid, errors = validate_import_payload(parsed)
         if errors:
             return self.flow.async_show_form(
@@ -378,192 +483,49 @@ class ConfigFlowHelper:
                 errors={CONF_BULK_YAML: "bulk_invalid"},
                 description_placeholders={"errors": "\n".join(errors)},
             )
+        devices = self._devices()
         for d in valid:
-            self.hass.async_create_task(
-                self.hass.config_entries.flow.async_init(
-                    DOMAIN,
-                    context={"source": SOURCE_IMPORT},
-                    data={CONF_MODULE_ID: MODULE_ID, **d},
-                )
+            slug = d.pop(CONF_SLUG_KEY, None) or unique_slug(
+                slugify(d.get(CONF_DISPLAY_NAME, "device")) or "device",
+                set(devices.keys()),
             )
-        return self.flow.async_abort(reason="bulk_import_started")
-
-    async def async_import(self, import_data: dict[str, Any]) -> FlowResult:
-        """Legt EIN Device aus validierten Import-Daten an (R-DC-08)."""
-        err = validate_import_device(import_data)
-        if err:
-            return self.flow.async_abort(reason="import_invalid")
-        device_type = DeviceType(import_data[CONF_DEVICE_TYPE])
-        slug = str(import_data[CONF_SLUG]).strip().lower()
-        await self.flow.async_set_unique_id(f"{MODULE_ID}:{slug}")
-        self.flow._abort_if_unique_id_configured()
-
-        # Felder = alle Slot-Keys die im Import vorkommen
-        field_keys = [k for k in ALL_SLOT_KEYS if import_data.get(k)]
-        data = _build_entry_data(device_type, slug, field_keys, import_data)
-        buckets = import_data.get(CONF_WATT_BUCKETS) or []
-        if not isinstance(buckets, list):
-            buckets = []
-        options = _build_entry_options(import_data, buckets)
-        return self.flow.async_create_entry(
-            title=data[CONF_DISPLAY_NAME] or slug, data=data, options=options
-        )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OptionsFlowHelper
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class OptionsFlowHelper:
-    """Nachträgliches Anpassen: Felder/Slots + Runtime/Watt-Zeilen."""
-
-    def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, flow: OptionsFlow
-    ) -> None:
-        self.hass = hass
-        self.entry = entry
-        self.flow = flow
-        self._field_keys: list[str] = []
-
-    @property
-    def device_type(self) -> DeviceType:
-        return DeviceType(self.entry.data[CONF_DEVICE_TYPE])
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        return self.flow.async_show_menu(
-            step_id="init", menu_options=["fields", "runtime"]
-        )
-
-    async def async_step_fields(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        if user_input is None:
-            defaults = {
-                CONF_SLUG: self.entry.data.get(CONF_SLUG, ""),
-                CONF_DISPLAY_NAME: self.entry.data.get(CONF_DISPLAY_NAME, ""),
-                CONF_FIELDS: self.entry.data.get(CONF_FIELDS)
-                or list(default_fields(self.device_type)),
+            field_keys = [k for k in ALL_SLOT_KEYS if d.get(k)]
+            conf: dict[str, Any] = {
+                CONF_DEVICE_TYPE: d[CONF_DEVICE_TYPE],
+                CONF_DISPLAY_NAME: d.get(CONF_DISPLAY_NAME, slug),
+                CONF_FIELDS: field_keys,
             }
-            return self.flow.async_show_form(
-                step_id="fields",
-                data_schema=_options_fields_schema(self.device_type, defaults),
-            )
-        self._field_keys = [
-            k for k in (user_input.get(CONF_FIELDS) or []) if k in SLOT_CATALOG
-        ]
-        self._pending_display = user_input.get(CONF_DISPLAY_NAME) or self.entry.data.get(
-            CONF_DISPLAY_NAME
+            for k in field_keys:
+                conf[k] = d[k]
+            for k in (
+                CONF_WATT_THRESHOLD_ON,
+                CONF_STICKY_HOLD_SECONDS,
+                CONF_EXPOSE_SECONDARY_SENSORS,
+                CONF_WATT_BUCKETS,
+            ):
+                if k in d:
+                    conf[k] = d[k]
+            devices[slug] = conf
+        return self._save_devices(devices)
+
+
+# Bulk-YAML darf optional einen expliziten slug mitgeben.
+CONF_SLUG_KEY = "slug"
+
+
+def _pick_schema(devices: dict[str, dict[str, Any]]) -> vol.Schema:
+    options = [
+        selector.SelectOptionDict(
+            value=slug, label=f"{conf.get(CONF_DISPLAY_NAME, slug)} ({slug})"
         )
-        defaults = {k: self.entry.data.get(k) for k in self._field_keys}
-        return self.flow.async_show_form(
-            step_id="field_values",
-            data_schema=_slots_schema(self._field_keys, defaults),
-        )
-
-    async def async_step_field_values(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        user_input = user_input or {}
-        errors: dict[str, str] = {}
-        for key in self._field_keys:
-            if not user_input.get(key):
-                errors[key] = "required"
-        if errors:
-            return self.flow.async_show_form(
-                step_id="field_values",
-                data_schema=_slots_schema(self._field_keys, user_input),
-                errors=errors,
-            )
-        new_data = dict(self.entry.data)
-        # Alte Slot-Werte entfernen, neue setzen
-        for key in ALL_SLOT_KEYS:
-            new_data.pop(key, None)
-        for key in self._field_keys:
-            if user_input.get(key):
-                new_data[key] = user_input[key]
-        new_data[CONF_FIELDS] = list(self._field_keys)
-        if getattr(self, "_pending_display", None):
-            new_data[CONF_DISPLAY_NAME] = self._pending_display
-        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
-        return self.flow.async_create_entry(title="", data=self.entry.options)
-
-    async def async_step_runtime(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        if user_input is not None:
-            buckets = _buckets_from_form(user_input)
-            new_options = {
-                **self.entry.options,
-                CONF_WATT_THRESHOLD_ON: int(
-                    user_input.get(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON)
-                ),
-                CONF_STICKY_HOLD_SECONDS: int(
-                    user_input.get(
-                        CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS
-                    )
-                ),
-                CONF_EXPOSE_SECONDARY_SENSORS: bool(
-                    user_input.get(
-                        CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS
-                    )
-                ),
-                CONF_WATT_BUCKETS: buckets,
-            }
-            return self.flow.async_create_entry(title="", data=new_options)
-        return self.flow.async_show_form(
-            step_id="runtime", data_schema=_runtime_schema(self.entry.options)
-        )
-
-
-def _options_fields_schema(
-    device_type: DeviceType, defaults: dict[str, Any]
-) -> vol.Schema:
-    """Options-Variante der Feld-Maske: nur Display + Feld-Multiselect."""
-    pre = defaults.get(CONF_FIELDS) or list(default_fields(device_type))
+        for slug, conf in devices.items()
+    ]
     return vol.Schema(
         {
-            vol.Required(
-                CONF_DISPLAY_NAME, default=defaults.get(CONF_DISPLAY_NAME, "")
-            ): str,
-            vol.Required(CONF_FIELDS, default=pre): selector.SelectSelector(
+            vol.Required("slug"): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(ALL_SLOT_KEYS),
-                    multiple=True,
-                    mode=selector.SelectSelectorMode.LIST,
+                    options=options, mode=selector.SelectSelectorMode.LIST
                 )
-            ),
+            )
         }
     )
-
-
-def _runtime_schema(opts: dict[str, Any]) -> vol.Schema:
-    fields: dict[Any, Any] = {
-        vol.Optional(
-            CONF_WATT_THRESHOLD_ON,
-            default=opts.get(CONF_WATT_THRESHOLD_ON, DEFAULT_WATT_THRESHOLD_ON),
-        ): vol.All(int, vol.Range(min=0, max=5000)),
-        vol.Optional(
-            CONF_STICKY_HOLD_SECONDS,
-            default=opts.get(CONF_STICKY_HOLD_SECONDS, DEFAULT_STICKY_HOLD_SECONDS),
-        ): vol.All(int, vol.Range(min=0, max=3600)),
-        vol.Optional(
-            CONF_EXPOSE_SECONDARY_SENSORS,
-            default=opts.get(
-                CONF_EXPOSE_SECONDARY_SENSORS, DEFAULT_EXPOSE_SECONDARY_SENSORS
-            ),
-        ): bool,
-    }
-    prefill = _form_from_buckets(opts.get(CONF_WATT_BUCKETS))
-    for _state, op_key, val_key in _WATT_ROWS:
-        op_d = prefill.get(op_key)
-        if op_d:
-            fields[vol.Optional(op_key, default=op_d)] = _operator_selector()
-        else:
-            fields[vol.Optional(op_key)] = _operator_selector()
-        fields[vol.Optional(val_key, default=prefill.get(val_key))] = vol.Any(
-            None, vol.All(vol.Coerce(float), vol.Range(min=0, max=10000))
-        )
-    return vol.Schema(fields)

@@ -558,3 +558,33 @@ def test_validate_import_payload_empty_is_error():
     assert errors
     valid, errors = DT.validate_import_payload("nope")
     assert errors
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# slugify / unique_slug (Single-Hub: slug aus Anzeigename)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_slugify_basic():
+    import bcd_device_types as DT
+
+    assert DT.slugify("Wohnzimmer TV") == "wohnzimmer_tv"
+    assert DT.slugify("  Küche  Kaffee ") == "kueche_kaffee"
+    assert DT.slugify("PS5 / PlayStation") == "ps5_playstation"
+    assert DT.slugify("LED-Stripe #1") == "led_stripe_1"
+    assert DT.slugify("Über-Gerät") == "ueber_geraet"
+
+
+def test_slugify_collapses_separators():
+    import bcd_device_types as DT
+
+    assert DT.slugify("a---b   c") == "a_b_c"
+    assert DT.slugify("__rand__") == "rand"
+
+
+def test_unique_slug_appends_counter():
+    import bcd_device_types as DT
+
+    existing = {"tv", "tv_2"}
+    assert DT.unique_slug("tv", existing) == "tv_3"
+    assert DT.unique_slug("pc", existing) == "pc"

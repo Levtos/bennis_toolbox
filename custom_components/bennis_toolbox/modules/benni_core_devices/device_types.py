@@ -248,6 +248,44 @@ def is_valid_slug(slug: str) -> bool:
     return bool(slug) and bool(SLUG_RE.match(slug))
 
 
+def slugify(text: str) -> str:
+    """Wandelt einen Anzeigenamen in einen slug (a-z0-9_) um.
+
+    'Wohnzimmer TV' → 'wohnzimmer_tv'. Mehrfache/führende/trailing
+    Trennzeichen werden zu einem Unterstrich kollabiert.
+    """
+    out = []
+    prev_us = False
+    for ch in text.strip().lower():
+        if ch.isalnum() and ch.isascii():
+            out.append(ch)
+            prev_us = False
+        elif ch in (" ", "-", "_", ".", "/"):
+            if not prev_us:
+                out.append("_")
+                prev_us = True
+        # alles andere (Umlaute etc.) — simple Transliteration der häufigsten
+        elif ch in _TRANSLIT:
+            out.append(_TRANSLIT[ch])
+            prev_us = False
+    return "".join(out).strip("_")
+
+
+_TRANSLIT: Final[dict[str, str]] = {
+    "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+}
+
+
+def unique_slug(base: str, existing: set[str]) -> str:
+    """Stellt Eindeutigkeit her: hängt _2, _3, … an falls nötig."""
+    if base not in existing:
+        return base
+    i = 2
+    while f"{base}_{i}" in existing:
+        i += 1
+    return f"{base}_{i}"
+
+
 def validate_import_device(d: Any) -> str | None:
     """Validiert EIN Device-Dict aus dem Bulk-Import (R-DC-08).
 

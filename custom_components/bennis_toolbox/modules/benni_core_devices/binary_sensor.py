@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ...const import unique_id
 from .const import MODULE_ID
-from .coordinator import DeviceCoordinator, coordinator_from_hass
+from .coordinator import DeviceCoordinator, coordinators_for_entry
 from .logic import DeviceResult
 
 
@@ -29,13 +29,13 @@ async def async_get_entities(
 ) -> list[Entity]:
     if platform != Platform.BINARY_SENSOR:
         return []
-    coordinator = coordinator_from_hass(hass, entry)
-    if coordinator is None or not coordinator.expose_secondary_sensors:
-        return []
-    return [
-        PoweredBinarySensor(coordinator, entry),
-        AvailableBinarySensor(coordinator, entry),
-    ]
+    out: list[Entity] = []
+    for coordinator in coordinators_for_entry(hass, entry).values():
+        if not coordinator.expose_secondary_sensors:
+            continue
+        out.append(PoweredBinarySensor(coordinator, entry))
+        out.append(AvailableBinarySensor(coordinator, entry))
+    return out
 
 
 class _BaseDeviceBinarySensor(
@@ -53,7 +53,9 @@ class _BaseDeviceBinarySensor(
         name: str,
     ) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, suffix)
+        self._attr_unique_id = unique_id(
+            MODULE_ID, entry.entry_id, coordinator.slug, suffix
+        )
         self._attr_suggested_object_id = _object_id(coordinator.slug, suffix)
         self._attr_name = name
         from .sensor import _device_info
