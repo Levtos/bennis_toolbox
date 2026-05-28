@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from .const import (
+    CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_DEVICE_TYPE,
     CONF_INTEGRATION_ENTITY,
@@ -56,59 +57,40 @@ class SlotSpec:
 
 SLOT_CATALOG: Final[dict[str, SlotSpec]] = {
     CONF_INTEGRATION_ENTITY: SlotSpec(
-        CONF_INTEGRATION_ENTITY,
-        ("media_player", "sensor", "binary_sensor", "switch"),
-        "Integration-Entity (media_player o.ä.)",
+        CONF_INTEGRATION_ENTITY, ("media_player",), "Media Player"
     ),
     CONF_POWER_ENTITY: SlotSpec(
-        CONF_POWER_ENTITY,
-        ("binary_sensor", "switch", "input_boolean", "sensor"),
-        "Power-Sensor (an/aus)",
+        CONF_POWER_ENTITY, ("binary_sensor",), "An/Aus-Sensor"
     ),
     CONF_STATUS_ENTITY: SlotSpec(
-        CONF_STATUS_ENTITY,
-        ("media_player", "sensor", "binary_sensor"),
-        "Status-Entity (Netzwerk / Sub-State)",
+        CONF_STATUS_ENTITY, ("sensor",), "Status-Sensor"
     ),
     CONF_TITLE_ENTITY: SlotSpec(
-        CONF_TITLE_ENTITY,
-        ("sensor", "media_player"),
-        "Titel-Entity (aktueller Titel)",
+        CONF_TITLE_ENTITY, ("sensor",), "Titel-Sensor"
     ),
     CONF_WATT_SENSOR: SlotSpec(
-        CONF_WATT_SENSOR,
-        ("sensor",),
-        "Watt-Sensor (Fallback / power_state)",
+        CONF_WATT_SENSOR, ("sensor",), "Watt-Sensor"
     ),
     CONF_WIFI_SENSOR: SlotSpec(
-        CONF_WIFI_SENSOR,
-        ("binary_sensor", "sensor"),
-        "WLAN-Konnektivität",
+        CONF_WIFI_SENSOR, ("binary_sensor",), "WLAN-Status"
     ),
     CONF_SWITCH_ENTITY: SlotSpec(
-        CONF_SWITCH_ENTITY,
-        ("switch", "input_boolean"),
-        "Switch-Entity (Smart Plug)",
+        CONF_SWITCH_ENTITY, ("switch",), "Schalter / Steckdose"
     ),
     CONF_LIGHT_ENTITY: SlotSpec(
-        CONF_LIGHT_ENTITY,
-        ("light",),
-        "Light-Entity",
+        CONF_LIGHT_ENTITY, ("light",), "Licht"
     ),
     CONF_COVER_ENTITY: SlotSpec(
-        CONF_COVER_ENTITY,
-        ("cover",),
-        "Cover-Entity",
+        CONF_COVER_ENTITY, ("cover",), "Rollo / Cover"
     ),
     CONF_POSITION_ENTITY: SlotSpec(
-        CONF_POSITION_ENTITY,
-        ("sensor", "cover"),
-        "Positions-Sensor (optional)",
+        CONF_POSITION_ENTITY, ("sensor",), "Positions-Sensor"
+    ),
+    CONF_CLIMATE_ENTITY: SlotSpec(
+        CONF_CLIMATE_ENTITY, ("climate",), "Thermostat / Klima"
     ),
     CONF_VALUE_ENTITY: SlotSpec(
-        CONF_VALUE_ENTITY,
-        ("sensor", "binary_sensor"),
-        "Quell-Sensor (Sensor-Wrapper)",
+        CONF_VALUE_ENTITY, ("sensor",), "Wert-Sensor"
     ),
 }
 
@@ -204,6 +186,23 @@ _COVER = DeviceTypeProfile(
     stateful=True,
 )
 
+_CLIMATE = DeviceTypeProfile(
+    device_type=DeviceType.CLIMATE,
+    default_fields=(CONF_CLIMATE_ENTITY,),
+    integration_slot=CONF_CLIMATE_ENTITY,
+    state_slot=CONF_CLIMATE_ENTITY,
+    # Nur geräte-inhärente Wahrheiten — KEIN comfort/eco-Urteil (das macht
+    # benni_climate_policy, weil es current_temp gegen einen Sollwert +
+    # Kontext bewertet). hvac_mode = State, Rest aus den climate-Attributen.
+    extra_attributes=(
+        "current_temperature",
+        "target_temperature",
+        "hvac_action",
+        "hvac_mode",
+    ),
+    stateful=True,
+)
+
 _SENSOR_WRAPPER = DeviceTypeProfile(
     device_type=DeviceType.SENSOR_WRAPPER,
     default_fields=(CONF_VALUE_ENTITY,),
@@ -222,6 +221,7 @@ PROFILES: Final[dict[DeviceType, DeviceTypeProfile]] = {
     DeviceType.PLUG: _PLUG,
     DeviceType.LIGHT: _LIGHT,
     DeviceType.COVER: _COVER,
+    DeviceType.CLIMATE: _CLIMATE,
     DeviceType.SENSOR_WRAPPER: _SENSOR_WRAPPER,
 }
 

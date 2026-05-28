@@ -68,7 +68,8 @@
           "light_entity": "Light-Entity",
           "cover_entity": "Cover-Entity",
           "position_entity": "Positions-Sensor",
-          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
+          "climate_entity": "Thermostat / Klima"
         }
       },
       "thresholds": {
@@ -89,7 +90,8 @@
           "watt_idle_op": "idle: Operator",
           "watt_idle_value": "idle: Watt-Wert",
           "watt_playing_op": "playing: Operator",
-          "watt_playing_value": "playing: Watt-Wert"
+          "watt_playing_value": "playing: Watt-Wert",
+          "climate_entity": "Thermostat / Klima"
         }
       }
     },
@@ -213,7 +215,8 @@
         "description": "Anzeigename und welche Felder belegt werden sollen.",
         "data": {
           "display_name": "Anzeigename",
-          "fields": "Felder belegen (Multi-Select)"
+          "fields": "Felder belegen (Multi-Select)",
+          "climate_entity": "Thermostat / Klima"
         }
       },
       "field_values": {
@@ -230,7 +233,8 @@
           "light_entity": "Light-Entity",
           "cover_entity": "Cover-Entity",
           "position_entity": "Positions-Sensor",
-          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
+          "climate_entity": "Thermostat / Klima"
         }
       },
       "add_type": {
@@ -262,7 +266,8 @@
           "light_entity": "Licht",
           "cover_entity": "Rollo/Cover",
           "position_entity": "Positions-Sensor",
-          "value_entity": "Wert-Sensor"
+          "value_entity": "Wert-Sensor",
+          "climate_entity": "Thermostat / Klima"
         }
       },
       "add_runtime": {

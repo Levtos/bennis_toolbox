@@ -148,7 +148,13 @@ class DeviceResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-_TRUTHY = frozenset({"on", "home", "true", "1", "yes", "active", "playing", "open"})
+_TRUTHY = frozenset(
+    {
+        "on", "home", "true", "1", "yes", "active", "playing", "open",
+        # climate hvac_mode-Werte (Thermostat aktiv = powered)
+        "heat", "cool", "auto", "heat_cool", "dry", "fan_only",
+    }
+)
 _FALSY = frozenset({"off", "not_home", "false", "0", "no", "inactive", "idle", "closed"})
 
 

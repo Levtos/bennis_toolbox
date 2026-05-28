@@ -29,6 +29,7 @@ class DeviceType(str, Enum):
     PLUG = "plug"
     LIGHT = "light"
     COVER = "cover"
+    CLIMATE = "climate"
     SENSOR_WRAPPER = "sensor_wrapper"
 
 
@@ -55,6 +56,7 @@ CONF_SWITCH_ENTITY: Final[str] = "switch_entity"  # plug switch
 CONF_LIGHT_ENTITY: Final[str] = "light_entity"
 CONF_COVER_ENTITY: Final[str] = "cover_entity"
 CONF_POSITION_ENTITY: Final[str] = "position_entity"  # cover position separat
+CONF_CLIMATE_ENTITY: Final[str] = "climate_entity"  # Thermostat (climate domain)
 CONF_VALUE_ENTITY: Final[str] = "value_entity"  # sensor_wrapper
 
 # Knöpfe / Runtime
