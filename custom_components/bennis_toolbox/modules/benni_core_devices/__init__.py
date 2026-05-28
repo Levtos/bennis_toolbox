@@ -53,6 +53,29 @@ def _devices_conf(entry: ConfigEntry) -> dict[str, dict[str, Any]]:
     return dict(raw) if isinstance(raw, dict) else {}
 
 
+def _device_identifier(slug: str) -> tuple[str, str]:
+    return (DOMAIN, f"{MODULE_ID}:{slug}")
+
+
+def _reconcile_devices(
+    hass: HomeAssistant, entry: ConfigEntry, devices_conf: dict[str, dict[str, Any]]
+) -> None:
+    """Entfernt verwaiste HA-Geräte (+ kaskadierend deren Entitäten) für
+    Slugs, die nicht mehr in der Config stehen.
+
+    HA räumt Sub-Geräte eines Config-Entries nicht selbst auf — beim
+    'Gerät entfernen' (Options-Flow) bliebe sonst das HA-Device + die Entität
+    als Waise bestehen. Läuft bei jedem Setup/Reload.
+    """
+    dev_reg = dr.async_get(hass)
+    valid = {HUB_IDENTIFIER} | {
+        _device_identifier(slug) for slug in devices_conf
+    }
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        if not (set(device.identifiers) & valid):
+            dev_reg.async_remove_device(device.id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Hub-Gerät registrieren, damit Geräte sich darunter einhängen können.
     dev_reg = dr.async_get(hass)
@@ -65,8 +88,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_type=dr.DeviceEntryType.SERVICE,
     )
 
+    devices_conf = _devices_conf(entry)
+    _reconcile_devices(hass, entry, devices_conf)
+
     coordinators: dict[str, DeviceCoordinator] = {}
-    for slug, conf in _devices_conf(entry).items():
+    for slug, conf in devices_conf.items():
         # slug im conf sicherstellen (Storage-Key + Properties brauchen ihn)
         conf = {**conf, "slug": slug}
         coordinator = DeviceCoordinator(hass, entry, conf)
