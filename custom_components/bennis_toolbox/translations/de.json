@@ -406,13 +406,21 @@
         "data": {
           "watt_threshold_on": "Watt-Schwelle 'an' (W)",
           "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
-          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
-          "watt_off_op": "off: Operator",
-          "watt_off_value": "off: Watt-Wert",
-          "watt_idle_op": "idle: Operator",
-          "watt_idle_value": "idle: Watt-Wert",
-          "watt_playing_op": "playing: Operator",
-          "watt_playing_value": "playing: Watt-Wert"
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen"
+        },
+        "sections": {
+          "watt_classification": {
+            "name": "Watt → power_state (optional)",
+            "description": "Optionale physikalische Klassifikation: Watt-Wert → Zustand. Leer lassen wenn nicht gebraucht. Operatoren müssen zusammen den Bereich abdecken.",
+            "data": {
+              "watt_off_op": "off: Operator",
+              "watt_off_value": "off: Watt-Wert",
+              "watt_idle_op": "idle: Operator",
+              "watt_idle_value": "idle: Watt-Wert",
+              "watt_playing_op": "playing: Operator",
+              "watt_playing_value": "playing: Watt-Wert"
+            }
+          }
         }
       },
       "edit_device": {

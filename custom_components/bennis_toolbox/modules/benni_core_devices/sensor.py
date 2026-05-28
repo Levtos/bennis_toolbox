@@ -22,7 +22,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, async_generate_entity_id
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ...const import DOMAIN, unique_id
@@ -85,9 +85,13 @@ class _BaseDeviceSensor(CoordinatorEntity[DeviceCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, suffix)
-        self._attr_suggested_object_id = object_id
         self._attr_name = name
         self._attr_device_info = _device_info(coordinator)
+        # Entity-ID deterministisch erzwingen (sonst leitet HA sie aus dem
+        # Anzeigenamen ab → sensor.tv). Wir wollen sensor.benni_device_<slug>.
+        self.entity_id = async_generate_entity_id(
+            "sensor.{}", object_id, hass=coordinator.hass
+        )
 
     @property
     def _result(self) -> DeviceResult | None:

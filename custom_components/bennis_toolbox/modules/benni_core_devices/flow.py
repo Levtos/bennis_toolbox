@@ -23,7 +23,7 @@ import voluptuous as vol
 import yaml
 from homeassistant.config_entries import ConfigEntry, OptionsFlow
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.helpers import selector
 
 from ...const import CONF_MODULE_ID
@@ -85,6 +85,9 @@ _WATT_ROWS: tuple[tuple[str, str, str], ...] = (
     ("idle", CONF_WATT_IDLE_OP, CONF_WATT_IDLE_VALUE),
     ("playing", CONF_WATT_PLAYING_OP, CONF_WATT_PLAYING_VALUE),
 )
+
+# Schlüssel der einklappbaren Watt-Sektion im Runtime-Formular.
+WATT_SECTION = "watt_classification"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,7 +156,8 @@ def _operator_selector() -> selector.SelectSelector:
 
 
 def _runtime_schema(field_keys: list[str], defaults: dict[str, Any]) -> vol.Schema:
-    """Schwelle/Sticky/Sekundär — plus Watt-Zeilen NUR wenn watt_sensor gewählt."""
+    """Schwelle/Sticky/Sekundär — plus optionale, einklappbare Watt-Sektion
+    (nur wenn watt_sensor gewählt)."""
     fields: dict[Any, Any] = {
         vol.Optional(
             CONF_WATT_THRESHOLD_ON,
@@ -172,14 +176,29 @@ def _runtime_schema(field_keys: list[str], defaults: dict[str, Any]) -> vol.Sche
     }
     if CONF_WATT_SENSOR in field_keys:
         prefill = _form_from_buckets(defaults.get(CONF_WATT_BUCKETS))
+        inner: dict[Any, Any] = {}
         for _state, op_key, val_key in _WATT_ROWS:
             op_d = prefill.get(op_key)
             marker = vol.Optional(op_key, default=op_d) if op_d else vol.Optional(op_key)
-            fields[marker] = _operator_selector()
-            fields[vol.Optional(val_key, default=prefill.get(val_key))] = vol.Any(
+            inner[marker] = _operator_selector()
+            inner[vol.Optional(val_key, default=prefill.get(val_key))] = vol.Any(
                 None, vol.All(vol.Coerce(float), vol.Range(min=0, max=10000))
             )
+        # Eingeklappte Sektion → signalisiert klar "optional".
+        fields[vol.Optional(WATT_SECTION)] = section(
+            vol.Schema(inner), {"collapsed": True}
+        )
     return vol.Schema(fields)
+
+
+def _flatten_runtime(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Hebt die Watt-Sektion auf Top-Level, damit _buckets_from_form +
+    _build_device_conf wie gewohnt arbeiten."""
+    flat = dict(user_input)
+    sec = flat.pop(WATT_SECTION, None)
+    if isinstance(sec, dict):
+        flat.update(sec)
+    return flat
 
 
 def _bulk_schema(default: str = "") -> vol.Schema:
@@ -288,6 +307,7 @@ class OptionsFlowHelper:
         self._fields: list[str] = []
         self._slots: dict[str, Any] = {}
         self._editing_slug: str | None = None
+        self._runtime_defaults: dict[str, Any] = {}
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -317,6 +337,7 @@ class OptionsFlowHelper:
         self._type = None
         self._editing_slug = None
         self._slots = {}
+        self._runtime_defaults = {}
         return self.flow.async_show_form(step_id="add_type", data_schema=_type_schema())
 
     async def async_step_add_type(
@@ -362,7 +383,8 @@ class OptionsFlowHelper:
         if not self._fields:
             # keine Felder → direkt zur Runtime (Gerät ohne Slots erlaubt)
             return self.flow.async_show_form(
-                step_id="add_runtime", data_schema=_runtime_schema([], {})
+                step_id="add_runtime",
+                data_schema=_runtime_schema([], self._runtime_defaults),
             )
         return self.flow.async_show_form(
             step_id="add_slots", data_schema=_slots_schema(self._fields, self._slots)
@@ -386,7 +408,7 @@ class OptionsFlowHelper:
         self._slots = dict(user_input)
         return self.flow.async_show_form(
             step_id="add_runtime",
-            data_schema=_runtime_schema(self._fields, self._slots),
+            data_schema=_runtime_schema(self._fields, self._runtime_defaults),
         )
 
     async def async_step_add_runtime(
@@ -396,10 +418,11 @@ class OptionsFlowHelper:
         if user_input is None:
             return self.flow.async_show_form(
                 step_id="add_runtime",
-                data_schema=_runtime_schema(self._fields, {}),
+                data_schema=_runtime_schema(self._fields, self._runtime_defaults),
             )
+        runtime = _flatten_runtime(user_input)
         conf = _build_device_conf(
-            self._type, self._display, self._fields, self._slots, user_input
+            self._type, self._display, self._fields, self._slots, runtime
         )
         devices = self._devices()
         if self._editing_slug and self._editing_slug in devices:
@@ -430,6 +453,18 @@ class OptionsFlowHelper:
         self._display = conf.get(CONF_DISPLAY_NAME, slug)
         self._fields = list(conf.get(CONF_FIELDS) or [])
         self._slots = {k: conf.get(k) for k in self._fields}
+        # Runtime-Werte (Schwelle/Sticky/Sekundär/Buckets) für add_runtime
+        # vorbefüllen, damit Bearbeiten sie nicht auf Default zurücksetzt.
+        self._runtime_defaults = {
+            k: v
+            for k, v in {
+                CONF_WATT_THRESHOLD_ON: conf.get(CONF_WATT_THRESHOLD_ON),
+                CONF_STICKY_HOLD_SECONDS: conf.get(CONF_STICKY_HOLD_SECONDS),
+                CONF_EXPOSE_SECONDARY_SENSORS: conf.get(CONF_EXPOSE_SECONDARY_SENSORS),
+                CONF_WATT_BUCKETS: conf.get(CONF_WATT_BUCKETS),
+            }.items()
+            if v is not None
+        }
         return self.flow.async_show_form(
             step_id="add_fields",
             data_schema=_fields_schema(
