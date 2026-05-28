@@ -173,6 +173,49 @@ notification_router_set_dnd:
           step: 1
           mode: box
 
+# --- Benni Core · Devices ----------------------------------------------------
+
+benni_core_devices_set_override:
+  name: Device Core — Set override
+  description: Forces powered and/or power_state for one device, bypassing the
+    normal fallback logic. Persists across restarts until cleared or expired.
+  fields:
+    slug:
+      required: true
+      selector:
+        text:
+    powered:
+      required: false
+      selector:
+        boolean:
+    power_state:
+      required: false
+      selector:
+        select:
+          options:
+            - "off"
+            - standby
+            - idle
+            - playing
+            - unknown
+    expire_seconds:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 2592000
+          step: 1
+          mode: box
+
+benni_core_devices_clear_override:
+  name: Device Core — Clear override
+  description: Removes an active override for one device and resumes normal logic.
+  fields:
+    slug:
+      required: true
+      selector:
+        text:
+
 # --- Cover Policy ------------------------------------------------------------
 
 cover_policy_apply_now:

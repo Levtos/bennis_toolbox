@@ -4,7 +4,9 @@
       "user": {
         "title": "Benni's Toolbox",
         "description": "Wähle das Modul, das du der Toolbox hinzufügen willst. Module mit Status \"pending\" sind im Repo angelegt, aber noch nicht voll aktiv — sie können dennoch vorgemerkt werden.",
-        "data": { "_module_id": "Modul" }
+        "data": {
+          "_module_id": "Modul"
+        }
       },
       "module_step": {
         "title": "Modulkonfiguration",
@@ -33,23 +35,73 @@
           "scan_interval": "Scan-Intervall in Sekunden",
           "apply_enabled": "Cover wirklich fahren? (sonst nur Decision-Sensoren)",
           "manual_override_duration": "Manueller Override hält … Sekunden",
-          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"
+          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden",
+          "device_type": "Geräte-Typ"
         }
       },
-      "thresholds": { "title": "Schwellwerte" }
+      "thresholds": {
+        "title": "Schwellwerte"
+      },
+      "slots": {
+        "title": "Gerät konfigurieren",
+        "description": "Lege Kurznamen (slug) und Quell-Entities fest. Pflichtfelder hängen vom Typ ab. Watt-Buckets optional als YAML-Liste.",
+        "data": {
+          "slug": "Slug (eindeutig, a-z0-9_)",
+          "display_name": "Anzeigename",
+          "integration_entity": "Integration-Entity (media_player o.ä.)",
+          "power_entity": "Power-Sensor (z.B. Konsole an)",
+          "status_entity": "Status-Entity (Netzwerk / Sub-State)",
+          "title_entity": "Titel-Entity (aktueller Titel)",
+          "watt_sensor": "Watt-Sensor (Fallback / power_state)",
+          "wifi_sensor": "WLAN-Konnektivität",
+          "switch_entity": "Switch-Entity (Smart Plug)",
+          "light_entity": "Light-Entity",
+          "cover_entity": "Cover-Entity",
+          "position_entity": "Positions-Sensor (Cover, optional)",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
+          "watt_threshold_on": "Watt-Schwelle „an“ (W)",
+          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
+          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+        }
+      },
+      "pick_mode": {
+        "title": "Gerät(e) hinzufügen",
+        "description": "Einzelnes Gerät anlegen oder mehrere auf einmal per YAML-Liste importieren.",
+        "menu_options": {
+          "single": "Einzelnes Gerät",
+          "bulk": "Bulk-Import (YAML)"
+        }
+      },
+      "bulk": {
+        "title": "Bulk-Import (YAML)",
+        "description": "YAML-Liste von Geräten. Jeder Eintrag braucht slug + device_type + die Pflicht-Slots des Typs. Entweder alle gültig oder es wird nichts angelegt.",
+        "data": {
+          "bulk_yaml": "Geräte (YAML-Liste)"
+        }
+      }
     },
     "abort": {
       "missing_module": "Fehlender Modul-Identifikator im Config-Entry.",
       "unknown_module": "Dieses Modul ist nicht (mehr) registriert.",
       "invalid_flow_state": "Flow-Zustand kaputt.",
       "already_configured": "Diese Modul-Instanz existiert schon.",
-      "single_instance_allowed": "Nur eine Instanz pro Modul erlaubt."
+      "single_instance_allowed": "Nur eine Instanz pro Modul erlaubt.",
+      "import_not_supported": "Dieses Modul unterstützt keinen Import.",
+      "bulk_import_started": "Bulk-Import gestartet — Geräte werden angelegt.",
+      "import_invalid": "Import-Daten ungültig oder unvollständig."
     },
     "error": {
       "unknown_module": "Unbekanntes Modul.",
       "cannot_connect": "Verbindung fehlgeschlagen.",
       "invalid_url": "URL fehlt oder ist ungültig.",
-      "required": "Pflichtfeld."
+      "required": "Pflichtfeld.",
+      "invalid_slug": "Slug ungültig — nur Kleinbuchstaben, Ziffern, Unterstrich.",
+      "invalid_type": "Unbekannter Geräte-Typ.",
+      "invalid_yaml": "Eingabe ist kein gültiges YAML.",
+      "buckets_not_list": "Watt-Buckets müssen eine Liste sein.",
+      "bucket_missing_state": "Jeder Watt-Bucket braucht ein \"state\"-Feld.",
+      "bulk_invalid": "Bulk-Import ungültig — siehe Fehler: {errors}"
     }
   },
   "options": {
@@ -76,7 +128,8 @@
           "pc": "PC",
           "denon": "Denon",
           "homepods": "HomePods",
-          "context": "Context / Globale Quellen"
+          "context": "Context / Globale Quellen",
+          "slots": "Quell-Entities"
         }
       },
       "tv": {
@@ -199,7 +252,11 @@
         "data": {
           "apply_enabled": "Cover wirklich fahren (sonst nur Decision-Sensoren)",
           "manual_override_duration": "Manueller Override hält … Sekunden",
-          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden"
+          "startup_block_seconds": "Apply nach HA-Start blockieren … Sekunden",
+          "watt_threshold_on": "Watt-Schwelle „an“ (W)",
+          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
+          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
         }
       },
       "device_basics": {
@@ -238,6 +295,29 @@
           "diffuser_on_minutes": "Diffuser: An-Phase in Minuten",
           "diffuser_off_minutes": "Diffuser: Aus-Phase in Minuten",
           "allowed_contexts": "Erlaubte Tageskontexte (Policy SC) — morgens / tagsüber / abends / nachts; detaillierte Day-State-Werte (z. B. late_morning, afternoon, early_night) werden intern auf diese vier Buckets gemappt"
+        }
+      },
+      "slots": {
+        "title": "Quell-Entities ändern",
+        "description": "Passe die Quell-Entities dieses Geräts an. Pflichtfelder hängen vom Typ ab.",
+        "data": {
+          "slug": "Slug (eindeutig, a-z0-9_)",
+          "display_name": "Anzeigename",
+          "integration_entity": "Integration-Entity (media_player o.ä.)",
+          "power_entity": "Power-Sensor (z.B. Konsole an)",
+          "status_entity": "Status-Entity (Netzwerk / Sub-State)",
+          "title_entity": "Titel-Entity (aktueller Titel)",
+          "watt_sensor": "Watt-Sensor (Fallback / power_state)",
+          "wifi_sensor": "WLAN-Konnektivität",
+          "switch_entity": "Switch-Entity (Smart Plug)",
+          "light_entity": "Light-Entity",
+          "cover_entity": "Cover-Entity",
+          "position_entity": "Positions-Sensor (Cover, optional)",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
+          "watt_threshold_on": "Watt-Schwelle „an“ (W)",
+          "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
+          "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
+          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
         }
       }
     },

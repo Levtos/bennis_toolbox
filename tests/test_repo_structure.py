@@ -27,6 +27,7 @@ EXPECTED_MODULE_IDS: set[str] = {
     "benni_core_day_state",
     "benni_core_user_state",
     "benni_core_presence_state",
+    "benni_core_devices",
     # Alt-Module bleiben bis zur Migration auf das neue Fundament.
     "benni_context",
     "benni_media_context",

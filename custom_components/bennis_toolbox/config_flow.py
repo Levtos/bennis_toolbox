@@ -75,6 +75,25 @@ class BennisToolboxConfigFlow(ConfigFlow, domain=DOMAIN):
         self._helper = await _maybe_make_helper(self.hass, module_id, self)
         return await self._dispatch_first_step()
 
+    # --- Step: Import (programmatisch, z.B. Bulk-Import) ---------------------
+
+    async def async_step_import(self, import_data: dict[str, Any]) -> FlowResult:
+        """Programmatischer Entry-Punkt (SOURCE_IMPORT).
+
+        Genutzt vom Bulk-Import eines Moduls: pro Device wird ein Flow mit
+        `context={"source": "import"}` und `data={_module_id, ...}` gestartet.
+        Wir laden den Modul-Helper und delegieren an dessen `async_import`.
+        """
+        module_id = import_data.get(CONF_MODULE_ID)
+        if not module_id or module_id not in REGISTERED_MODULE_IDS:
+            return self.async_abort(reason="unknown_module")
+        self._module_id = module_id
+        self._helper = await _maybe_make_helper(self.hass, module_id, self)
+        importer = getattr(self._helper, "async_import", None)
+        if importer is None:
+            return self.async_abort(reason="import_not_supported")
+        return await importer(import_data)
+
     # --- Step: an Modul-Helper delegieren ------------------------------------
 
     async def _dispatch_first_step(self) -> FlowResult:
