@@ -456,12 +456,23 @@ def test_integration_slot_in_catalog_and_defaults():
             )
 
 
-def test_slot_catalog_domains_are_broad():
+def test_slot_catalog_domains_are_tight():
     import bcd_device_types as DT
 
-    # Integration-Slot darf nicht typ-eng sein (mind. media_player + sensor)
-    integ = DT.SLOT_CATALOG["integration_entity"]
-    assert "media_player" in integ.domains and "sensor" in integ.domains
+    # Jedes Feld akzeptiert genau eine spezifische Domain (kein Domain-Misch).
+    expected = {
+        "integration_entity": ("media_player",),
+        "power_entity": ("binary_sensor",),
+        "watt_sensor": ("sensor",),
+        "wifi_sensor": ("binary_sensor",),
+        "switch_entity": ("switch",),
+        "light_entity": ("light",),
+        "cover_entity": ("cover",),
+    }
+    for key, doms in expected.items():
+        assert DT.SLOT_CATALOG[key].domains == doms, (
+            f"{key}: erwartet {doms}, ist {DT.SLOT_CATALOG[key].domains}"
+        )
 
 
 def test_import_validation_relaxed_slots_optional():

@@ -56,59 +56,37 @@ class SlotSpec:
 
 SLOT_CATALOG: Final[dict[str, SlotSpec]] = {
     CONF_INTEGRATION_ENTITY: SlotSpec(
-        CONF_INTEGRATION_ENTITY,
-        ("media_player", "sensor", "binary_sensor", "switch"),
-        "Integration-Entity (media_player o.ä.)",
+        CONF_INTEGRATION_ENTITY, ("media_player",), "Media Player"
     ),
     CONF_POWER_ENTITY: SlotSpec(
-        CONF_POWER_ENTITY,
-        ("binary_sensor", "switch", "input_boolean", "sensor"),
-        "Power-Sensor (an/aus)",
+        CONF_POWER_ENTITY, ("binary_sensor",), "An/Aus-Sensor"
     ),
     CONF_STATUS_ENTITY: SlotSpec(
-        CONF_STATUS_ENTITY,
-        ("media_player", "sensor", "binary_sensor"),
-        "Status-Entity (Netzwerk / Sub-State)",
+        CONF_STATUS_ENTITY, ("sensor",), "Status-Sensor"
     ),
     CONF_TITLE_ENTITY: SlotSpec(
-        CONF_TITLE_ENTITY,
-        ("sensor", "media_player"),
-        "Titel-Entity (aktueller Titel)",
+        CONF_TITLE_ENTITY, ("sensor",), "Titel-Sensor"
     ),
     CONF_WATT_SENSOR: SlotSpec(
-        CONF_WATT_SENSOR,
-        ("sensor",),
-        "Watt-Sensor (Fallback / power_state)",
+        CONF_WATT_SENSOR, ("sensor",), "Watt-Sensor"
     ),
     CONF_WIFI_SENSOR: SlotSpec(
-        CONF_WIFI_SENSOR,
-        ("binary_sensor", "sensor"),
-        "WLAN-Konnektivität",
+        CONF_WIFI_SENSOR, ("binary_sensor",), "WLAN-Status"
     ),
     CONF_SWITCH_ENTITY: SlotSpec(
-        CONF_SWITCH_ENTITY,
-        ("switch", "input_boolean"),
-        "Switch-Entity (Smart Plug)",
+        CONF_SWITCH_ENTITY, ("switch",), "Schalter / Steckdose"
     ),
     CONF_LIGHT_ENTITY: SlotSpec(
-        CONF_LIGHT_ENTITY,
-        ("light",),
-        "Light-Entity",
+        CONF_LIGHT_ENTITY, ("light",), "Licht"
     ),
     CONF_COVER_ENTITY: SlotSpec(
-        CONF_COVER_ENTITY,
-        ("cover",),
-        "Cover-Entity",
+        CONF_COVER_ENTITY, ("cover",), "Rollo / Cover"
     ),
     CONF_POSITION_ENTITY: SlotSpec(
-        CONF_POSITION_ENTITY,
-        ("sensor", "cover"),
-        "Positions-Sensor (optional)",
+        CONF_POSITION_ENTITY, ("sensor",), "Positions-Sensor"
     ),
     CONF_VALUE_ENTITY: SlotSpec(
-        CONF_VALUE_ENTITY,
-        ("sensor", "binary_sensor"),
-        "Quell-Sensor (Sensor-Wrapper)",
+        CONF_VALUE_ENTITY, ("sensor",), "Wert-Sensor"
     ),
 }
 

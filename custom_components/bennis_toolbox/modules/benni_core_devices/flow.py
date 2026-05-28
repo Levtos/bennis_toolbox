@@ -62,19 +62,21 @@ from .device_types import (
     validate_import_payload,
 )
 
-# Feld-Labels mit Beispiel für den Multi-Select (schöner als rohe Keys).
+# Feld-Labels mit der akzeptierten Domain in Klammern — eindeutig, ohne
+# verwirrende Beispiel-Dopplungen. Jedes Feld akzeptiert genau eine Domain
+# (siehe SLOT_CATALOG).
 FIELD_LABELS: dict[str, str] = {
-    "integration_entity": "Integration (z. B. media_player.living_tv)",
-    "power_entity": "Power-Sensor (z. B. binary_sensor … _power)",
-    "status_entity": "Status (z. B. media_player.ps5)",
-    "title_entity": "Titel (z. B. sensor … _media_title)",
-    "watt_sensor": "Watt-Sensor (z. B. sensor … _power)",
-    "wifi_sensor": "WLAN-Status (z. B. binary_sensor … _wifi)",
-    "switch_entity": "Schalter / Plug (z. B. switch.coffee)",
-    "light_entity": "Licht (z. B. light.living_ceiling)",
-    "cover_entity": "Rollo / Cover (z. B. cover.blackout)",
-    "position_entity": "Position (z. B. sensor … _position)",
-    "value_entity": "Wert-Sensor (z. B. sensor.garden_lux)",
+    "integration_entity": "Media Player (media_player)",
+    "power_entity": "An/Aus-Sensor (binary_sensor)",
+    "status_entity": "Status-Sensor (sensor)",
+    "title_entity": "Titel-Sensor (sensor)",
+    "watt_sensor": "Watt-Sensor (sensor)",
+    "wifi_sensor": "WLAN-Status (binary_sensor)",
+    "switch_entity": "Schalter / Steckdose (switch)",
+    "light_entity": "Licht (light)",
+    "cover_entity": "Rollo / Cover (cover)",
+    "position_entity": "Positions-Sensor (sensor)",
+    "value_entity": "Wert-Sensor (sensor)",
 }
 
 _WATT_ROWS: tuple[tuple[str, str, str], ...] = (
