@@ -22,6 +22,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 
 from ...const import DATA_ENTRIES, DOMAIN
 from ._spec import SPEC
@@ -74,6 +75,16 @@ def _reconcile_devices(
     for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
         if not (set(device.identifiers) & valid):
             dev_reg.async_remove_device(device.id)
+
+    # Stale-benannte Entitäten aufräumen: alles was nicht dem aktuellen
+    # `benni_device_<slug>`-Schema folgt (z.B. Alt-Eintrag `sensor.tv`).
+    # Der Registry-Eintrag wird entfernt; die Plattform legt die Entität
+    # danach mit der korrekten, erzwungenen entity_id neu an.
+    ent_reg = er.async_get(hass)
+    for e in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        object_id = e.entity_id.split(".", 1)[1]
+        if not object_id.startswith("benni_device_"):
+            ent_reg.async_remove(e.entity_id)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
