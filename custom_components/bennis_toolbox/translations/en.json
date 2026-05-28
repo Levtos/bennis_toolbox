@@ -53,7 +53,8 @@
           "light_entity": "Light entity",
           "cover_entity": "Cover entity",
           "position_entity": "Position sensor",
-          "value_entity": "Source sensor (sensor wrapper)"
+          "value_entity": "Source sensor (sensor wrapper)",
+          "climate_entity": "Thermostat / climate"
         }
       },
       "pick_mode": {
@@ -86,7 +87,8 @@
           "watt_idle_op": "idle: operator",
           "watt_idle_value": "idle: watt value",
           "watt_playing_op": "playing: operator",
-          "watt_playing_value": "playing: watt value"
+          "watt_playing_value": "playing: watt value",
+          "climate_entity": "Thermostat / climate"
         }
       }
     },
@@ -340,7 +342,8 @@
         "description": "Display name and which fields to use.",
         "data": {
           "display_name": "Display name",
-          "fields": "Fields to use (multi-select)"
+          "fields": "Fields to use (multi-select)",
+          "climate_entity": "Thermostat / climate"
         }
       },
       "field_values": {
@@ -357,7 +360,8 @@
           "light_entity": "Light entity",
           "cover_entity": "Cover entity",
           "position_entity": "Position sensor",
-          "value_entity": "Source sensor (sensor wrapper)"
+          "value_entity": "Source sensor (sensor wrapper)",
+          "climate_entity": "Thermostat / climate"
         }
       },
       "add_type": {
@@ -389,7 +393,8 @@
           "light_entity": "Light",
           "cover_entity": "Cover",
           "position_entity": "Position sensor",
-          "value_entity": "Value sensor"
+          "value_entity": "Value sensor",
+          "climate_entity": "Thermostat / climate"
         }
       },
       "add_runtime": {

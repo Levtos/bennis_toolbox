@@ -76,6 +76,7 @@ FIELD_LABELS: dict[str, str] = {
     "light_entity": "Licht (light)",
     "cover_entity": "Rollo / Cover (cover)",
     "position_entity": "Positions-Sensor (sensor)",
+    "climate_entity": "Thermostat / Klima (climate)",
     "value_entity": "Wert-Sensor (sensor)",
 }
 

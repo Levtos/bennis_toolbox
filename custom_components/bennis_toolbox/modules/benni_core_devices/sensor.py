@@ -139,8 +139,12 @@ class DeviceMainSensor(_BaseDeviceSensor):
         for key in profile.extra_attributes:
             if key == "watt":
                 attrs[key] = r.watt
-            elif key == "media_player_state":
+            elif key in ("media_player_state", "hvac_mode"):
+                # State des state_slots (media_player-State bzw. climate hvac_mode)
                 attrs[key] = r.raw_state if profile.state_slot else None
+            elif key == "target_temperature":
+                # HA-climate trägt den Sollwert im Attribut "temperature"
+                attrs[key] = r.extra.get("temperature")
             else:
                 attrs[key] = r.extra.get(key)
         return attrs

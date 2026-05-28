@@ -599,3 +599,61 @@ def test_unique_slug_appends_counter():
     existing = {"tv", "tv_2"}
     assert DT.unique_slug("tv", existing) == "tv_3"
     assert DT.unique_slug("pc", existing) == "pc"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Climate-Typ (nur rohe Wahrheiten, keine comfort/eco-Bewertung)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_climate_type_exists_with_raw_attributes():
+    import bcd_device_types as DT
+
+    p = DT.profile_for(C.DeviceType.CLIMATE)
+    assert "climate_entity" in p.default_fields
+    assert p.integration_slot == "climate_entity"
+    # nur rohe/geräte-inhärente Attribute, KEIN comfort/eco
+    assert set(p.extra_attributes) == {
+        "current_temperature",
+        "target_temperature",
+        "hvac_action",
+        "hvac_mode",
+    }
+    assert "comfort" not in p.extra_attributes
+    assert "eco" not in p.extra_attributes
+    assert "value_state" not in p.extra_attributes
+
+
+def test_climate_powered_when_hvac_mode_active():
+    cfg = _config(
+        configured=("climate_entity",),
+    )
+    cfg = L.DeviceConfig(
+        slug="therm", display_name="Thermostat", device_type="climate",
+        watt_threshold_on=5, watt_buckets=(), sticky_hold_seconds=30,
+        area_id=None, configured_slots=("climate_entity",),
+    )
+    inp = _inputs(
+        {"climate_entity": _reading("heat")},
+        integration_slot="climate_entity",
+        state_slot="climate_entity",
+    )
+    r = L.compute_device(cfg, inp, _persisted(), NOW)
+    assert r.powered is True  # hvac_mode 'heat' = aktiv
+    assert r.state == "heat"
+
+
+def test_climate_off_is_not_powered():
+    cfg = L.DeviceConfig(
+        slug="therm", display_name="Thermostat", device_type="climate",
+        watt_threshold_on=5, watt_buckets=(), sticky_hold_seconds=30,
+        area_id=None, configured_slots=("climate_entity",),
+    )
+    inp = _inputs(
+        {"climate_entity": _reading("off")},
+        integration_slot="climate_entity",
+        state_slot="climate_entity",
+    )
+    r = L.compute_device(cfg, inp, _persisted(), NOW)
+    assert r.powered is False
+    assert r.state == "off"

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from .const import (
+    CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_DEVICE_TYPE,
     CONF_INTEGRATION_ENTITY,
@@ -84,6 +85,9 @@ SLOT_CATALOG: Final[dict[str, SlotSpec]] = {
     ),
     CONF_POSITION_ENTITY: SlotSpec(
         CONF_POSITION_ENTITY, ("sensor",), "Positions-Sensor"
+    ),
+    CONF_CLIMATE_ENTITY: SlotSpec(
+        CONF_CLIMATE_ENTITY, ("climate",), "Thermostat / Klima"
     ),
     CONF_VALUE_ENTITY: SlotSpec(
         CONF_VALUE_ENTITY, ("sensor",), "Wert-Sensor"
@@ -182,6 +186,23 @@ _COVER = DeviceTypeProfile(
     stateful=True,
 )
 
+_CLIMATE = DeviceTypeProfile(
+    device_type=DeviceType.CLIMATE,
+    default_fields=(CONF_CLIMATE_ENTITY,),
+    integration_slot=CONF_CLIMATE_ENTITY,
+    state_slot=CONF_CLIMATE_ENTITY,
+    # Nur geräte-inhärente Wahrheiten — KEIN comfort/eco-Urteil (das macht
+    # benni_climate_policy, weil es current_temp gegen einen Sollwert +
+    # Kontext bewertet). hvac_mode = State, Rest aus den climate-Attributen.
+    extra_attributes=(
+        "current_temperature",
+        "target_temperature",
+        "hvac_action",
+        "hvac_mode",
+    ),
+    stateful=True,
+)
+
 _SENSOR_WRAPPER = DeviceTypeProfile(
     device_type=DeviceType.SENSOR_WRAPPER,
     default_fields=(CONF_VALUE_ENTITY,),
@@ -200,6 +221,7 @@ PROFILES: Final[dict[DeviceType, DeviceTypeProfile]] = {
     DeviceType.PLUG: _PLUG,
     DeviceType.LIGHT: _LIGHT,
     DeviceType.COVER: _COVER,
+    DeviceType.CLIMATE: _CLIMATE,
     DeviceType.SENSOR_WRAPPER: _SENSOR_WRAPPER,
 }
 
