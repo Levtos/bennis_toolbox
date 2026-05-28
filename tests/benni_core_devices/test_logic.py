@@ -185,17 +185,35 @@ def test_integration_on_no_disagreement():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_power_state_buckets_basic():
+def test_power_state_buckets_operator_order():
     buckets = (
-        L.WattBucket(state="off", max=5),
-        L.WattBucket(state="standby", max=30),
-        L.WattBucket(state="idle", max=70),
-        L.WattBucket(state="playing", max=None),
+        L.WattBucket(state="off", op="<=", value=5),
+        L.WattBucket(state="idle", op="<=", value=30),
+        L.WattBucket(state="playing", op=">", value=30),
     )
     assert L.classify_power_state(0.5, buckets) == "off"
-    assert L.classify_power_state(10, buckets) == "standby"
-    assert L.classify_power_state(50, buckets) == "idle"
+    assert L.classify_power_state(5, buckets) == "off"      # <=5
+    assert L.classify_power_state(10, buckets) == "idle"
+    assert L.classify_power_state(30, buckets) == "idle"    # <=30
     assert L.classify_power_state(100, buckets) == "playing"
+
+
+def test_power_state_all_operators():
+    assert L.classify_power_state(5, (L.WattBucket("x", "<", 10),)) == "x"
+    assert L.classify_power_state(10, (L.WattBucket("x", "<", 10),)) == "unknown"
+    assert L.classify_power_state(10, (L.WattBucket("x", "<=", 10),)) == "x"
+    assert L.classify_power_state(10, (L.WattBucket("x", "=", 10),)) == "x"
+    assert L.classify_power_state(11, (L.WattBucket("x", ">", 10),)) == "x"
+    assert L.classify_power_state(10, (L.WattBucket("x", ">=", 10),)) == "x"
+
+
+def test_power_state_catch_all():
+    buckets = (
+        L.WattBucket(state="off", op="<=", value=5),
+        L.WattBucket(state="on", op=None, value=None),  # catch-all
+    )
+    assert L.classify_power_state(3, buckets) == "off"
+    assert L.classify_power_state(999, buckets) == "on"
 
 
 def test_power_state_without_buckets_is_unknown():
@@ -203,16 +221,22 @@ def test_power_state_without_buckets_is_unknown():
 
 
 def test_power_state_without_watt_is_unknown():
-    buckets = (L.WattBucket(state="off", max=5), L.WattBucket(state="on", max=None))
+    buckets = (L.WattBucket(state="off", op="<=", value=5),)
     assert L.classify_power_state(None, buckets) == "unknown"
+
+
+def test_power_state_no_match_is_unknown():
+    # Kein Bucket matcht und kein catch-all → unknown
+    buckets = (L.WattBucket(state="off", op="<", value=5),)
+    assert L.classify_power_state(100, buckets) == "unknown"
 
 
 def test_power_state_always_from_watt_even_when_integration_on():
     """LH OQ-3-Auflösung: power_state immer aus Watt, unabhängig von Integration."""
     buckets = (
-        L.WattBucket(state="off", max=5),
-        L.WattBucket(state="standby", max=30),
-        L.WattBucket(state="playing", max=None),
+        L.WattBucket(state="off", op="<=", value=5),
+        L.WattBucket(state="idle", op="<=", value=30),
+        L.WattBucket(state="playing", op=">", value=30),
     )
     cfg = _config(buckets=buckets, configured=("integration_entity", "watt_sensor"))
     inp = _inputs(
@@ -228,24 +252,31 @@ def test_power_state_always_from_watt_even_when_integration_on():
     assert r.power_state == "off"
 
 
-def test_parse_watt_buckets_handles_normalization():
+def test_parse_watt_buckets_keeps_order():
     parsed = L.parse_watt_buckets(
         [
-            {"max": 30, "state": "standby"},
-            {"max": 5, "state": "off"},
-            {"state": "playing"},
-            {"max": 70, "state": "idle"},
+            {"state": "off", "op": "<=", "value": 5},
+            {"state": "idle", "op": "<=", "value": 30},
+            {"state": "playing", "op": ">", "value": 30},
         ]
     )
-    # Sortiert: 5, 30, 70, catch-all
-    assert [b.state for b in parsed] == ["off", "standby", "idle", "playing"]
+    assert [b.state for b in parsed] == ["off", "idle", "playing"]
+    assert parsed[0].op == "<=" and parsed[0].value == 5.0
+
+
+def test_parse_watt_buckets_catch_all_entry():
+    parsed = L.parse_watt_buckets(
+        [{"state": "off", "op": "<=", "value": 5}, {"state": "on"}]
+    )
+    assert parsed[1].op is None and parsed[1].value is None
 
 
 def test_parse_watt_buckets_robust_against_garbage():
     assert L.parse_watt_buckets(None) == ()
     assert L.parse_watt_buckets("not a list") == ()
-    assert L.parse_watt_buckets([{"max": "abc", "state": "x"}]) == ()
-    assert L.parse_watt_buckets([{"max": 5}]) == ()  # missing state
+    assert L.parse_watt_buckets([{"op": "<", "value": 5}]) == ()  # missing state
+    assert L.parse_watt_buckets([{"state": "x", "op": "??", "value": 5}]) == ()  # bad op
+    assert L.parse_watt_buckets([{"state": "x", "op": "<", "value": "abc"}]) == ()  # bad value
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -404,24 +435,43 @@ def test_last_powered_change_persists_when_no_transition():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_all_device_types_have_at_least_one_required_slot():
+def test_all_device_types_have_default_fields():
     import bcd_device_types as DT
 
     for dt in C.DeviceType:
-        required = [s for s in DT.profile_for(dt).slots if s.required]
-        assert required, f"{dt.value} hat keine Pflicht-Slots"
+        assert DT.default_fields(dt), f"{dt.value} hat keine Default-Felder"
 
 
-def test_integration_slot_always_in_profile_slots():
+def test_integration_slot_in_catalog_and_defaults():
     import bcd_device_types as DT
 
     for dt in C.DeviceType:
         profile = DT.profile_for(dt)
         if profile.integration_slot is not None:
-            slot_keys = {s.key for s in profile.slots}
-            assert profile.integration_slot in slot_keys, (
-                f"{dt.value}: integration_slot {profile.integration_slot!r} fehlt in slots"
+            assert profile.integration_slot in DT.SLOT_CATALOG, (
+                f"{dt.value}: integration_slot fehlt im Katalog"
             )
+            assert profile.integration_slot in profile.default_fields, (
+                f"{dt.value}: integration_slot nicht in default_fields"
+            )
+
+
+def test_slot_catalog_domains_are_broad():
+    import bcd_device_types as DT
+
+    # Integration-Slot darf nicht typ-eng sein (mind. media_player + sensor)
+    integ = DT.SLOT_CATALOG["integration_entity"]
+    assert "media_player" in integ.domains and "sensor" in integ.domains
+
+
+def test_import_validation_relaxed_slots_optional():
+    import bcd_device_types as DT
+
+    # Neues Modell: TV ohne integration_entity ist KEIN Fehler mehr
+    assert DT.validate_import_device({"slug": "living_tv", "device_type": "tv"}) is None
+    # nur slug + device_type pflicht
+    assert DT.validate_import_device({"slug": "x", "device_type": "nope"}) is not None
+    assert DT.validate_import_device({"slug": "Bad Slug", "device_type": "tv"}) is not None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -446,12 +496,11 @@ def test_validate_import_device_ok_plug():
     assert DT.validate_import_device(d) is None
 
 
-def test_validate_import_device_missing_required_slot():
+def test_validate_import_device_slot_optional_now():
     import bcd_device_types as DT
 
-    d = {"slug": "living_tv", "device_type": "tv"}  # integration_entity fehlt
-    err = DT.validate_import_device(d)
-    assert err is not None and "integration_entity" in err
+    # Neues Modell: TV ohne integration_entity ist OK (Slots optional)
+    assert DT.validate_import_device({"slug": "living_tv", "device_type": "tv"}) is None
 
 
 def test_validate_import_device_bad_slug_and_type():
@@ -467,12 +516,11 @@ def test_validate_import_payload_all_or_nothing():
 
     devices = [
         {"slug": "living_pc", "device_type": "plug", "switch_entity": "switch.pc"},
-        {"slug": "living_tv", "device_type": "tv"},  # invalid (missing slot)
+        {"slug": "bad_one", "device_type": "nonsense"},  # invalid device_type
     ]
     valid, errors = DT.validate_import_payload(devices)
     assert errors  # has at least one error
-    # valid enthält nur das gute, aber Aufrufer legt bei errors nichts an
-    assert any("living_tv" in e for e in errors)
+    assert any("bad_one" in e for e in errors)
 
 
 def test_validate_import_payload_duplicate_slug():

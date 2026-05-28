@@ -65,12 +65,36 @@ class DeviceConfig:
 class WattBucket:
     """Bucket-Eintrag für `power_state`-Ableitung (R-DC-06).
 
-    max: obere Grenze (exklusiv); None = catch-all (letzter Bucket).
-    state: semantischer State (off/standby/idle/playing/...).
+    state: semantischer State (off/idle/playing/...).
+    op:    Vergleichsoperator gegen den Watt-Wert (<, <=, =, >, >=).
+           None = catch-all (matcht immer).
+    value: Vergleichswert in Watt. None = catch-all.
+
+    Auswertung: Buckets werden in Reihenfolge geprüft, erster Treffer gewinnt.
+    Die Reihenfolge bestimmt der User (off → idle → playing).
     """
 
     state: str
-    max: float | None = None
+    op: str | None = None
+    value: float | None = None
+
+
+# Erlaubte Vergleichsoperatoren für Watt-Buckets.
+WATT_OPERATORS: tuple[str, ...] = ("<", "<=", "=", ">", ">=")
+
+
+def _match_operator(op: str, watt: float, value: float) -> bool:
+    if op == "<":
+        return watt < value
+    if op == "<=":
+        return watt <= value
+    if op == "=":
+        return watt == value
+    if op == ">":
+        return watt > value
+    if op == ">=":
+        return watt >= value
+    return False
 
 
 @dataclass(frozen=True)
@@ -156,18 +180,17 @@ def classify_power_state(
     """R-DC-06: Watt → semantischer power_state.
 
     Ohne buckets oder watt → "unknown".
-    Mit buckets: erster Bucket mit watt < max gewinnt, sonst der catch-all (max=None).
+    Mit buckets: in Reihenfolge prüfen, erster Treffer gewinnt. Ein Bucket
+    ohne Operator/Value gilt als catch-all (matcht immer).
     """
     if not buckets or watt is None:
         return PowerState.UNKNOWN.value
-    catch_all: str | None = None
     for b in buckets:
-        if b.max is None:
-            catch_all = b.state
-            continue
-        if watt < b.max:
+        if b.op is None or b.value is None:
+            return b.state  # catch-all
+        if _match_operator(b.op, watt, b.value):
             return b.state
-    return catch_all if catch_all is not None else PowerState.UNKNOWN.value
+    return PowerState.UNKNOWN.value
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -326,21 +349,20 @@ def is_boot_phase(boot_start: datetime, now: datetime) -> bool:
 
 
 def parse_watt_buckets(raw: Any) -> tuple[WattBucket, ...]:
-    """Parst eine Bucket-Liste aus dem Config-Flow.
+    """Parst eine Bucket-Liste aus Config-Flow / Storage / Import.
 
-    Erwartetes Format:
-        [{"max": 5, "state": "off"}, {"max": 30, "state": "standby"}, {"state": "playing"}]
+    Erwartetes Format (Reihenfolge = Auswertungsreihenfolge):
+        [{"state": "off", "op": "<=", "value": 5},
+         {"state": "idle", "op": "<=", "value": 30},
+         {"state": "playing", "op": ">", "value": 30}]
 
-    Validierung:
-    - max muss aufsteigend sein (sonst rauswerfen — `_normalize`)
-    - letzter Bucket darf catch-all sein (kein max)
-    - leere Liste → leeres Tupel
+    Ein Eintrag ohne op/value gilt als catch-all. Reihenfolge bleibt erhalten
+    (kein Re-Sort — der User bestimmt die Priorität).
 
-    Robust gegen None/leere Werte.
+    Robust gegen None/leere/kaputte Werte: ungültige Einträge werden
+    übersprungen.
     """
-    if not raw:
-        return ()
-    if not isinstance(raw, list):
+    if not raw or not isinstance(raw, list):
         return ()
     out: list[WattBucket] = []
     for entry in raw:
@@ -349,33 +371,19 @@ def parse_watt_buckets(raw: Any) -> tuple[WattBucket, ...]:
         state = entry.get("state")
         if not isinstance(state, str) or not state:
             continue
-        max_v = entry.get("max")
-        max_f: float | None
-        if max_v is None:
-            max_f = None
-        else:
-            try:
-                max_f = float(max_v)
-            except (TypeError, ValueError):
-                continue
-        out.append(WattBucket(state=state, max=max_f))
-    return _normalize_buckets(tuple(out))
-
-
-def _normalize_buckets(buckets: tuple[WattBucket, ...]) -> tuple[WattBucket, ...]:
-    """Sortiere ascending by max; catch-all (max=None) ans Ende.
-
-    Wenn mehrere catch-alls → nur der erste bleibt. Wenn max-Werte gleich →
-    Reihenfolge stabil.
-    """
-    if not buckets:
-        return ()
-    with_max = [b for b in buckets if b.max is not None]
-    without_max = [b for b in buckets if b.max is None]
-    with_max.sort(key=lambda b: b.max if b.max is not None else float("inf"))
-    out = list(with_max)
-    if without_max:
-        out.append(without_max[0])
+        op = entry.get("op")
+        value_raw = entry.get("value")
+        # catch-all: weder op noch value
+        if op in (None, "") and value_raw in (None, ""):
+            out.append(WattBucket(state=state, op=None, value=None))
+            continue
+        if op not in WATT_OPERATORS:
+            continue
+        try:
+            value = float(value_raw)
+        except (TypeError, ValueError):
+            continue
+        out.append(WattBucket(state=state, op=op, value=value))
     return tuple(out)
 
 

@@ -1,27 +1,31 @@
-"""Device-Typ-Profile (LH §6).
+"""Device-Typ-Profile + globaler Slot-Katalog (LH §6, v0.2-Redesign).
 
-Pro Typ deklarativ: welche Slots Pflicht sind, welche optional, welche
-Attribute am Haupt-Sensor erscheinen, welcher Slot die Integration-Truth
-liefert (für R-DC-01) und welcher den `media_player`-State trägt.
+Neues Modell (Feld-Maske):
+- Es gibt EINEN globalen Slot-Katalog (`SLOT_CATALOG`) mit allen möglichen
+  Feldern und breiten (nicht typ-gebundenen) Entity-Domains.
+- Der Config-Flow lässt den User pro Device frei wählen, welche Felder er
+  belegen will (Multi-Select). Gewählte Felder werden zu Pflicht-Pickern.
+- Der `device_type` steuert nur noch die Attribut-Semantik: welcher Slot die
+  Integration-Truth liefert (R-DC-01), welcher den raw-State trägt, welche
+  Extra-Attribute am Haupt-Sensor erscheinen — plus die Default-Vorauswahl
+  der Felder in der Maske.
 
-HA-frei — wird sowohl im Config-Flow als auch in der Logik benutzt.
+HA-frei — wird im Config-Flow und in der Logik benutzt.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from typing import Any, Final
 
 from .const import (
-    CONF_DEVICE_TYPE,
-    CONF_DISPLAY_NAME,
-    CONF_SLUG,
     CONF_COVER_ENTITY,
+    CONF_DEVICE_TYPE,
     CONF_INTEGRATION_ENTITY,
     CONF_LIGHT_ENTITY,
     CONF_POSITION_ENTITY,
     CONF_POWER_ENTITY,
+    CONF_SLUG,
     CONF_STATUS_ENTITY,
     CONF_SWITCH_ENTITY,
     CONF_TITLE_ENTITY,
@@ -34,44 +38,112 @@ from .const import (
 
 @dataclass(frozen=True)
 class SlotSpec:
-    """Definition eines Config-Flow-Slots."""
+    """Definition eines Slots im globalen Katalog.
+
+    `domains` ist ein breiter, nicht typ-gebundener Filter für den
+    Entity-Picker. Bewusst großzügig — der User soll jede plausible Entity
+    wählen können, nicht nur bestehende Atomics.
+    """
 
     key: str
-    required: bool
     domains: tuple[str, ...]
     description: str = ""
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GLOBALER SLOT-KATALOG — alle Felder, breite Domains, typ-unabhängig
+# ─────────────────────────────────────────────────────────────────────────────
+
+SLOT_CATALOG: Final[dict[str, SlotSpec]] = {
+    CONF_INTEGRATION_ENTITY: SlotSpec(
+        CONF_INTEGRATION_ENTITY,
+        ("media_player", "sensor", "binary_sensor", "switch"),
+        "Integration-Entity (media_player o.ä.)",
+    ),
+    CONF_POWER_ENTITY: SlotSpec(
+        CONF_POWER_ENTITY,
+        ("binary_sensor", "switch", "input_boolean", "sensor"),
+        "Power-Sensor (an/aus)",
+    ),
+    CONF_STATUS_ENTITY: SlotSpec(
+        CONF_STATUS_ENTITY,
+        ("media_player", "sensor", "binary_sensor"),
+        "Status-Entity (Netzwerk / Sub-State)",
+    ),
+    CONF_TITLE_ENTITY: SlotSpec(
+        CONF_TITLE_ENTITY,
+        ("sensor", "media_player"),
+        "Titel-Entity (aktueller Titel)",
+    ),
+    CONF_WATT_SENSOR: SlotSpec(
+        CONF_WATT_SENSOR,
+        ("sensor",),
+        "Watt-Sensor (Fallback / power_state)",
+    ),
+    CONF_WIFI_SENSOR: SlotSpec(
+        CONF_WIFI_SENSOR,
+        ("binary_sensor", "sensor"),
+        "WLAN-Konnektivität",
+    ),
+    CONF_SWITCH_ENTITY: SlotSpec(
+        CONF_SWITCH_ENTITY,
+        ("switch", "input_boolean"),
+        "Switch-Entity (Smart Plug)",
+    ),
+    CONF_LIGHT_ENTITY: SlotSpec(
+        CONF_LIGHT_ENTITY,
+        ("light",),
+        "Light-Entity",
+    ),
+    CONF_COVER_ENTITY: SlotSpec(
+        CONF_COVER_ENTITY,
+        ("cover",),
+        "Cover-Entity",
+    ),
+    CONF_POSITION_ENTITY: SlotSpec(
+        CONF_POSITION_ENTITY,
+        ("sensor", "cover"),
+        "Positions-Sensor (optional)",
+    ),
+    CONF_VALUE_ENTITY: SlotSpec(
+        CONF_VALUE_ENTITY,
+        ("sensor", "binary_sensor"),
+        "Quell-Sensor (Sensor-Wrapper)",
+    ),
+}
+
+ALL_SLOT_KEYS: Final[tuple[str, ...]] = tuple(SLOT_CATALOG.keys())
+
+
+def slot_spec(key: str) -> SlotSpec | None:
+    return SLOT_CATALOG.get(key)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEVICE-TYP-PROFILE — nur noch Semantik + Default-Feldvorauswahl
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 @dataclass(frozen=True)
 class DeviceTypeProfile:
-    """Vollständiges Profil eines Device-Typs."""
+    """Profil eines Device-Typs (Semantik, nicht Pflicht-Enforcement)."""
 
     device_type: DeviceType
-    slots: tuple[SlotSpec, ...]
+    # Default-Vorauswahl der Felder in der Maske (vorab angehakt).
+    default_fields: tuple[str, ...]
     # Welcher Slot liefert die Integration-Truth für R-DC-01 (Stufe 1)?
     integration_slot: str | None
-    # Welcher Slot trägt den raw-State (z.B. media_player-State) der ins
-    # `media_player_state`-Attribut wandert?
+    # Welcher Slot trägt den raw-State (z.B. media_player-State)?
     state_slot: str | None
-    # Typspezifische Attribut-Schlüssel (am Haupt-Sensor zusätzlich exposed).
+    # Typspezifische Attribut-Schlüssel am Haupt-Sensor.
     extra_attributes: tuple[str, ...] = field(default_factory=tuple)
-    # Ist das Gerät stateful (semantischer State über powered hinaus)?
-    # Stateful: TV/AVR/Konsole/Speaker/Light/Cover.
-    # Stateless: Plug, sensor_wrapper.
+    # Stateful (semantischer State über powered hinaus)?
     stateful: bool = False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PROFILE — LH §6
-# ─────────────────────────────────────────────────────────────────────────────
-
 _TV = DeviceTypeProfile(
     device_type=DeviceType.TV,
-    slots=(
-        SlotSpec(CONF_INTEGRATION_ENTITY, True, ("media_player",), "TV media_player (WebOS/Sony)"),
-        SlotSpec(CONF_WATT_SENSOR, False, ("sensor",), "Steckdose Watt-Sensor (Fallback)"),
-        SlotSpec(CONF_WIFI_SENSOR, False, ("binary_sensor", "sensor"), "WLAN-Konnektivität"),
-    ),
+    default_fields=(CONF_INTEGRATION_ENTITY, CONF_WATT_SENSOR, CONF_WIFI_SENSOR),
     integration_slot=CONF_INTEGRATION_ENTITY,
     state_slot=CONF_INTEGRATION_ENTITY,
     extra_attributes=("watt", "current_app", "wifi_online", "media_player_state"),
@@ -80,11 +152,7 @@ _TV = DeviceTypeProfile(
 
 _AV_RECEIVER = DeviceTypeProfile(
     device_type=DeviceType.AV_RECEIVER,
-    slots=(
-        SlotSpec(CONF_INTEGRATION_ENTITY, True, ("media_player",), "AVR media_player (Denon/HEOS)"),
-        SlotSpec(CONF_WATT_SENSOR, False, ("sensor",), "Steckdose Watt-Sensor (Fallback)"),
-        SlotSpec(CONF_WIFI_SENSOR, False, ("binary_sensor", "sensor"), "WLAN-Konnektivität"),
-    ),
+    default_fields=(CONF_INTEGRATION_ENTITY, CONF_WATT_SENSOR, CONF_WIFI_SENSOR),
     integration_slot=CONF_INTEGRATION_ENTITY,
     state_slot=CONF_INTEGRATION_ENTITY,
     extra_attributes=("watt", "current_source", "volume", "wifi_online", "media_player_state"),
@@ -93,12 +161,7 @@ _AV_RECEIVER = DeviceTypeProfile(
 
 _CONSOLE = DeviceTypeProfile(
     device_type=DeviceType.CONSOLE,
-    slots=(
-        SlotSpec(CONF_POWER_ENTITY, True, ("binary_sensor", "switch", "input_boolean"), "Power-Sensor (PS5/Switch an)"),
-        SlotSpec(CONF_STATUS_ENTITY, False, ("media_player", "sensor"), "Status / PS Network media_player"),
-        SlotSpec(CONF_TITLE_ENTITY, False, ("sensor",), "Aktueller Titel"),
-        SlotSpec(CONF_WATT_SENSOR, False, ("sensor",), "Steckdose Watt-Sensor"),
-    ),
+    default_fields=(CONF_POWER_ENTITY, CONF_STATUS_ENTITY, CONF_TITLE_ENTITY, CONF_WATT_SENSOR),
     integration_slot=CONF_POWER_ENTITY,
     state_slot=CONF_STATUS_ENTITY,
     extra_attributes=("status", "title", "watt"),
@@ -107,10 +170,7 @@ _CONSOLE = DeviceTypeProfile(
 
 _SPEAKER = DeviceTypeProfile(
     device_type=DeviceType.SPEAKER,
-    slots=(
-        SlotSpec(CONF_INTEGRATION_ENTITY, True, ("media_player",), "Speaker media_player (Sonos/HomePod)"),
-        SlotSpec(CONF_WIFI_SENSOR, False, ("binary_sensor", "sensor"), "WLAN-Konnektivität"),
-    ),
+    default_fields=(CONF_INTEGRATION_ENTITY, CONF_WIFI_SENSOR),
     integration_slot=CONF_INTEGRATION_ENTITY,
     state_slot=CONF_INTEGRATION_ENTITY,
     extra_attributes=("media_player_state", "current_track", "volume", "wifi_online"),
@@ -119,10 +179,7 @@ _SPEAKER = DeviceTypeProfile(
 
 _PLUG = DeviceTypeProfile(
     device_type=DeviceType.PLUG,
-    slots=(
-        SlotSpec(CONF_SWITCH_ENTITY, True, ("switch", "input_boolean"), "Smart Plug Switch"),
-        SlotSpec(CONF_WATT_SENSOR, False, ("sensor",), "Verbrauchsmessung"),
-    ),
+    default_fields=(CONF_SWITCH_ENTITY, CONF_WATT_SENSOR),
     integration_slot=CONF_SWITCH_ENTITY,
     state_slot=None,
     extra_attributes=("watt",),
@@ -131,9 +188,7 @@ _PLUG = DeviceTypeProfile(
 
 _LIGHT = DeviceTypeProfile(
     device_type=DeviceType.LIGHT,
-    slots=(
-        SlotSpec(CONF_LIGHT_ENTITY, True, ("light",), "Light-Entität"),
-    ),
+    default_fields=(CONF_LIGHT_ENTITY,),
     integration_slot=CONF_LIGHT_ENTITY,
     state_slot=CONF_LIGHT_ENTITY,
     extra_attributes=("brightness", "color_temp", "rgb"),
@@ -142,10 +197,7 @@ _LIGHT = DeviceTypeProfile(
 
 _COVER = DeviceTypeProfile(
     device_type=DeviceType.COVER,
-    slots=(
-        SlotSpec(CONF_COVER_ENTITY, True, ("cover",), "Cover-Entität"),
-        SlotSpec(CONF_POSITION_ENTITY, False, ("sensor",), "Position separat (falls nötig)"),
-    ),
+    default_fields=(CONF_COVER_ENTITY, CONF_POSITION_ENTITY),
     integration_slot=CONF_COVER_ENTITY,
     state_slot=CONF_COVER_ENTITY,
     extra_attributes=("position", "cover_state"),
@@ -154,9 +206,7 @@ _COVER = DeviceTypeProfile(
 
 _SENSOR_WRAPPER = DeviceTypeProfile(
     device_type=DeviceType.SENSOR_WRAPPER,
-    slots=(
-        SlotSpec(CONF_VALUE_ENTITY, True, ("sensor", "binary_sensor"), "Quell-Sensor"),
-    ),
+    default_fields=(CONF_VALUE_ENTITY,),
     integration_slot=CONF_VALUE_ENTITY,
     state_slot=CONF_VALUE_ENTITY,
     extra_attributes=("value", "unit"),
@@ -177,22 +227,19 @@ PROFILES: Final[dict[DeviceType, DeviceTypeProfile]] = {
 
 
 def profile_for(device_type: DeviceType | str) -> DeviceTypeProfile:
-    """Lookup-Helper. Akzeptiert Enum oder Slug."""
     dt = device_type if isinstance(device_type, DeviceType) else DeviceType(device_type)
     return PROFILES[dt]
 
 
-def required_slot_keys(device_type: DeviceType | str) -> tuple[str, ...]:
-    return tuple(s.key for s in profile_for(device_type).slots if s.required)
-
-
-def all_slot_keys(device_type: DeviceType | str) -> tuple[str, ...]:
-    return tuple(s.key for s in profile_for(device_type).slots)
+def default_fields(device_type: DeviceType | str) -> tuple[str, ...]:
+    return profile_for(device_type).default_fields
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SLUG + IMPORT-VALIDIERUNG (HA-frei, testbar)
 # ─────────────────────────────────────────────────────────────────────────────
+
+import re
 
 SLUG_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
 
@@ -204,7 +251,9 @@ def is_valid_slug(slug: str) -> bool:
 def validate_import_device(d: Any) -> str | None:
     """Validiert EIN Device-Dict aus dem Bulk-Import (R-DC-08).
 
-    Returns None bei OK, sonst eine Fehler-Beschreibung (für Notification).
+    Neues Modell: nur slug + gültiger device_type sind Pflicht. Slots sind
+    alle optional (was nicht da ist, ist okay). Unbekannte Slot-Keys werden
+    ignoriert. Returns None bei OK, sonst eine Fehlerbeschreibung.
     """
     if not isinstance(d, dict):
         return "Eintrag ist kein Mapping"
@@ -213,19 +262,16 @@ def validate_import_device(d: Any) -> str | None:
         return f"ungültiger slug: {d.get(CONF_SLUG)!r}"
     dt_raw = d.get(CONF_DEVICE_TYPE)
     try:
-        dt = DeviceType(dt_raw)
+        DeviceType(dt_raw)
     except (ValueError, TypeError):
         return f"{slug}: unbekannter device_type {dt_raw!r}"
-    for key in required_slot_keys(dt):
-        if not d.get(key):
-            return f"{slug}: Pflicht-Slot {key!r} fehlt"
     return None
 
 
 def validate_import_payload(
     devices: Any,
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Validiert die gesamte Bulk-Import-Liste (strict / all-or-nothing, OQ-10).
+    """Validiert die gesamte Bulk-Import-Liste (strict / all-or-nothing).
 
     Returns (valid_devices, errors). Bei nicht-leerer errors-Liste sollte der
     Aufrufer NICHTS anlegen.
@@ -234,20 +280,21 @@ def validate_import_payload(
         return ([], ["devices ist keine nicht-leere Liste"])
     errors: list[str] = []
     valid: list[dict[str, Any]] = []
-    seen_slugs: set[str] = set()
+    seen: set[str] = set()
     for idx, d in enumerate(devices):
         err = validate_import_device(d)
         if err:
             errors.append(f"#{idx + 1}: {err}")
             continue
         slug = str(d[CONF_SLUG]).strip().lower()
-        if slug in seen_slugs:
+        if slug in seen:
             errors.append(f"#{idx + 1}: doppelter slug {slug!r}")
             continue
-        seen_slugs.add(slug)
-        # Normalisiere slug (lowercase/strip) + display_name-Default
+        seen.add(slug)
         normalized = dict(d)
         normalized[CONF_SLUG] = slug
+        from .const import CONF_DISPLAY_NAME
+
         if not normalized.get(CONF_DISPLAY_NAME):
             normalized[CONF_DISPLAY_NAME] = slug
         valid.append(normalized)

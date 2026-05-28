@@ -21,10 +21,11 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ...const import unique_id
+from ...const import DOMAIN, unique_id
 from .const import (
     CONF_WATT_SENSOR,
     MODULE_ID,
@@ -37,6 +38,17 @@ from .logic import DeviceResult
 def _object_id(slug: str, suffix: str | None = None) -> str:
     base = f"benni_device_{slug}"
     return f"{base}_{suffix}" if suffix else base
+
+
+def _device_info(coordinator: DeviceCoordinator) -> DeviceInfo:
+    """HA-Device pro Config-Entry, damit Haupt- + Sekundär-Sensoren unter
+    einer Geräte-Karte gruppiert erscheinen (Benni Core · Devices)."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{MODULE_ID}:{coordinator.slug}")},
+        name=coordinator.display_name,
+        manufacturer="Benni Core · Devices",
+        model=coordinator.device_type.value,
+    )
 
 
 async def async_get_entities(
@@ -73,6 +85,7 @@ class _BaseDeviceSensor(CoordinatorEntity[DeviceCoordinator], SensorEntity):
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, suffix)
         self._attr_suggested_object_id = object_id
         self._attr_name = name
+        self._attr_device_info = _device_info(coordinator)
 
     @property
     def _result(self) -> DeviceResult | None:

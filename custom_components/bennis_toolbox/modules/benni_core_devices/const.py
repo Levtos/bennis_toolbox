@@ -66,6 +66,21 @@ CONF_EXPOSE_SECONDARY_SENSORS: Final[str] = "expose_secondary_sensors"
 # Bulk-Import (Config-Flow, R-DC-08)
 CONF_BULK_YAML: Final[str] = "bulk_yaml"
 
+# Feld-Maske: Multi-Select welche Slots der User belegen will
+CONF_FIELDS: Final[str] = "fields"
+
+# Watt-Bucket-Zeilen im Config-Flow (3 feste Zeilen mit Operator + Wert).
+# Leerer Wert = Zeile deaktiviert.
+CONF_WATT_OFF_OP: Final[str] = "watt_off_op"
+CONF_WATT_OFF_VALUE: Final[str] = "watt_off_value"
+CONF_WATT_IDLE_OP: Final[str] = "watt_idle_op"
+CONF_WATT_IDLE_VALUE: Final[str] = "watt_idle_value"
+CONF_WATT_PLAYING_OP: Final[str] = "watt_playing_op"
+CONF_WATT_PLAYING_VALUE: Final[str] = "watt_playing_value"
+
+# Operatoren für Watt-Buckets (gespiegelt aus logic.WATT_OPERATORS).
+WATT_OPERATOR_CHOICES: Final[tuple[str, ...]] = ("<", "<=", "=", ">", ">=")
+
 # Defaults
 DEFAULT_WATT_THRESHOLD_ON: Final[int] = 5
 DEFAULT_STICKY_HOLD_SECONDS: Final[int] = 30

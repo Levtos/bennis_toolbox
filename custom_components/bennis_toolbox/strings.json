@@ -4,7 +4,9 @@
       "user": {
         "title": "Benni's Toolbox",
         "description": "Wähle das Modul, das du der Toolbox hinzufügen willst. Module mit Status \"pending\" sind im Repo angelegt, aber noch nicht voll aktiv — sie können dennoch vorgemerkt werden.",
-        "data": { "_module_id": "Modul" }
+        "data": {
+          "_module_id": "Modul"
+        }
       },
       "module_step": {
         "title": "Modulkonfiguration",
@@ -53,29 +55,43 @@
         }
       },
       "slots": {
-        "title": "Gerät konfigurieren",
-        "description": "Lege den Kurznamen (slug, nur a-z0-9_) und die Quell-Entities fest. Pflichtfelder hängen vom Geräte-Typ ab. Watt-Buckets optional als YAML-Liste (z.B. \"- {max: 5, state: off}\").",
+        "title": "Quell-Entities",
+        "description": "Wähle eine Entity je gewähltem Feld.",
         "data": {
-          "slug": "Slug (eindeutig, a-z0-9_)",
-          "display_name": "Anzeigename",
           "integration_entity": "Integration-Entity (media_player o.ä.)",
-          "power_entity": "Power-Sensor (z.B. Konsole an)",
-          "status_entity": "Status-Entity (Netzwerk / Sub-State)",
-          "title_entity": "Titel-Entity (aktueller Titel)",
-          "watt_sensor": "Watt-Sensor (Fallback / power_state)",
+          "power_entity": "Power-Sensor (an/aus)",
+          "status_entity": "Status-Entity (Netzwerk/Sub-State)",
+          "title_entity": "Titel-Entity",
+          "watt_sensor": "Watt-Sensor",
           "wifi_sensor": "WLAN-Konnektivität",
           "switch_entity": "Switch-Entity (Smart Plug)",
           "light_entity": "Light-Entity",
           "cover_entity": "Cover-Entity",
-          "position_entity": "Positions-Sensor (Cover, optional)",
-          "value_entity": "Quell-Sensor (Sensor-Wrapper)",
+          "position_entity": "Positions-Sensor",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
+        }
+      },
+      "thresholds": {
+        "title": "Schwellwerte"
+      },
+      "fields": {
+        "title": "Gerät konfigurieren",
+        "description": "Slug + Anzeigename, welche Felder du belegen willst, Runtime-Knöpfe und optional Watt-Zeilen (off/idle/playing) für den power_state. Gewählte Felder werden im nächsten Schritt zu Pflicht-Pickern.",
+        "data": {
+          "slug": "Slug (eindeutig, a-z0-9_)",
+          "display_name": "Anzeigename",
+          "fields": "Felder belegen (Multi-Select)",
           "watt_threshold_on": "Watt-Schwelle 'an' (W)",
           "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
           "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
-          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+          "watt_off_op": "off: Operator",
+          "watt_off_value": "off: Watt-Wert",
+          "watt_idle_op": "idle: Operator",
+          "watt_idle_value": "idle: Watt-Wert",
+          "watt_playing_op": "playing: Operator",
+          "watt_playing_value": "playing: Watt-Wert"
         }
-      },
-      "thresholds": { "title": "Schwellwerte" }
+      }
     },
     "abort": {
       "missing_module": "Fehlender Modul-Identifikator im Config-Entry.",
@@ -116,7 +132,7 @@
           "remove_device": "Gerät entfernen",
           "calendar": "Kalender",
           "special_rules": "Spezialregeln",
-          "slots": "Quell-Entities"
+          "fields": "Felder & Entities"
         }
       },
       "slots": {
@@ -183,7 +199,37 @@
           "watt_threshold_on": "Watt-Schwelle 'an' (W)",
           "sticky_hold_seconds": "Sticky-Hold (Sekunden)",
           "expose_secondary_sensors": "Sekundär-Sensoren erzeugen",
-          "watt_buckets": "Watt-Buckets (YAML-Liste, optional)"
+          "watt_off_op": "off: Operator",
+          "watt_off_value": "off: Watt-Wert",
+          "watt_idle_op": "idle: Operator",
+          "watt_idle_value": "idle: Watt-Wert",
+          "watt_playing_op": "playing: Operator",
+          "watt_playing_value": "playing: Watt-Wert"
+        }
+      },
+      "fields": {
+        "title": "Felder wählen",
+        "description": "Anzeigename und welche Felder belegt werden sollen.",
+        "data": {
+          "display_name": "Anzeigename",
+          "fields": "Felder belegen (Multi-Select)"
+        }
+      },
+      "field_values": {
+        "title": "Entities zuordnen",
+        "description": "Eine Entity je gewähltem Feld.",
+        "data": {
+          "integration_entity": "Integration-Entity (media_player o.ä.)",
+          "power_entity": "Power-Sensor (an/aus)",
+          "status_entity": "Status-Entity (Netzwerk/Sub-State)",
+          "title_entity": "Titel-Entity",
+          "watt_sensor": "Watt-Sensor",
+          "wifi_sensor": "WLAN-Konnektivität",
+          "switch_entity": "Switch-Entity (Smart Plug)",
+          "light_entity": "Light-Entity",
+          "cover_entity": "Cover-Entity",
+          "position_entity": "Positions-Sensor",
+          "value_entity": "Quell-Sensor (Sensor-Wrapper)"
         }
       }
     }
