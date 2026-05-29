@@ -42,6 +42,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Stabile Identifier des Hub-Geräts (alle Geräte hängen via_device daran).
 HUB_IDENTIFIER = (DOMAIN, f"{MODULE_ID}_hub")
+# Eigener Hub für Atomic Light Groups — Gruppen erscheinen als eigene
+# Geräte-Kategorie, getrennt von den Einzelgeräten.
+GROUPS_HUB_IDENTIFIER = (DOMAIN, f"{MODULE_ID}_groups_hub")
 
 __all__ = [
     "SPEC",
@@ -49,6 +52,7 @@ __all__ = [
     "ConfigFlowHelper",
     "OptionsFlowHelper",
     "HUB_IDENTIFIER",
+    "GROUPS_HUB_IDENTIFIER",
     "async_setup_entry",
     "async_unload_entry",
     "async_get_entities",
@@ -75,7 +79,7 @@ def _reconcile_devices(
     als Waise bestehen. Läuft bei jedem Setup/Reload.
     """
     dev_reg = dr.async_get(hass)
-    valid = {HUB_IDENTIFIER} | {
+    valid = {HUB_IDENTIFIER, GROUPS_HUB_IDENTIFIER} | {
         _device_identifier(slug) for slug in devices_conf
     }
     for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
@@ -103,6 +107,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name=NAME,
         manufacturer="Benni's Toolbox",
         model="Device Core Hub",
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+    # Eigener Hub für Atomic Light Groups — Gruppen erscheinen als eigene
+    # Kategorie, nicht vermischt mit den Einzelgeräten.
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={GROUPS_HUB_IDENTIFIER},
+        name=f"{NAME} · Light Groups",
+        manufacturer="Benni's Toolbox",
+        model="Light Groups Hub",
         entry_type=dr.DeviceEntryType.SERVICE,
     )
 

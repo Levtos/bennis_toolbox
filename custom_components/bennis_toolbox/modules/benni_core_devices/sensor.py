@@ -214,12 +214,12 @@ class LightGroupSensor(SensorEntity):
         name: str,
         members: list[str],
     ) -> None:
-        from . import HUB_IDENTIFIER
+        from . import GROUPS_HUB_IDENTIFIER
 
         self._members = list(members)
         self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, f"group_{slug}")
         self._attr_name = name
-        self._attr_device_info = DeviceInfo(identifiers={HUB_IDENTIFIER})
+        self._attr_device_info = DeviceInfo(identifiers={GROUPS_HUB_IDENTIFIER})
         self.entity_id = async_generate_entity_id(
             "sensor.{}", f"{GROUP_OBJECT_ID_PREFIX}{slug}", hass=hass
         )
