@@ -32,6 +32,8 @@ from .const import (
     CONF_DEVICE_TYPE,
     CONF_DEVICES,
     CONF_DISPLAY_NAME,
+    CONF_GROUP_MEMBERS,
+    CONF_LIGHT_GROUPS,
     CONF_EXPOSE_SECONDARY_SENSORS,
     CONF_FIELDS,
     CONF_STICKY_HOLD_SECONDS,
@@ -308,6 +310,7 @@ class OptionsFlowHelper:
         self._slots: dict[str, Any] = {}
         self._editing_slug: str | None = None
         self._runtime_defaults: dict[str, Any] = {}
+        self._editing_group_slug: str | None = None
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -326,7 +329,10 @@ class OptionsFlowHelper:
     ) -> FlowResult:
         return self.flow.async_show_menu(
             step_id="init",
-            menu_options=["add_device", "edit_device", "remove_device", "bulk"],
+            menu_options=[
+                "add_device", "edit_device", "remove_device", "bulk",
+                "add_group", "edit_group", "remove_group",
+            ],
         )
 
     # ── Gerät hinzufügen ──────────────────────────────────────────────────────
@@ -546,9 +552,121 @@ class OptionsFlowHelper:
             devices[slug] = conf
         return self._save_devices(devices)
 
+    # ── Atomic Light Groups ───────────────────────────────────────────────────
+
+    def _light_groups(self) -> dict[str, dict[str, Any]]:
+        raw = self.entry.options.get(CONF_LIGHT_GROUPS)
+        return dict(raw) if isinstance(raw, dict) else {}
+
+    def _save_light_groups(self, groups: dict[str, dict[str, Any]]) -> FlowResult:
+        new_options = {**self.entry.options, CONF_LIGHT_GROUPS: groups}
+        return self.flow.async_create_entry(title="", data=new_options)
+
+    async def async_step_add_group(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        self._editing_group_slug = None
+        return self.flow.async_show_form(
+            step_id="group_form", data_schema=_group_form_schema({})
+        )
+
+    async def async_step_group_form(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="group_form", data_schema=_group_form_schema({})
+            )
+        name = str(user_input.get(CONF_DISPLAY_NAME, "")).strip()
+        members = [m for m in (user_input.get(CONF_GROUP_MEMBERS) or []) if m]
+        errors: dict[str, str] = {}
+        if not name:
+            errors[CONF_DISPLAY_NAME] = "required"
+        if not members:
+            errors[CONF_GROUP_MEMBERS] = "required"
+        if errors:
+            return self.flow.async_show_form(
+                step_id="group_form",
+                data_schema=_group_form_schema(user_input),
+                errors=errors,
+            )
+        groups = self._light_groups()
+        if self._editing_group_slug and self._editing_group_slug in groups:
+            slug = self._editing_group_slug
+        else:
+            slug = unique_slug(slugify(name) or "group", set(groups.keys()))
+        groups[slug] = {CONF_DISPLAY_NAME: name, CONF_GROUP_MEMBERS: members}
+        return self._save_light_groups(groups)
+
+    async def async_step_edit_group(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        groups = self._light_groups()
+        if not groups:
+            return self.flow.async_abort(reason="no_groups")
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="edit_group", data_schema=_group_pick_schema(groups)
+            )
+        slug = user_input["slug"]
+        conf = groups.get(slug)
+        if not conf:
+            return self.flow.async_abort(reason="no_groups")
+        self._editing_group_slug = slug
+        return self.flow.async_show_form(
+            step_id="group_form", data_schema=_group_form_schema(conf)
+        )
+
+    async def async_step_remove_group(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        groups = self._light_groups()
+        if not groups:
+            return self.flow.async_abort(reason="no_groups")
+        if user_input is None:
+            return self.flow.async_show_form(
+                step_id="remove_group", data_schema=_group_pick_schema(groups)
+            )
+        groups.pop(user_input["slug"], None)
+        return self._save_light_groups(groups)
+
 
 # Bulk-YAML darf optional einen expliziten slug mitgeben.
 CONF_SLUG_KEY = "slug"
+
+
+def _group_form_schema(defaults: dict[str, Any]) -> vol.Schema:
+    members_default = defaults.get(CONF_GROUP_MEMBERS) or []
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_DISPLAY_NAME, default=defaults.get(CONF_DISPLAY_NAME, "")
+            ): str,
+            vol.Required(
+                CONF_GROUP_MEMBERS, default=members_default
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="light", multiple=True)
+            ),
+        }
+    )
+
+
+def _group_pick_schema(groups: dict[str, dict[str, Any]]) -> vol.Schema:
+    options = [
+        selector.SelectOptionDict(
+            value=slug, label=f"{conf.get(CONF_DISPLAY_NAME, slug)} ({slug})"
+        )
+        for slug, conf in groups.items()
+    ]
+    return vol.Schema(
+        {
+            vol.Required("slug"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options, mode=selector.SelectSelectorMode.LIST
+                )
+            )
+        }
+    )
 
 
 def _pick_schema(devices: dict[str, dict[str, Any]]) -> vol.Schema:

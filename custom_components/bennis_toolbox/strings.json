@@ -135,7 +135,10 @@
           "calendar": "Kalender",
           "special_rules": "Spezialregeln",
           "fields": "Felder & Entities",
-          "bulk": "Bulk-Import (YAML)"
+          "bulk": "Bulk-Import (YAML)",
+          "add_group": "Lichtgruppe hinzufügen",
+          "edit_group": "Lichtgruppe bearbeiten",
+          "remove_group": "Lichtgruppe entfernen"
         }
       },
       "slots": {
@@ -313,10 +316,30 @@
         "data": {
           "bulk_yaml": "Geräte (YAML-Liste)"
         }
+      },
+      "group_form": {
+        "title": "Lichtgruppe",
+        "data": {
+          "display_name": "Name",
+          "members": "Lampen (mehrere)"
+        }
+      },
+      "edit_group": {
+        "title": "Lichtgruppe bearbeiten",
+        "data": {
+          "slug": "Gruppe"
+        }
+      },
+      "remove_group": {
+        "title": "Lichtgruppe entfernen",
+        "data": {
+          "slug": "Gruppe"
+        }
       }
     },
     "abort": {
-      "no_devices": "Keine Geräte vorhanden."
+      "no_devices": "Keine Geräte vorhanden.",
+      "no_groups": "Keine Lichtgruppen vorhanden."
     },
     "error": {
       "invalid_yaml": "Eingabe ist kein gültiges YAML.",

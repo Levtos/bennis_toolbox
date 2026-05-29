@@ -26,7 +26,13 @@ from homeassistant.helpers import entity_registry as er
 
 from ...const import DATA_ENTRIES, DOMAIN
 from ._spec import SPEC
-from .const import CONF_DEVICES, MODULE_ID, NAME
+from .const import (
+    CONF_DEVICES,
+    DEVICE_OBJECT_ID_PREFIX,
+    GROUP_OBJECT_ID_PREFIX,
+    MODULE_ID,
+    NAME,
+)
 from .coordinator import DeviceCoordinator
 from .entities import async_get_entities  # re-export
 from .flow import ConfigFlowHelper, OptionsFlowHelper  # re-export
@@ -81,9 +87,10 @@ def _reconcile_devices(
     # Der Registry-Eintrag wird entfernt; die Plattform legt die Entität
     # danach mit der korrekten, erzwungenen entity_id neu an.
     ent_reg = er.async_get(hass)
+    valid_prefixes = (DEVICE_OBJECT_ID_PREFIX, GROUP_OBJECT_ID_PREFIX)
     for e in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
         object_id = e.entity_id.split(".", 1)[1]
-        if not object_id.startswith("benni_device_"):
+        if not object_id.startswith(valid_prefixes):
             ent_reg.async_remove(e.entity_id)
 
 

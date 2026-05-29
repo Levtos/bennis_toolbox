@@ -20,14 +20,18 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, async_generate_entity_id
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ...const import DOMAIN, unique_id
 from .const import (
-    CONF_WATT_SENSOR,
+    CONF_DISPLAY_NAME,
+    CONF_GROUP_MEMBERS,
+    CONF_LIGHT_GROUPS,
+    GROUP_OBJECT_ID_PREFIX,
     MODULE_ID,
     POWER_STATE_SLUGS,
 )
@@ -66,6 +70,18 @@ async def async_get_entities(
             out.append(PowerStateSensor(coordinator, entry))
             if coordinator.watt_slot_key:
                 out.append(WattSensor(coordinator, entry))
+    # Atomic Light Groups (Mengen von Lampen) — ein Sensor je Gruppe.
+    groups = entry.options.get(CONF_LIGHT_GROUPS)
+    if isinstance(groups, dict):
+        for slug, conf in groups.items():
+            members = [m for m in (conf.get(CONF_GROUP_MEMBERS) or []) if isinstance(m, str)]
+            out.append(
+                LightGroupSensor(
+                    hass, entry, slug,
+                    name=conf.get(CONF_DISPLAY_NAME, slug),
+                    members=members,
+                )
+            )
     return out
 
 
@@ -174,6 +190,76 @@ class PowerStateSensor(_BaseDeviceSensor):
     def native_value(self) -> str | None:
         r = self._result
         return r.power_state if r else None
+
+
+class LightGroupSensor(SensorEntity):
+    """Atomic Light Group: eine Menge von Lampen als EINE Wahrheit.
+
+    State = "on" wenn mind. eine Member-Lampe an ist, sonst "off".
+    Attribute exponieren die Member (`members` + HA-Group-Style `entity_id`),
+    damit Konsumenten (z.B. light_policy) sie auf die Einzellampen expandieren
+    können (Scene-Presets verteilt Paletten über Einzel-Member).
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:lightbulb-group"
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        slug: str,
+        *,
+        name: str,
+        members: list[str],
+    ) -> None:
+        from . import HUB_IDENTIFIER
+
+        self._members = list(members)
+        self._attr_unique_id = unique_id(MODULE_ID, entry.entry_id, f"group_{slug}")
+        self._attr_name = name
+        self._attr_device_info = DeviceInfo(identifiers={HUB_IDENTIFIER})
+        self.entity_id = async_generate_entity_id(
+            "sensor.{}", f"{GROUP_OBJECT_ID_PREFIX}{slug}", hass=hass
+        )
+        self._unsub = None
+
+    async def async_added_to_hass(self) -> None:
+        if self._members:
+            self._unsub = async_track_state_change_event(
+                self.hass, self._members, self._on_member_change
+            )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub is not None:
+            self._unsub()
+            self._unsub = None
+
+    @callback
+    def _on_member_change(self, _event) -> None:
+        self.async_write_ha_state()
+
+    def _on_members(self) -> list[str]:
+        return [
+            m for m in self._members
+            if (st := self.hass.states.get(m)) is not None and st.state == "on"
+        ]
+
+    @property
+    def native_value(self) -> str:
+        return "on" if self._on_members() else "off"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        on = self._on_members()
+        return {
+            "members": list(self._members),
+            "entity_id": list(self._members),  # HA-Group-Style für Konsumenten
+            "member_count": len(self._members),
+            "on_count": len(on),
+            "any_on": bool(on),
+        }
 
 
 class WattSensor(_BaseDeviceSensor):
