@@ -71,6 +71,15 @@ CONF_BULK_YAML: Final[str] = "bulk_yaml"
 # Single-Hub: Geräte-Liste in entry.options. Dict {slug: device_conf}.
 CONF_DEVICES: Final[str] = "devices"
 
+# Atomic Light Groups: Mengen von Lampen (Geräte-Topologie im Atomic-Layer,
+# von Aggregat-Modulen wie light_policy konsumiert). Dict {slug: group_conf}
+# mit group_conf = {display_name, members: [light entity_ids]}.
+CONF_LIGHT_GROUPS: Final[str] = "light_groups"
+CONF_GROUP_MEMBERS: Final[str] = "members"
+# Object-ID-Schema der Gruppen-Sensoren: sensor.benni_light_group_<slug>
+GROUP_OBJECT_ID_PREFIX: Final[str] = "benni_light_group_"
+DEVICE_OBJECT_ID_PREFIX: Final[str] = "benni_device_"
+
 # Feld-Maske: Multi-Select welche Slots der User belegen will
 CONF_FIELDS: Final[str] = "fields"
 

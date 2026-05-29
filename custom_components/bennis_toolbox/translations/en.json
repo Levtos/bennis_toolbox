@@ -141,7 +141,10 @@
           "homepods": "HomePods",
           "context": "Context / global sources",
           "fields": "Fields & entities",
-          "bulk": "Bulk import (YAML)"
+          "bulk": "Bulk import (YAML)",
+          "add_group": "Add light group",
+          "edit_group": "Edit light group",
+          "remove_group": "Remove light group"
         }
       },
       "tv": {
@@ -440,6 +443,25 @@
         "data": {
           "bulk_yaml": "Devices (YAML list)"
         }
+      },
+      "group_form": {
+        "title": "Light group",
+        "data": {
+          "display_name": "Name",
+          "members": "Lights (multiple)"
+        }
+      },
+      "edit_group": {
+        "title": "Edit light group",
+        "data": {
+          "slug": "Group"
+        }
+      },
+      "remove_group": {
+        "title": "Remove light group",
+        "data": {
+          "slug": "Group"
+        }
       }
     },
     "selector": {
@@ -451,7 +473,8 @@
       }
     },
     "abort": {
-      "no_devices": "No devices configured."
+      "no_devices": "No devices configured.",
+      "no_groups": "No light groups configured."
     },
     "error": {
       "invalid_yaml": "Input is not valid YAML.",
